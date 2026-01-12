@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام إدارة الطلاب السحابي | Pro</title>
+    <title>نظام إدارة بيانات الطلاب | النسخة الاحترافية</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     
@@ -13,8 +13,6 @@
         from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } 
         from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } 
-        from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyC-RyeNVI6aNmWSJIYhQCG_4J_RQDAovds",
@@ -28,35 +26,12 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const storage = getStorage(app);
         const studentsCol = collection(db, "students");
-
-        // ضغط الصور
-        async function compressImage(file) {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.src = e.target.result;
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const MAX_WIDTH = 800; 
-                        const scaleSize = MAX_WIDTH / img.width;
-                        canvas.width = MAX_WIDTH;
-                        canvas.height = img.height * scaleSize;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.7);
-                    };
-                };
-            });
-        }
 
         window.login = async () => {
             const email = document.getElementById('loginEmail').value;
             const pass = document.getElementById('loginPass').value;
-            try { await signInWithEmailAndPassword(auth, email, pass); } catch (e) { alert("خطأ في الدخول"); }
+            try { await signInWithEmailAndPassword(auth, email, pass); } catch (e) { alert("خطأ في بيانات الدخول"); }
         };
 
         window.logout = () => signOut(auth);
@@ -67,41 +42,21 @@
             if(user) loadData();
         });
 
-        // البحث الذكي
-        window.searchData = () => {
-            const term = document.getElementById('searchInput').value.toLowerCase();
-            const filtered = window.allStudentsData.filter(s => 
-                s.name.toLowerCase().includes(term) || s.qaid.includes(term)
-            );
-            render(filtered);
-        };
-
         window.saveData = async () => {
             const id = document.getElementById('editId').value;
-            const file = document.getElementById('studentImg').files[0];
-            let imageUrl = document.getElementById('currentImgUrl').value || "";
             const btn = document.getElementById('saveBtn');
+            if(!document.getElementById('fName').value.trim()) return alert("يرجى إدخال اسم الطالب");
 
-            if(!document.getElementById('fName').value.trim()) return alert("الاسم مطلوب");
-
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
             btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
 
             try {
-                if (file) {
-                    const compressedBlob = await compressImage(file);
-                    const storageRef = ref(storage, 'students/' + Date.now() + ".jpg");
-                    const snapshot = await uploadBytes(storageRef, compressedBlob);
-                    imageUrl = await getDownloadURL(snapshot.ref);
-                }
-
                 const student = {
                     name: document.getElementById('fName').value.trim(),
                     mother: document.getElementById('mName').value.trim(),
                     qaid: document.getElementById('qNum').value.trim(),
                     page: document.getElementById('pNum').value.trim(),
                     note: document.getElementById('note').value.trim(),
-                    photo: imageUrl,
                     timestamp: Date.now()
                 };
 
@@ -109,16 +64,13 @@
                 else await addDoc(studentsCol, student);
                 
                 resetForm();
-                alert("تمت العملية بنجاح");
-            } catch (e) { alert("فشل الحفظ"); }
-            btn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> حفظ في السحابة';
+            } catch (e) { alert("حدث خطأ أثناء الحفظ"); }
             btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save"></i> حفظ البيانات';
         };
 
         window.del = async (id) => {
-            if(confirm('هل أنت متأكد من حذف بيانات هذا الطالب نهائياً؟')) {
-                await deleteDoc(doc(db, "students", id));
-            }
+            if(confirm('هل أنت متأكد من حذف هذا السجل نهائياً؟')) await deleteDoc(doc(db, "students", id));
         };
 
         function loadData() {
@@ -128,6 +80,14 @@
             });
         }
 
+        window.searchData = () => {
+            const term = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = window.allStudentsData.filter(s => 
+                s.name.toLowerCase().includes(term) || s.qaid.includes(term)
+            );
+            render(filtered);
+        };
+
         window.importExcel = async (e) => {
             const file = e.target.files[0];
             const reader = new FileReader();
@@ -135,170 +95,62 @@
                 const data = new Uint8Array(evt.target.result);
                 const wb = XLSX.read(data, {type: 'array'});
                 const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                const chunkSize = 500;
-                for (let i = 0; i < json.length; i += chunkSize) {
-                    const batch = writeBatch(db);
-                    json.slice(i, i + chunkSize).forEach(row => {
-                        const newDoc = doc(studentsCol);
-                        batch.set(newDoc, {
-                            name: row['الاسم الرباعي'] || row['الاسم'] || "",
-                            mother: row['اسم الأم'] || "",
-                            qaid: String(row['رقم القيد'] || ""),
-                            page: String(row['رقم الصفحة'] || ""),
-                            note: row['الملاحظات'] || "",
-                            photo: "", timestamp: Date.now()
-                        });
+                const batch = writeBatch(db);
+                json.forEach(row => {
+                    const newDoc = doc(studentsCol);
+                    batch.set(newDoc, {
+                        name: row['الاسم الرباعي'] || row['الاسم'] || "",
+                        mother: row['اسم الأم'] || "",
+                        qaid: String(row['رقم القيد'] || ""),
+                        page: String(row['رقم الصفحة'] || ""),
+                        note: row['الملاحظات'] || "",
+                        timestamp: Date.now()
                     });
-                    await batch.commit();
-                }
-                alert("تم الاستيراد بنجاح");
+                });
+                await batch.commit();
+                alert("تم استيراد البيانات بنجاح!");
             };
             reader.readAsArrayBuffer(file);
         };
     </script>
 
     <style>
-        :root { --primary: #2563eb; --danger: #ef4444; --bg: #f8fafc; --text: #1e293b; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
-        .container { max-width: 900px; margin: auto; }
+        :root {
+            --primary: #1e293b;
+            --accent: #3b82f6;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #334155;
+        }
+
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text-main); margin: 0; padding: 15px; direction: rtl; }
+        .container { max-width: 1000px; margin: auto; }
         
-        /* بطاقات الواجهة */
-        .card { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #e2e8f0; }
+        .card { background: var(--card-bg); padding: 25px; border-radius: 20px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid #e2e8f0; }
         
-        /* حقول الإدخال */
-        input, textarea { width: 100%; padding: 12px 15px; margin-top: 8px; border: 1.5px solid #e2e8f0; border-radius: 10px; box-sizing: border-box; font-size: 14px; transition: 0.3s; }
-        input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+        h2, h3 { color: var(--primary); margin-bottom: 20px; }
+
+        .input-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        input, textarea { width: 100%; padding: 12px 15px; border: 1.5px solid #e2e8f0; border-radius: 12px; font-size: 14px; transition: 0.3s; box-sizing: border-box; }
+        input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+
+        button { border: none; border-radius: 12px; cursor: pointer; transition: 0.3s; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-primary { background: var(--primary); color: white; padding: 14px; width: 100%; font-size: 16px; }
+        .btn-primary:hover { background: #0f172a; transform: translateY(-2px); }
         
-        /* الأزرار */
-        button { border: none; border-radius: 10px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; }
-        .btn-main { background: var(--primary); color: white; padding: 14px; width: 100%; margin-top: 15px; }
-        .btn-main:hover { background: #1d4ed8; transform: translateY(-1px); }
-        .btn-icon { padding: 8px; border-radius: 8px; font-size: 14px; }
-        .btn-edit { background: #dcfce7; color: #166534; }
-        .btn-del { background: #fee2e2; color: #991b1b; }
+        .btn-action { padding: 8px 12px; font-size: 13px; background: #f1f5f9; color: var(--text-main); }
+        .btn-action:hover { background: #e2e8f0; }
 
-        /* الجدول */
-        .table-wrapper { overflow-x: auto; background: white; border-radius: 16px; border: 1px solid #e2e8f0; }
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #f1f5f9; padding: 15px; font-size: 13px; text-transform: uppercase; color: #64748b; }
-        td { padding: 15px; border-top: 1px solid #f1f5f9; text-align: center; font-size: 14px; }
-        
-        /* عناصر الصور */
-        .student-avatar { width: 48px; height: 48px; border-radius: 12px; object-fit: cover; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        
-        /* شريط البحث */
-        .search-box { position: relative; margin-bottom: 20px; }
-        .search-box i { position: absolute; right: 15px; top: 18px; color: #94a3b8; }
-        .search-box input { padding-right: 40px; background: white; border: 2px solid #fff; }
+        .search-container { position: relative; margin-bottom: 25px; }
+        .search-container i { position: absolute; right: 15px; top: 15px; color: #94a3b8; }
+        .search-container input { padding-right: 45px; height: 50px; background: white; border-radius: 15px; font-size: 16px; }
 
-        /* صفحة الدخول */
-        #loginPage { height: 90vh; flex-direction: column; justify-content: center; align-items: center; }
-    </style>
-</head>
-<body>
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: #f1f5f9; color: #64748b; padding: 15px; font-size: 13px; text-align: center; border-bottom: 2px solid #e2e8f0; }
+        td { padding: 15px; text-align: center; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+        tr:hover { background: #fcfcfc; }
 
-<div id="loginPage" class="container" style="display: none;">
-    <div class="card" style="width: 100%; max-width: 400px; text-align: center;">
-        <i class="fas fa-user-shield fa-3x" style="color: var(--primary); margin-bottom: 15px;"></i>
-        <h2>سجل الطلاب الاحترافي</h2>
-        <input type="email" id="loginEmail" placeholder="البريد الإلكتروني">
-        <input type="password" id="loginPass" placeholder="كلمة المرور">
-        <button class="btn-main" onclick="login()">دخول النظام</button>
-    </div>
-</div>
+        .badge-qaid { background: #eff6ff; color: #1d4ed8; padding: 4px 10px; border-radius: 8px; font-weight: bold; }
 
-<div id="appContent" class="container" style="display: none;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2 style="margin: 0; color: #1e293b;"><i class="fas fa-graduation-cap"></i> لوحة الإدارة</h2>
-        <button onclick="logout()" style="background: white; border: 1.5px solid #e2e8f0; padding: 8px 15px;"><i class="fas fa-sign-out-alt"></i> خروج</button>
-    </div>
-
-    <div class="card">
-        <input type="hidden" id="editId">
-        <input type="hidden" id="currentImgUrl">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-            <input type="text" id="fName" placeholder="الاسم الرباعي">
-            <input type="text" id="mName" placeholder="اسم الأم">
-            <input type="text" id="qNum" placeholder="رقم القيد">
-            <input type="number" id="pNum" placeholder="رقم الصفحة">
-        </div>
-        <div style="margin-top: 15px;">
-            <label style="font-size: 13px; font-weight: 600;"><i class="fas fa-image"></i> صورة الطالب (ضغط تلقائي):</label>
-            <input type="file" id="studentImg" accept="image/*">
-        </div>
-        <textarea id="note" placeholder="ملاحظات الطالب..." rows="2"></textarea>
-        <button id="saveBtn" class="btn-main" onclick="saveData()"><i class="fas fa-cloud-upload-alt"></i> حفظ في السحابة</button>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">
-            <button onclick="document.getElementById('fileInput').click()" style="background:#f1f5f9; color: #475569;"><i class="fas fa-file-import"></i> استيراد</button>
-            <button onclick="exportExcel()" style="background:#f1f5f9; color: #475569;"><i class="fas fa-file-export"></i> تصدير</button>
-        </div>
-        <input type="file" id="fileInput" hidden onchange="importExcel(event)">
-    </div>
-
-    <div class="search-box">
-        <i class="fas fa-search"></i>
-        <input type="text" id="searchInput" placeholder="ابحث بالاسم أو رقم القيد..." onkeyup="searchData()">
-    </div>
-
-    <div class="table-wrapper">
-        <table>
-            <thead>
-                <tr>
-                    <th>الصورة</th>
-                    <th>الاسم الكامل</th>
-                    <th>رقم القيد</th>
-                    <th>إجراءات</th>
-                </tr>
-            </thead>
-            <tbody id="tableBody"></tbody>
-        </table>
-    </div>
-</div>
-
-<script>
-    function render(data) {
-        const tbody = document.getElementById('tableBody');
-        tbody.innerHTML = '';
-        data.forEach(s => {
-            tbody.innerHTML += `<tr>
-                <td><img src="${s.photo || 'https://via.placeholder.com/50'}" class="student-avatar"></td>
-                <td style="font-weight: 600; color: #334155;">${s.name}</td>
-                <td><span style="background: #f1f5f9; padding: 4px 10px; border-radius: 6px;">${s.qaid}</span></td>
-                <td>
-                    <div style="display: flex; gap: 5px; justify-content: center;">
-                        <button class="btn-icon btn-edit" onclick="edit('${s.id}')"><i class="fas fa-edit"></i></button>
-                        <button class="btn-icon btn-del" onclick="del('${s.id}')"><i class="fas fa-trash-alt"></i></button>
-                    </div>
-                </td>
-            </tr>`;
-        });
-    }
-
-    window.edit = (id) => {
-        const s = window.allStudentsData.find(x => x.id === id);
-        document.getElementById('editId').value = s.id;
-        document.getElementById('fName').value = s.name;
-        document.getElementById('mName').value = s.mother;
-        document.getElementById('qNum').value = s.qaid;
-        document.getElementById('pNum').value = s.page;
-        document.getElementById('note').value = s.note || '';
-        document.getElementById('currentImgUrl').value = s.photo || '';
-        document.getElementById('saveBtn').innerHTML = '<i class="fas fa-sync-alt"></i> تحديث البيانات';
-        window.scrollTo({top: 0, behavior: 'smooth'});
-    };
-
-    function resetForm() {
-        document.getElementById('editId').value = '';
-        document.getElementById('fName').value = '';
-        document.getElementById('mName').value = '';
-        document.getElementById('qNum').value = '';
-        document.getElementById('pNum').value = '';
-        document.getElementById('note').value = '';
-        document.getElementById('studentImg').value = '';
-        document.getElementById('currentImgUrl').value = '';
-        document.getElementById('saveBtn').innerHTML = '<i class="fas fa-cloud-upload-alt"></i> حفظ في السحابة';
-    }
-</script>
-</body>
-</html>
+        #loginPage { height: 90vh; display: flex; align-items: center; justify-content: center; }
+        .login-
