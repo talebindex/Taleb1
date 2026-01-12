@@ -7,99 +7,87 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, writeBatch } 
-        from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
-        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } 
-        from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+    <style>
+        :root { --main: #1e293b; --blue: #0ea5e9; --orange: #f59e0b; --bg: #f1f5f9; --card: #ffffff; --text: #334155; }
+        body.dark-mode { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --main: #38bdf8; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; direction: rtl; transition: 0.3s; }
+        
+        .container { max-width: 700px; margin: auto; padding: 20px; }
+        .card { background: var(--card); padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid rgba(0,0,0,0.05); }
+        
+        /* البحث الأنيق */
+        .search-wrapper { display: flex; align-items: center; gap: 10px; background: var(--card); padding: 10px 20px; border-radius: 50px; border: 2px solid var(--blue); margin-bottom: 20px; }
+        .search-wrapper input { border: none; background: transparent; flex: 1; color: var(--text); outline: none; font-size: 16px; }
+        
+        /* الإدخالات */
+        .grid-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        input, select, textarea { background: var(--bg); color: var(--text); width: 100%; padding: 12px; margin-top: 8px; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; outline: none; }
+        
+        /* الأزرار */
+        .btn { border: none; border-radius: 10px; cursor: pointer; padding: 12px; font-weight: bold; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.3s; }
+        .btn-save { background: var(--main); width: 100%; margin-top: 15px; font-size: 16px; }
+        .action-bar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 15px; }
+        
+        /* القائمة */
+        .student-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .student-item:last-child { border-bottom: none; }
+        .highlight-badge { padding: 4px 12px; border-radius: 8px; font-weight: bold; font-size: 12px; }
+        .qaid-badge { background: #dcfce7; color: #166534; }
+        .page-badge { background: #fef9c3; color: #854d0e; }
 
-        // إعدادات Firebase
-        const firebaseConfig = {
-            apiKey: "AIzaSyC-RyeNVI6aNmWSJIYhQCG_4J_RQDAovds",
-            authDomain: "student-archive-f8689.firebaseapp.com",
-            projectId: "student-archive-f8689",
-            storageBucket: "student-archive-f8689.appspot.com",
-            messagingSenderId: "815104091476",
-            appId: "1:815104091476:web:8e725238d8ebabaf26d4c1"
-        };
+        /* التحكم الإضافي */
+        .theme-toggle { position: fixed; bottom: 20px; left: 20px; width: 50px; height: 50px; border-radius: 50%; background: var(--main); color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1000; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        const studentsCol = collection(db, "students");
+        /* نظام الطباعة المطور */
+        .print-header, .print-footer, .print-only-table-head { display: none; }
+        
+        @media print {
+            .no-print, .theme-toggle, .search-wrapper, .action-bar, .card:not(#listCard), i { display: none !important; }
+            body { background: white !important; color: black !important; padding: 0; }
+            .container { max-width: 100%; padding: 0; }
+            .print-header { display: block !important; text-align: center; margin-bottom: 30px; }
+            .print-header h1 { font-size: 20px; border-bottom: 2px solid black; padding-bottom: 10px; margin: 0; }
+            
+            #studentsList { display: table !important; width: 100%; border-collapse: collapse; }
+            .student-item { display: table-row !important; }
+            .student-info { display: table-cell !important; padding: 10px; border: 1px solid black; text-align: center; vertical-align: middle; }
+            .print-only-table-head { display: table-row !important; background: #eee !important; font-weight: bold; }
+            .highlight-badge { background: transparent !important; color: black !important; padding: 0 !important; font-weight: bold; }
+            .print-footer { display: block !important; margin-top: 50px; text-align: center; font-weight: bold; }
+        }
 
-        onAuthStateChanged(auth, (user) => {
-            document.getElementById('loginPage').style.display = user ? 'none' : 'flex';
-            document.getElementById('appContent').style.display = user ? 'block' : 'none';
-            if(user) loadData();
-        });
+        /* صفحة تسجيل الدخول */
+        #loginPage { height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); }
+    </style>
+</head>
+<body>
 
-        // حفظ البيانات
-        window.saveData = async () => {
-            const id = document.getElementById('editId').value;
-            const nameValue = document.getElementById('fName').value.trim();
-            const surnameValue = document.getElementById('surname').value.trim();
-            const btn = document.getElementById('saveBtn');
+<div id="loginPage">
+    <div class="card" style="width: 320px; text-align: center;">
+        <i class="fas fa-database fa-3x" style="color: var(--blue); margin-bottom: 15px;"></i>
+        <h3 style="margin-bottom: 20px;">نظام أرشيف الكنعان</h3>
+        <input type="email" id="loginEmail" placeholder="البريد الإلكتروني">
+        <input type="password" id="loginPass" placeholder="كلمة المرور">
+        <button class="btn btn-save" onclick="login()">دخول</button>
+    </div>
+</div>
 
-            const student = {
-                name: nameValue,
-                surname: surnameValue,
-                mother: document.getElementById('mName').value.trim(),
-                qaid: document.getElementById('qNum').value.trim(),
-                page: document.getElementById('pNum').value.trim(),
-                note: document.getElementById('note').value.trim(),
-                timestamp: Date.now()
-            };
+<div id="appContent" class="container" style="display: none;">
+    <div class="print-header">
+        <h1>فهرس القيد العام ث.ش محمد عبدالعزيز الكنعان للبنين</h1>
+    </div>
 
-            if(!student.name) return alert("الاسم مطلوب");
+    <div class="no-print" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <span>العدد الإجمالي: <b id="totalCount" style="color:var(--blue)">0</b> سجل</span>
+        <button onclick="logout()" style="color:#ef4444; border:none; background:none; cursor:pointer; font-weight:bold;"><i class="fas fa-sign-out-alt"></i> خروج</button>
+    </div>
 
-            btn.disabled = true;
-            try {
-                if(id) await updateDoc(doc(db, "students", id), student);
-                else await addDoc(studentsCol, student);
-                resetForm();
-            } catch (e) { alert("خطأ في الحفظ"); }
-            btn.disabled = false;
-        };
-
-        // استيراد من إكسل
-        window.importExcel = async (e) => {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = async (evt) => {
-                const data = new Uint8Array(evt.target.result);
-                const wb = XLSX.read(data, {type: 'array'});
-                const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                const batch = writeBatch(db);
-                json.forEach(row => {
-                    const newDoc = doc(studentsCol);
-                    batch.set(newDoc, {
-                        name: row['الاسم'] || row['الاسم الرباعي'] || "",
-                        surname: row['اللقب'] || "",
-                        mother: row['اسم الأم'] || "",
-                        qaid: String(row['رقم القيد'] || ""),
-                        page: String(row['رقم الصفحة'] || ""),
-                        note: row['الملاحظات'] || "",
-                        timestamp: Date.now()
-                    });
-                });
-                await batch.commit();
-                alert("تم استيراد البيانات بنجاح!");
-            };
-            reader.readAsArrayBuffer(file);
-        };
-
-        // تصدير إلى إكسل
-        window.exportExcel = () => {
-            const dataToExport = window.allStudentsData.map(({id, timestamp, ...rest}) => rest);
-            const ws = XLSX.utils.json_to_sheet(dataToExport);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
-            XLSX.writeFile(wb, "سجل_الطلاب.xlsx");
-        };
-
-        function loadData() {
-            onSnapshot(query(studentsCol, orderBy("timestamp", "desc")), (snapshot) => {
-                window.allStudentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                document.getElementById('totalCount').
+    <div class="card no-print">
+        <input type="hidden" id="editId">
+        <div class="grid-inputs">
+            <input type="text" id="fName" placeholder="الاسم الرباعي">
+            <input type="text" id="surname" placeholder="اللقب">
+        </div>
+        <div class="grid-inputs">
+            <input type="text" id="mName" placeholder="اسم الأم">
+            <input type="text" id="qNum" placeholder="رقم القيد
