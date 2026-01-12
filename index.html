@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام أرشيف ث.ش محمد عبدالعزيز الكنعان</title>
+    <title>نظام أرشيف ثانوية محمد عبدالعزيز الكنعان</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     
@@ -144,31 +144,30 @@
         
         .action-bar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
 
-        /* تنسيق عرض الطلاب الاحترافي */
         .student-item { display: flex; align-items: center; justify-content: space-between; border-right: 5px solid var(--blue); }
         .student-details { flex: 1; }
         .student-name { font-size: 1.1rem; font-weight: bold; color: var(--main); margin: 0; }
         .student-meta { display: flex; gap: 15px; margin-top: 8px; }
         .highlight-badge { display: flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 8px; font-weight: bold; font-size: 14px; }
-        .qaid-badge { background: #dcfce7; color: #166534; }
+        .qaid-badge { background: #e0f2fe; color: #0369a1; }
         .page-badge { background: #fef9c3; color: #854d0e; }
 
         .theme-toggle { position: fixed; bottom: 25px; left: 25px; width: 50px; height: 50px; border-radius: 50%; background: var(--main); color: white; display: flex; align-items: center; justify-content: center; z-index: 1000; cursor: pointer; }
 
-        /* ترويسة الطباعة والجداول */
-        .print-only { display: none; }
+        /* ترويسة وجدول الطباعة */
+        .print-area { display: none; }
+
         @media print {
-            .no-print, .theme-toggle, .search-wrapper, .action-bar, .card:not(#listCard), i { display: none !important; }
-            body { background: white !important; color: black !important; }
-            .container { max-width: 100%; }
-            .print-only { display: block !important; }
-            .print-header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+            .no-print, .theme-toggle, .search-wrapper, .action-bar, .card, i { display: none !important; }
+            body { background: white !important; color: black !important; padding: 0; margin: 0; }
+            .container { max-width: 100%; width: 100%; }
             
-            #studentsList { display: table !important; width: 100% !important; border-collapse: collapse !important; }
-            .student-item { display: table-row !important; border: none !important; }
-            .student-item > div { display: table-cell !important; padding: 10px; border: 1px solid black !important; text-align: center; }
-            .print-table-head { display: table-header-group !important; background: #eee !important; font-weight: bold; }
-            .highlight-badge { background: transparent !important; color: black !important; padding: 0 !important; border: none !important; display: inline; }
+            .print-area { display: block !important; width: 100%; }
+            .print-header { text-align: center; margin-bottom: 20px; padding: 10px; border-bottom: 2px solid black; }
+            
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border: 1px solid black !important; padding: 8px; text-align: center; font-size: 12pt; }
+            th { background-color: #f2f2f2 !important; -webkit-print-color-adjust: exact; }
         }
     </style>
 </head>
@@ -186,112 +185,57 @@
 
 <div id="appContent" class="container" style="display: none;">
     
-    <div class="print-only print-header">
-        <h2>فهرس القيد العام</h2>
-        <h3>ث.ش محمد عبد العزيز الكنعان للبنين</h3>
-    </div>
-
-    <div class="no-print" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-        <span>العدد الإجمالي: <b id="totalCount" style="color: var(--blue);">0</b></span>
-        <button onclick="logout()" style="color:#ef4444; border:none; background:none; font-weight:bold; cursor:pointer;">خروج</button>
-    </div>
-
-    <div class="card no-print">
-        <input type="hidden" id="editId">
-        <input type="text" id="fName" placeholder="الاسم الرباعي">
-        <input type="text" id="surname" placeholder="اللقب">
-        <div class="grid-inputs">
-            <input type="text" id="mName" placeholder="اسم الأم">
-            <input type="text" id="qNum" placeholder="رقم القيد">
-            <input type="number" id="pNum" placeholder="رقم الصفحة">
+    <div class="print-area">
+        <div class="print-header">
+            <h2>فهرس القيد العام</h2>
+            <h3>ث.ش محمد عبد العزيز الكنعان للبنين</h3>
         </div>
-        <textarea id="note" placeholder="ملاحظات..." rows="2"></textarea>
-        <button id="saveBtn" class="btn btn-save" onclick="saveData()"><i class="fas fa-save"></i> حفظ في السحابة</button>
-        <div class="action-bar">
-            <button class="btn" style="background:#6366f1" onclick="document.getElementById('file').click()">استيراد</button>
-            <button class="btn" style="background:var(--orange)" onclick="exportExcel()">تصدير</button>
-            <button class="btn" style="background:var(--blue)" onclick="window.print()">طباعة</button>
+        <table id="printTable">
+            <thead>
+                <tr>
+                    <th>الاسم الكامل واللقب</th>
+                    <th>اسم الأم</th>
+                    <th>رقم القيد</th>
+                    <th>رقم الصفحة</th>
+                </tr>
+            </thead>
+            <tbody id="printBody"></tbody>
+        </table>
+    </div>
+
+    <div class="no-print">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <span>العدد الإجمالي: <b id="totalCount" style="color: var(--blue);">0</b></span>
+            <button onclick="logout()" style="color:#ef4444; border:none; background:none; font-weight:bold; cursor:pointer;">خروج</button>
         </div>
-        <input type="file" id="file" hidden onchange="importExcel(event)">
-    </div>
 
-    <div class="search-wrapper no-print">
-        <i class="fas fa-search"></i>
-        <input type="text" id="searchInput" placeholder="بحث بالاسم أو رقم القيد..." onkeyup="applyFilters()">
-        <select id="sortSelect" onchange="applyFilters()" style="width: auto; margin: 0; border: none; background: transparent;">
-            <option value="newest">الأحدث</option>
-            <option value="alpha">أبجدي</option>
-            <option value="oldest">الأقدم</option>
-        </select>
-    </div>
-
-    <div id="listCard" class="card" style="padding: 0; overflow: hidden; border: none; background: transparent;">
-        <div id="studentsList">
+        <div class="card">
+            <input type="hidden" id="editId">
+            <input type="text" id="fName" placeholder="الاسم الرباعي">
+            <input type="text" id="surname" placeholder="اللقب">
+            <div class="grid-inputs">
+                <input type="text" id="mName" placeholder="اسم الأم">
+                <input type="text" id="qNum" placeholder="رقم القيد">
+                <input type="number" id="pNum" placeholder="رقم الصفحة">
             </div>
-    </div>
-</div>
-
-<div class="theme-toggle no-print" onclick="toggleDarkMode()">
-    <i class="fas fa-adjust"></i>
-</div>
-
-<script>
-    function render(data) {
-        const list = document.getElementById('studentsList');
-        // ترويسة الجدول عند الطباعة
-        let html = `
-            <div class="print-only print-table-head">
-                <div style="display: table-row;">
-                    <div style="display: table-cell; border: 1px solid black; padding: 10px;">الاسم الكامل واللقب</div>
-                    <div style="display: table-cell; border: 1px solid black; padding: 10px;">اسم الأم</div>
-                    <div style="display: table-cell; border: 1px solid black; padding: 10px;">رقم القيد</div>
-                    <div style="display: table-cell; border: 1px solid black; padding: 10px;">الصفحة</div>
-                </div>
+            <textarea id="note" placeholder="ملاحظات..." rows="2"></textarea>
+            <button id="saveBtn" class="btn btn-save" onclick="saveData()"><i class="fas fa-save"></i> حفظ في السحابة</button>
+            <div class="action-bar">
+                <button class="btn" style="background:#6366f1" onclick="document.getElementById('file').click()">استيراد</button>
+                <button class="btn" style="background:var(--orange)" onclick="exportExcel()">تصدير</button>
+                <button class="btn" style="background:var(--blue)" onclick="window.print()">طباعة</button>
             </div>
-        `;
+            <input type="file" id="file" hidden onchange="importExcel(event)">
+        </div>
 
-        data.forEach(s => {
-            html += `
-                <div class="student-item card">
-                    <div class="student-details">
-                        <p class="student-name">${s.name} ${s.surname ? '<span style="color:var(--orange)">['+s.surname+']</span>' : ''}</p>
-                        <div class="student-meta">
-                            <span class="no-print" style="font-size: 13px; color: gray;">الأم: ${s.mother}</span>
-                            <span class="highlight-badge qaid-badge"><i class="fas fa-id-card no-print"></i> قيد: ${s.qaid}</span>
-                            <span class="highlight-badge page-badge"><i class="fas fa-file-alt no-print"></i> صفحة: ${s.page}</span>
-                        </div>
-                    </div>
-                    <div class="print-only">${s.mother}</div>
-                    <div class="print-only">${s.qaid}</div>
-                    <div class="print-only">${s.page}</div>
-                    <div class="no-print" style="display: flex; gap: 15px;">
-                        <i class="fas fa-edit" style="color:var(--blue); cursor:pointer;" onclick="edit('${s.id}')"></i>
-                        <i class="fas fa-trash" style="color:#ef4444; cursor:pointer;" onclick="del('${s.id}')"></i>
-                    </div>
-                </div>
-            `;
-        });
-        list.innerHTML = html;
-    }
+        <div class="search-wrapper">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchInput" placeholder="بحث بالاسم أو رقم القيد..." onkeyup="applyFilters()">
+            <select id="sortSelect" onchange="applyFilters()" style="width: auto; margin: 0; border: none; background: transparent;">
+                <option value="newest">الأحدث</option>
+                <option value="alpha">أبجدي</option>
+                <option value="oldest">الأقدم</option>
+            </select>
+        </div>
 
-    window.edit = (id) => {
-        const s = window.allStudentsData.find(x => x.id === id);
-        document.getElementById('editId').value = s.id;
-        document.getElementById('fName').value = s.name;
-        document.getElementById('surname').value = s.surname || '';
-        document.getElementById('mName').value = s.mother;
-        document.getElementById('qNum').value = s.qaid;
-        document.getElementById('pNum').value = s.page;
-        document.getElementById('note').value = s.note || '';
-        document.getElementById('saveBtn').innerHTML = '<i class="fas fa-sync"></i> تحديث السجل';
-        window.scrollTo({top: 0, behavior: 'smooth'});
-    };
-
-    window.resetForm = () => {
-        document.getElementById('editId').value = '';
-        document.querySelectorAll('input, textarea').forEach(i => i.value = '');
-        document.getElementById('saveBtn').innerHTML = '<i class="fas fa-save"></i> حفظ في السحابة';
-    };
-</script>
-</body>
-</html>
+        <div id="studentsList"></div>
