@@ -2,7 +2,8 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>نظام إدارة الطلاب السحابي - النسخة الاحترافية</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة الطلاب السحابي - النسخة الكاملة</title>
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     
     <script type="module">
@@ -27,13 +28,13 @@
         const auth = getAuth(app);
         const studentsCol = collection(db, "students");
 
-        // نظام تسجيل الدخول
+        // --- نظام تسجيل الدخول ---
         window.login = async () => {
             const email = document.getElementById('loginEmail').value;
             const pass = document.getElementById('loginPass').value;
             try {
                 await signInWithEmailAndPassword(auth, email, pass);
-            } catch (e) { alert("خطأ في الدخول: " + e.message); }
+            } catch (e) { alert("خطأ في الدخول: تأكد من تفعيل Email/Password في Firebase"); }
         };
 
         window.logout = () => signOut(auth);
@@ -49,7 +50,7 @@
             }
         });
 
-        // حفظ البيانات
+        // --- إدارة البيانات (إضافة وتعديل) ---
         window.saveData = async () => {
             const id = document.getElementById('editId').value;
             const student = {
@@ -65,15 +66,15 @@
                 if(id) await updateDoc(doc(db, "students", id), student);
                 else await addDoc(studentsCol, student);
                 resetForm();
-            } catch (e) { alert("خطأ في الحفظ: " + e.message); }
+            } catch (e) { alert("حدث خطأ أثناء الحفظ"); }
         };
 
-        // حذف بيانات
+        // --- حذف البيانات ---
         window.del = async (id) => {
-            if(confirm('هل أنت متأكد؟')) await deleteDoc(doc(db, "students", id));
+            if(confirm('هل أنت متأكد من حذف هذا السجل؟')) await deleteDoc(doc(db, "students", id));
         };
 
-        // تحميل البيانات لحظياً
+        // --- تحميل البيانات لحظياً ---
         function loadData() {
             const q = query(studentsCol, orderBy("timestamp", "desc"));
             onSnapshot(q, (snapshot) => {
@@ -84,7 +85,7 @@
             });
         }
 
-        // استيراد إكسل بنظام الدفعات (حل مشكلة الرسالة السابقة)
+        // --- استيراد إكسل (نظام الدفعات Batch) ---
         window.importExcel = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -96,7 +97,7 @@
                     const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
                     if(json.length === 0) return alert("الملف فارغ!");
                     
-                    if(!confirm(`هل تريد رفع ${json.length} سجل؟`)) return;
+                    alert(`جاري رفع ${json.length} سجل... يرجى الانتظار`);
 
                     const chunkSize = 500;
                     for (let i = 0; i < json.length; i += chunkSize) {
@@ -105,7 +106,7 @@
                         chunk.forEach(row => {
                             const newDoc = doc(studentsCol);
                             batch.set(newDoc, {
-                                name: row['الاسم الرباعي'] || row['الاسم'] || "",
+                                name: row['الاسم الرباعي'] || row['الاسم'] || "غير معروف",
                                 mother: row['اسم الأم'] || "",
                                 qaid: String(row['رقم القيد'] || ""),
                                 page: String(row['رقم الصفحة'] || ""),
@@ -116,116 +117,32 @@
                         await batch.commit();
                     }
                     alert("تم الاستيراد بنجاح!");
-                    e.target.value = "";
-                } catch (err) { alert("خطأ أثناء الرفع: " + err.message); }
+                } catch (err) { alert("فشل الاستيراد: " + err.message); }
             };
             reader.readAsArrayBuffer(file);
+        };
+
+        // --- تصدير البيانات إلى إكسل ---
+        window.exportExcel = () => {
+            if (!window.allStudentsData || window.allStudentsData.length === 0) return alert("لا توجد بيانات!");
+            const excelData = window.allStudentsData.map(s => ({
+                "الاسم الرباعي": s.name,
+                "اسم الأم": s.mother,
+                "رقم القيد": s.qaid,
+                "رقم الصفحة": s.page,
+                "الملاحظات": s.note
+            }));
+            const ws = XLSX.utils.json_to_sheet(excelData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
+            XLSX.writeFile(wb, `سجل_الطلاب_${new Date().toLocaleDateString()}.xlsx`);
         };
     </script>
 
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --info: #3498db; --bg: #f4f7f6; }
+        :root { --primary: #2c3e50; --success: #27ae60; --danger: #e74c3c; --bg: #f4f7f6; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; text-align: right; }
-        .container { max-width: 1000px; margin: 20px auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .entry-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-        input, textarea { padding: 10px; border: 1px solid #ddd; border-radius: 5px; width: 100%; box-sizing: border-box; }
-        .btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; color: white; font-weight: bold; }
-        .btn-save { background: var(--success); }
-        .btn-logout { background: #e74c3c; float: left; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #eee; padding: 12px; text-align: center; }
-        th { background: var(--primary); color: white; }
-        #loginPage { max-width: 350px; margin: 100px auto; padding: 30px; background: white; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; }
-    </style>
-</head>
-<body>
-
-<div id="loginPage">
-    <h2>تسجيل الدخول</h2>
-    <input type="email" id="loginEmail" placeholder="البريد الإلكتروني" style="margin-bottom: 10px;">
-    <input type="password" id="loginPass" placeholder="كلمة السر" style="margin-bottom: 15px;">
-    <button class="btn btn-save" style="width: 100%;" onclick="login()">دخول</button>
-</div>
-
-<div id="appContent" class="container" style="display:none;">
-    <button class="btn btn-logout" onclick="logout()">خروج</button>
-    <h2 style="text-align: center; color: var(--primary);">سجل الطلاب السحابي</h2>
-
-    <div class="entry-form">
-        <input type="hidden" id="editId">
-        <input type="text" id="fName" placeholder="الاسم الرباعي">
-        <input type="text" id="mName" placeholder="اسم الأم">
-        <input type="text" id="qNum" placeholder="رقم القيد">
-        <input type="number" id="pNum" placeholder="رقم الصفحة">
-        <textarea id="note" placeholder="ملاحظات..." style="grid-column: 1/-1;"></textarea>
-        <button class="btn btn-save" id="saveBtn" style="grid-column: 1/-1;" onclick="saveData()">حفظ في السحابة</button>
-    </div>
-
-    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-        <input type="text" id="searchInput" placeholder="بحث باسم الطالب..." onkeyup="search()">
-        <button class="btn" style="background:#8e44ad;" onclick="document.getElementById('fileInput').click()">📥 استيراد إكسل</button>
-        <input type="file" id="fileInput" hidden accept=".xlsx, .xls" onchange="importExcel(event)">
-    </div>
-
-    <table>
-        <thead>
-            <tr>
-                <th>الاسم</th>
-                <th>الأم</th>
-                <th>القيد</th>
-                <th>الصفحة</th>
-                <th>إجراءات</th>
-            </tr>
-        </thead>
-        <tbody id="tableBody"></tbody>
-    </table>
-</div>
-
-<script>
-    function render(data) {
-        const tbody = document.getElementById('tableBody');
-        tbody.innerHTML = '';
-        data.forEach(s => {
-            tbody.innerHTML += `<tr>
-                <td>${s.name}</td>
-                <td>${s.mother}</td>
-                <td>${s.qaid}</td>
-                <td>${s.page}</td>
-                <td>
-                    <button onclick="edit('${s.id}')" style="color:blue; border:none; background:none; cursor:pointer;">تعديل</button>
-                    <button onclick="del('${s.id}')" style="color:red; border:none; background:none; cursor:pointer;">حذف</button>
-                </td>
-            </tr>`;
-        });
-    }
-
-    function resetForm() {
-        document.getElementById('editId').value = '';
-        document.getElementById('fName').value = '';
-        document.getElementById('mName').value = '';
-        document.getElementById('qNum').value = '';
-        document.getElementById('pNum').value = '';
-        document.getElementById('note').value = '';
-        document.getElementById('saveBtn').innerText = 'حفظ في السحابة';
-    }
-
-    window.edit = (id) => {
-        const s = window.allStudentsData.find(x => x.id === id);
-        document.getElementById('editId').value = s.id;
-        document.getElementById('fName').value = s.name;
-        document.getElementById('mName').value = s.mother;
-        document.getElementById('qNum').value = s.qaid;
-        document.getElementById('pNum').value = s.page;
-        document.getElementById('note').value = s.note;
-        document.getElementById('saveBtn').innerText = 'تحديث البيانات';
-        window.scrollTo(0,0);
-    };
-
-    function search() {
-        const q = document.getElementById('searchInput').value.toLowerCase();
-        const filtered = window.allStudentsData.filter(s => s.name.toLowerCase().includes(q));
-        render(filtered);
-    }
-</script>
-</body>
-</html>
+        .container { max-width: 900px; margin: 20px auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .form-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        input, textarea { padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; width: 100%; box-sizing: border-box; }
+        .btn { padding: 12px; border: none; border-radius: 6px; cursor: pointer; color: white; font-weight: bold; transition:
