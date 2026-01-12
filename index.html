@@ -47,12 +47,36 @@
             if(val.length < 3) { alertBox.style.display = 'none'; return; }
             const found = window.allStudentsData.find(s => s.name.trim() === val.trim());
             if(found) {
-                alertBox.innerHTML = `<i class="fas fa-exclamation-triangle"></i> الاسم مسجل مسبقاً: قيد (${found.qaid}) - صفحة (${found.page})`;
+                alertBox.innerHTML = `<i class="fas fa-exclamation-triangle"></i> الاسم مسجل: قيد (${found.qaid}) - صفحة (${found.page})`;
                 alertBox.style.display = 'block';
             } else { alertBox.style.display = 'none'; }
         };
 
-        // وظيفة طباعة قيد محدد
+        // نظام خيارات الطباعة المتطور
+        window.showPrintOptions = () => {
+            document.getElementById('printModal').style.display = 'flex';
+        };
+
+        window.closePrintOptions = () => {
+            document.getElementById('printModal').style.display = 'none';
+        };
+
+        window.startPrint = (type) => {
+            let dataToPrint = [...window.allStudentsData];
+            if (type === 'alpha') {
+                dataToPrint.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+            } else if (type === 'qaid') {
+                dataToPrint.sort((a, b) => Number(a.qaid) - Number(b.qaid));
+            }
+            
+            window.render(dataToPrint);
+            window.closePrintOptions();
+            setTimeout(() => { 
+                window.print(); 
+                window.applyFilters(); 
+            }, 500);
+        };
+
         window.printQaid = (qaidNum) => {
             const filtered = window.allStudentsData.filter(s => String(s.qaid) === String(qaidNum));
             window.render(filtered);
@@ -172,24 +196,42 @@
         .smart-alert { background: #fee2e2; color: #b91c1c; padding: 8px; border-radius: 6px; margin-top: 6px; font-size: 0.8rem; display: none; }
         .theme-toggle { position: fixed; bottom: 20px; left: 20px; width: 45px; height: 45px; border-radius: 50%; background: var(--main); color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 
+        /* نافذة خيارات الطباعة */
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 2000; }
+        .modal-content { background: var(--card); padding: 25px; border-radius: 15px; width: 300px; text-align: center; }
+        .modal-btn { width: 100%; margin: 10px 0; padding: 12px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 1rem; }
+
         @media print {
-            @page { margin: 0.5cm; }
-            .no-print, .theme-toggle, .search-wrapper, .action-bar, .card, i { display: none !important; }
+            @page { margin: 0.3cm; }
+            .no-print, .theme-toggle, .search-wrapper, .action-bar, .card, i, .modal { display: none !important; }
             body { background: white !important; padding: 0 !important; }
             .container { max-width: 100% !important; width: 100% !important; margin: 0 !important; }
             .print-area { display: block !important; }
-            .print-header { text-align: center; margin-bottom: 10px; border-bottom: 1px solid black; padding-bottom: 5px; position: relative; top: 0; }
-            .print-header h2 { margin: 0; font-size: 14pt; }
-            .print-header p { margin: 0; font-size: 10pt; }
-            table { width: 100%; border-collapse: collapse; margin-top: 5px; }
-            th, td { border: 1px solid black !important; padding: 3px 5px; text-align: center; font-size: 10pt; line-height: 1.1; }
-            th { background: #f2f2f2 !important; -webkit-print-color-adjust: exact; }
+            .print-header { text-align: center; margin-bottom: 8px; border-bottom: 1.5px solid black; padding-bottom: 4px; }
+            .print-header h2 { margin: 0; font-size: 15pt; }
+            .print-header p { margin: 0; font-size: 10pt; font-weight: bold; }
+            table { width: 100%; border-collapse: collapse; margin-top: 2px; }
+            th, td { border: 1.2px solid black !important; padding: 3px 6px; text-align: center; font-size: 10pt; line-height: 1.1; }
+            th { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; }
             tr { page-break-inside: avoid; }
         }
         .print-area { display: none; }
     </style>
 </head>
 <body>
+
+<div id="printModal" class="modal">
+    <div class="modal-content card">
+        <h4 style="margin-top:0">اختر طريقة ترتيب الطباعة</h4>
+        <button class="modal-btn" style="background:var(--blue); color:white" onclick="startPrint('alpha')">
+            <i class="fas fa-sort-alpha-down"></i> طباعة حسب الأبجدية
+        </button>
+        <button class="modal-btn" style="background:var(--orange); color:white" onclick="startPrint('qaid')">
+            <i class="fas fa-list-ol"></i> طباعة حسب رقم القيد
+        </button>
+        <button class="modal-btn" style="background:#64748b; color:white" onclick="closePrintOptions()">إلغاء</button>
+    </div>
+</div>
 
 <div id="loginPage" style="height: 100vh; flex-direction: column; align-items: center; justify-content: center; display: none;">
     <div class="card" style="width: 300px; text-align: center;">
@@ -234,7 +276,9 @@
             <div class="action-bar">
                 <button class="btn" style="background:#6366f1" onclick="document.getElementById('file').click()">استيراد</button>
                 <button class="btn" style="background:var(--orange)" onclick="exportExcel()">تصدير</button>
-                <button class="btn" style="background:var(--blue)" onclick="window.print()">طباعة الكل</button>
+                <button class="btn" style="background:var(--blue)" onclick="showPrintOptions()">
+                    <i class="fas fa-print"></i> طباعة
+                </button>
             </div>
             <input type="file" id="file" hidden onchange="importExcel(event)">
         </div>
