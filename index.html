@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام أرشيف ثانوية محمد عبدالعزيز الكنعان</title>
+    <title>نظام إدارة الطلاب - النسخة المتكاملة</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     
@@ -47,10 +47,21 @@
                 qaid: document.getElementById('qNum').value.trim(),
                 page: document.getElementById('pNum').value.trim(),
                 note: document.getElementById('note').value.trim(),
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                dateStr: new Date().toLocaleDateString('en-CA')
             };
 
             if(!student.name) return alert("الاسم مطلوب");
+
+            if(!id) {
+                const dup = window.allStudentsData.find(s => 
+                    s.name.toLowerCase() === nameValue.toLowerCase() && 
+                    (s.surname || "").toLowerCase() === surnameValue.toLowerCase()
+                );
+                if(dup) {
+                    if(!confirm(`تنبيه: الاسم موجود مسبقاً!\nقيد: ${dup.qaid} | صفحة: ${dup.page}\nهل تريد الاستمرار؟`)) return;
+                }
+            }
 
             btn.disabled = true;
             try {
@@ -78,17 +89,18 @@
                         qaid: String(row['رقم القيد'] || ""),
                         page: String(row['رقم الصفحة'] || ""),
                         note: row['الملاحظات'] || "",
-                        timestamp: Date.now()
+                        timestamp: Date.now(),
+                        dateStr: new Date().toLocaleDateString('en-CA')
                     });
                 });
                 await batch.commit();
-                alert("تم استيراد البيانات!");
+                alert("تم استيراد البيانات بنجاح!");
             };
             reader.readAsArrayBuffer(file);
         };
 
         window.exportExcel = () => {
-            const cleanData = window.allStudentsData.map(({id, timestamp, ...rest}) => rest);
+            const cleanData = window.allStudentsData.map(({id, timestamp, dateStr, ...rest}) => rest);
             const ws = XLSX.utils.json_to_sheet(cleanData);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
@@ -103,16 +115,17 @@
             });
         }
 
-        window.toggleDarkMode = () => document.body.classList.toggle('dark-mode');
+        window.toggleDarkMode = () => {
+            document.body.classList.toggle('dark-mode');
+            localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+        };
+        if(localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode');
 
         window.applyFilters = () => {
             const term = document.getElementById('searchInput').value.toLowerCase();
             const sortBy = document.getElementById('sortSelect').value;
             let filtered = window.allStudentsData.filter(s => 
-                s.name.toLowerCase().includes(term) || 
-                (s.surname || "").toLowerCase().includes(term) || 
-                String(s.qaid).includes(term) || 
-                String(s.page).includes(term)
+                s.name.toLowerCase().includes(term) || (s.surname || "").toLowerCase().includes(term) || s.qaid.includes(term)
             );
             if (sortBy === "alpha") filtered.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
             else if (sortBy === "oldest") filtered.sort((a, b) => a.timestamp - b.timestamp);
@@ -120,7 +133,7 @@
             render(filtered);
         };
 
-        window.del = async (id) => { if(confirm('حذف السجل؟')) await deleteDoc(doc(db, "students", id)); };
+        window.del = async (id) => { if(confirm('حذف؟')) await deleteDoc(doc(db, "students", id)); };
         window.logout = () => signOut(auth);
         window.login = async () => {
             const email = document.getElementById('loginEmail').value;
@@ -132,76 +145,9 @@
     <style>
         :root { --main: #1e293b; --blue: #0ea5e9; --orange: #f59e0b; --bg: #f1f5f9; --card: #ffffff; --text: #334155; }
         body.dark-mode { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --main: #38bdf8; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 10px; direction: rtl; }
-        .container { max-width: 700px; margin: auto; }
-        .card { background: var(--card); padding: 18px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 15px; border: 1px solid rgba(0,0,0,0.05); }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 10px; direction: rtl; transition: 0.3s; }
+        .container { max-width: 600px; margin: auto; }
+        .card { background: var(--card); padding: 18px; border-radius: 20px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); margin-bottom: 15px; border: 1px solid rgba(0,0,0,0.05); }
         
-        .search-wrapper { display: flex; align-items: center; gap: 8px; background: var(--card); padding: 5px 15px; border-radius: 50px; border: 2px solid var(--blue); margin-bottom: 20px; }
-        .search-wrapper input { border: none; background: transparent; padding: 10px; flex: 1; color: var(--text); outline: none; }
-        
-        .grid-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        input, select, textarea { background: var(--bg); color: var(--text); width: 100%; padding: 12px; margin-top: 8px; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; }
-        
-        .btn { border: none; border-radius: 10px; cursor: pointer; padding: 12px; font-weight: bold; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .btn-save { background: var(--main); width: 100%; margin-top: 10px; }
-        
-        .action-bar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
-        
-        .highlight-badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 13px; }
-        .qaid-badge { background: #dcfce7; color: #166534; }
-        .page-badge { background: #fef9c3; color: #854d0e; }
-
-        .theme-toggle { position: fixed; bottom: 25px; left: 25px; width: 50px; height: 50px; border-radius: 50%; background: var(--main); color: white; display: flex; align-items: center; justify-content: center; z-index: 1000; cursor: pointer; }
-
-        /* ترويسة للطباعة فقط */
-        .print-header { display: none; }
-        .print-table-head { display: none; }
-
-        @media print {
-            .no-print, .theme-toggle, .search-wrapper, .action-bar, .card:not(#listCard), i { display: none !important; }
-            body { background: white !important; color: black !important; }
-            .container { max-width: 100%; }
-            .print-header { display: block !important; text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
-            
-            #studentsList { display: table !important; width: 100% !important; border-collapse: collapse !important; }
-            .student-item { display: table-row !important; background: transparent !important; border: none !important; box-shadow: none !important; }
-            .student-info { display: table-cell !important; padding: 8px !important; border: 1px solid black !important; text-align: center !important; }
-            .print-table-head { display: table-row !important; background: #eee !important; font-weight: bold !important; }
-            .highlight-badge { background: transparent !important; color: black !important; padding: 0 !important; }
-            .print-footer { display: block !important; margin-top: 40px; text-align: center; }
-        }
-        .print-footer { display: none; }
-    </style>
-</head>
-<body>
-
-<div id="loginPage" style="height: 100vh; flex-direction: column; align-items: center; justify-content: center; display: none;">
-    <div class="card" style="width: 320px; text-align: center;">
-        <h3>دخول النظام</h3>
-        <input type="email" id="loginEmail" placeholder="البريد">
-        <input type="password" id="loginPass" placeholder="كلمة السر">
-        <button class="btn btn-save" onclick="login()">دخول</button>
-    </div>
-</div>
-
-<div id="appContent" class="container" style="display: none;">
-    <div class="print-header">
-        <h2>فهرس القيد العام ث.ش محمد عبدالعزيز الكنعان للبنين</h2>
-    </div>
-
-    <div class="no-print" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <span>العدد الإجمالي: <b id="totalCount">0</b></span>
-        <button onclick="logout()" style="color:red; border:none; background:none; cursor:pointer;">خروج</button>
-    </div>
-
-    <div class="card no-print">
-        <input type="hidden" id="editId">
-        <input type="text" id="fName" placeholder="الاسم الرباعي">
-        <input type="text" id="surname" placeholder="اللقب">
-        <div class="grid-inputs">
-            <input type="text" id="mName" placeholder="اسم الأم">
-            <input type="text" id="qNum" placeholder="رقم القيد">
-            <input type="number" id="pNum" placeholder="رقم الصفحة">
-        </div>
-        <textarea id="note" placeholder="ملاحظات..." rows="2"></textarea>
-        <button id
+        /* تصميم البحث الأنيق */
+        .search-wrapper { position: relative; display: flex; align-items: center; gap: 8px; background: var(--card); padding: 5px 15px; border-radius: 50px; border:
