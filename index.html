@@ -115,10 +115,17 @@
             localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
         };
 
+        // نظام الفلترة الرباعي (اسم، لقب، قيد، صفحة)
         window.applyFilters = () => {
             const term = document.getElementById('searchInput').value.toLowerCase();
             const sortBy = document.getElementById('sortSelect').value;
-            let filtered = window.allStudentsData.filter(s => s.name.toLowerCase().includes(term) || (s.surname || "").toLowerCase().includes(term) || s.qaid.includes(term));
+            let filtered = window.allStudentsData.filter(s => 
+                s.name.toLowerCase().includes(term) || 
+                (s.surname || "").toLowerCase().includes(term) || 
+                String(s.qaid).includes(term) || 
+                String(s.page).includes(term)
+            );
+            
             if (sortBy === "alpha") filtered.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
             else if (sortBy === "oldest") filtered.sort((a, b) => a.timestamp - b.timestamp);
             else filtered.sort((a, b) => b.timestamp - a.timestamp);
@@ -139,11 +146,10 @@
         body.dark-mode { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --main: #38bdf8; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 10px; direction: rtl; transition: 0.3s; }
         .container { max-width: 600px; margin: auto; }
-        .card { background: var(--card); padding: 18px; border-radius: 20px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); margin-bottom: 15px; border: 1px solid rgba(0,0,0,0.05); }
+        .card { background: var(--card); padding: 18px; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 15px; border: 1px solid rgba(0,0,0,0.05); }
         
-        /* البحث الأنيق */
         .search-wrapper { display: flex; align-items: center; gap: 8px; background: var(--card); padding: 5px 15px; border-radius: 50px; border: 2px solid var(--blue); margin-bottom: 20px; }
-        .search-wrapper input { border: none; background: transparent; padding: 10px; flex: 1; color: var(--text); }
+        .search-wrapper input { border: none; background: transparent; padding: 10px; flex: 1; color: var(--text); outline: none; }
         
         .grid-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         input, select, textarea { background: var(--card); color: var(--text); width: 100%; padding: 12px; margin-top: 8px; border: 1.5px solid #e2e8f0; border-radius: 12px; box-sizing: border-box; }
@@ -157,35 +163,34 @@
         .qaid-badge { background: #dcfce7; color: #166534; }
         .page-badge { background: #fef9c3; color: #854d0e; }
 
+        .student-item { display: flex; justify-content: space-between; align-items: center; }
+
         .theme-toggle { position: fixed; bottom: 25px; left: 25px; width: 50px; height: 50px; border-radius: 50%; background: var(--main); color: white; display: flex; align-items: center; justify-content: center; z-index: 1000; }
 
-        /* تنسيق الطباعة الرسمي */
+        /* ترويسة مخفية في الشاشة تظهر فقط في الطباعة */
+        .print-header { display: none; }
+
+        /* تنسيق الطباعة الرسمي المصلح */
         @media print {
-            .no-print, .theme-toggle, .search-wrapper, .action-bar, .card:not(#listCard), .fa-edit, .fa-trash { display: none !important; }
-            body { background: white !important; color: black !important; padding: 0; }
+            .no-print, .theme-toggle, .search-wrapper, .action-bar, .card:not(#listCard), i { display: none !important; }
+            body { background: white !important; color: black !important; padding: 0; margin: 0; }
             .container { max-width: 100%; }
             
-            /* ترويسة الطباعة */
-            body::before {
-                content: "فهرس القيد العام ث.ش محمد عبدالعزيز الكنعان للبنين";
-                display: block; text-align: center; font-size: 22px; font-weight: bold; margin-bottom: 30px; border-bottom: 3px double #000; padding-bottom: 10px;
-            }
+            .print-header { display: block !important; text-align: center; margin-bottom: 20px; }
+            .print-header h1 { font-size: 22px; border-bottom: 2px solid black; padding-bottom: 10px; margin: 0; }
 
-            /* تحويل البطاقات إلى جدول رسمي */
-            #studentsList { display: table; width: 100%; border-collapse: collapse; }
-            .student-item { display: table-row !important; border: none !important; box-shadow: none !important; }
+            #studentsList { display: table !important; width: 100% !important; border-collapse: collapse !important; }
+            .student-item { display: table-row !important; background: transparent !important; border: none !important; box-shadow: none !important; }
             
-            /* محاكاة خلايا الجدول */
-            .student-info { display: table-cell !important; padding: 10px; border: 1px solid black !important; text-align: center; vertical-align: middle; }
-            .student-info h4 { font-size: 16px; margin: 0; }
-            .highlight-badge { background: transparent !important; border: none !important; padding: 0; color: black !important; font-weight: normal; }
+            .student-info { display: table-cell !important; padding: 8px !important; border: 1px solid black !important; text-align: center !important; color: black !important; }
+            .student-info h4 { font-size: 14px !important; font-weight: bold !important; color: black !important; }
             
-            /* تذييل للتوقيع */
-            body::after {
-                content: "توقيع مدير المدرسة: ............................                ختم المدرسة: ............................";
-                display: block; margin-top: 50px; text-align: center; font-weight: bold;
-            }
+            /* إزالة ألوان الخلفية من الشارات عند الطباعة */
+            .highlight-badge { background: transparent !important; color: black !important; font-weight: bold !important; padding: 0 !important; }
+            
+            .print-footer { display: block !important; margin-top: 40px; text-align: center; font-weight: bold; font-size: 14px; }
         }
+        .print-footer { display: none; }
     </style>
 </head>
 <body>
@@ -200,6 +205,10 @@
 </div>
 
 <div id="appContent" class="container" style="display: none;">
+    <div class="print-header">
+        <h1>فهرس القيد العام ث.ش محمد عبدالعزيز الكنعان للبنين</h1>
+    </div>
+
     <div class="no-print" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
         <span>إجمالي السجلات: <b id="totalCount">0</b></span>
         <button onclick="logout()" style="color:#ef4444; border:none; background:none; cursor:pointer;">خروج</button>
@@ -220,15 +229,15 @@
         <div class="action-bar">
             <button class="btn" style="background:#6366f1; font-size: 12px;" onclick="document.getElementById('file').click()">استيراد</button>
             <button class="btn" style="background:var(--orange); font-size: 12px;" onclick="exportExcel()">تصدير</button>
-            <button class="btn" style="background:var(--blue); font-size: 12px;" onclick="window.print()">طباعة الكشف</button>
+            <button class="btn" style="background:var(--blue); font-size: 12px;" onclick="window.print()">طباعة</button>
         </div>
         <input type="file" id="file" hidden onchange="importExcel(event)">
     </div>
 
     <div class="search-wrapper no-print">
-        <i class="fas fa-search" style="color:var(--blue); margin-right:10px;"></i>
-        <input type="text" id="searchInput" placeholder="بحث سريع..." onkeyup="applyFilters()">
-        <select id="sortSelect" onchange="applyFilters()" style="width:auto; border:none; padding:0; margin:0;">
+        <i class="fas fa-search" style="color:var(--blue);"></i>
+        <input type="text" id="searchInput" placeholder="بحث بالاسم، اللقب، القيد أو الصفحة..." onkeyup="applyFilters()">
+        <select id="sortSelect" onchange="applyFilters()" style="width:auto; border:none; background:transparent;">
             <option value="newest">الأحدث</option>
             <option value="alpha">أبجدي</option>
             <option value="oldest">الأقدم</option>
@@ -236,15 +245,11 @@
     </div>
 
     <div id="listCard">
-        <div class="print-only" style="display:none;">
-            <div style="display:flex; border:1px solid black; background:#eee; font-weight:bold; text-align:center;">
-                <div style="flex:2; border:1px solid black; padding:5px;">اسم الطالب واللقب</div>
-                <div style="flex:1; border:1px solid black; padding:5px;">اسم الأم</div>
-                <div style="flex:1; border:1px solid black; padding:5px;">القيد</div>
-                <div style="flex:1; border:1px solid black; padding:5px;">الصفحة</div>
-            </div>
-        </div>
         <div id="studentsList"></div>
+    </div>
+
+    <div class="print-footer">
+        <p>توقيع مدير المدرسة: ............................                ختم المدرسة: ............................</p>
     </div>
 </div>
 
@@ -253,30 +258,50 @@
 <script>
     function render(data) {
         const list = document.getElementById('studentsList');
-        list.innerHTML = '';
+        // عند الطباعة، نحتاج لرأس جدول ثابت
+        let html = `
+            <div class="student-item card no-print" style="background:#eee; font-weight:bold; border-bottom:2px solid #ccc; display:flex !important;">
+                <div style="flex:2; padding:5px;">الاسم واللقب</div>
+                <div style="flex:1; padding:5px;">اسم الأم</div>
+                <div style="flex:1; padding:5px;">القيد</div>
+                <div style="flex:1; padding:5px;">الصفحة</div>
+            </div>
+        `;
+        
+        // رأس الجدول للطباعة فقط
+        html += `
+            <div class="student-item" style="display:none; display:table-row;">
+                <div class="student-info" style="font-weight:bold; background:#f0f0f0;">الاسم الكامل واللقب</div>
+                <div class="student-info" style="font-weight:bold; background:#f0f0f0;">اسم الأم</div>
+                <div class="student-info" style="font-weight:bold; background:#f0f0f0;">رقم القيد</div>
+                <div class="student-info" style="font-weight:bold; background:#f0f0f0;">رقم الصفحة</div>
+            </div>
+        `;
+
         data.forEach(s => {
-            // التنسيق للبطاقة الرقمية والجدول الورقي معاً
-            list.innerHTML += `
+            html += `
                 <div class="student-item card">
-                    <div class="student-info">
+                    <div class="student-info" style="flex:2;">
                         <h4>${s.name} ${s.surname ? '['+s.surname+']' : ''}</h4>
                     </div>
-                    <div class="student-info">
-                        <span class="no-print" style="font-size:12px; opacity:0.7;">الأم: </span>${s.mother}
+                    <div class="student-info" style="flex:1;">
+                        <span class="no-print" style="font-size:10px; opacity:0.6; display:block;">الأم</span>
+                        ${s.mother}
                     </div>
-                    <div class="student-info">
-                        <span class="highlight-badge qaid-badge"><span class="no-print">قيد: </span>${s.qaid}</span>
+                    <div class="student-info" style="flex:1;">
+                        <span class="highlight-badge qaid-badge"><span class="no-print" style="font-size:10px; opacity:0.6;">قيد: </span>${s.qaid}</span>
                     </div>
-                    <div class="student-info">
-                        <span class="highlight-badge page-badge"><span class="no-print">صفحة: </span>${s.page}</span>
+                    <div class="student-info" style="flex:1;">
+                        <span class="highlight-badge page-badge"><span class="no-print" style="font-size:10px; opacity:0.6;">صفحة: </span>${s.page}</span>
                     </div>
-                    <div class="no-print" style="display:flex; gap:15px; align-items:center;">
+                    <div class="no-print" style="display:flex; gap:10px; padding-right:10px;">
                         <i class="fas fa-edit" style="color:var(--blue); cursor:pointer;" onclick="edit('${s.id}')"></i>
                         <i class="fas fa-trash" style="color:#ef4444; cursor:pointer;" onclick="del('${s.id}')"></i>
                     </div>
                 </div>
             `;
         });
+        list.innerHTML = html;
     }
 
     window.edit = (id) => {
