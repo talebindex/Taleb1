@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام الطلاب - نسخة الصور والضغط الذكي</title>
+    <title>نظام إدارة الطلاب السحابي</title>
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, writeBatch } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
-        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-storage.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, writeBatch } 
+        from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } 
+        from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyC-RyeNVI6aNmWSJIYhQCG_4J_RQDAovds",
@@ -24,148 +25,174 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const storage = getStorage(app);
         const studentsCol = collection(db, "students");
 
-        // دالة ضغط الصور الذكية
-        async function compressImage(file) {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.src = event.target.result;
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const MAX_WIDTH = 1200; // تقليل العرض للحفاظ على الجودة والمساحة
-                        const scaleSize = MAX_WIDTH / img.width;
-                        canvas.width = MAX_WIDTH;
-                        canvas.height = img.height * scaleSize;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        canvas.toBlob((blob) => {
-                            resolve(blob);
-                        }, 'image/jpeg', 0.7); // جودة 70% مثالية جداً للتخزين
-                    };
-                };
-            });
-        }
-
+        // تسجيل الدخول
         window.login = async () => {
+            const email = document.getElementById('loginEmail').value;
+            const pass = document.getElementById('loginPass').value;
             try {
-                await signInWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('pass').value);
-            } catch (e) { alert("فشل الدخول!"); }
+                await signInWithEmailAndPassword(auth, email, pass);
+            } catch (e) { alert("خطأ في الدخول: " + e.message); }
         };
 
+        window.logout = () => signOut(auth);
+
         onAuthStateChanged(auth, (user) => {
-            document.getElementById('loginPage').style.display = user ? 'none' : 'block';
-            document.getElementById('appContent').style.display = user ? 'block' : 'none';
-            if(user) loadData();
+            if (user) {
+                document.getElementById('loginPage').style.display = 'none';
+                document.getElementById('appContent').style.display = 'block';
+                loadData();
+            } else {
+                document.getElementById('loginPage').style.display = 'block';
+                document.getElementById('appContent').style.display = 'none';
+            }
         });
 
+        // حفظ البيانات
         window.saveData = async () => {
-            const fileInput = document.getElementById('studentImg');
-            let imageUrl = document.getElementById('currentImgUrl').value || "";
-            const btn = document.getElementById('saveBtn');
-
-            btn.innerText = "جاري معالجة ورفع الصورة...";
-            btn.disabled = true;
-
+            const id = document.getElementById('editId').value;
+            const student = {
+                name: document.getElementById('fName').value.trim(),
+                mother: document.getElementById('mName').value.trim(),
+                qaid: document.getElementById('qNum').value.trim(),
+                page: document.getElementById('pNum').value.trim(),
+                note: document.getElementById('note').value.trim(),
+                timestamp: Date.now()
+            };
+            if(!student.name) return alert("يرجى إدخال اسم الطالب");
             try {
-                if (fileInput.files[0]) {
-                    const compressedBlob = await compressImage(fileInput.files[0]);
-                    const storageRef = ref(storage, 'students/' + Date.now() + ".jpg");
-                    const snapshot = await uploadBytes(storageRef, compressedBlob);
-                    imageUrl = await getDownloadURL(snapshot.ref);
-                }
-
-                const data = {
-                    name: document.getElementById('fName').value,
-                    qaid: document.getElementById('qNum').value,
-                    photo: imageUrl,
-                    timestamp: Date.now()
-                };
-
-                const id = document.getElementById('editId').value;
-                if(id) await updateDoc(doc(db, "students", id), data);
-                else await addDoc(studentsCol, data);
-
-                alert("تم الحفظ بنجاح!");
+                if(id) await updateDoc(doc(db, "students", id), student);
+                else await addDoc(studentsCol, student);
                 resetForm();
-                location.reload();
-            } catch (e) {
-                alert("خطأ: " + e.message);
-                btn.disabled = false;
-            }
+            } catch (e) { alert("خطأ في الحفظ"); }
+        };
+
+        window.del = async (id) => {
+            if(confirm('حذف؟')) await deleteDoc(doc(db, "students", id));
         };
 
         function loadData() {
-            onSnapshot(query(studentsCol, orderBy("timestamp", "desc")), (snap) => {
-                const tbody = document.getElementById('tableBody');
-                tbody.innerHTML = '';
-                snap.forEach(doc => {
-                    const s = doc.data();
-                    tbody.innerHTML += `<tr>
-                        <td><img src="${s.photo || 'https://via.placeholder.com/50'}" class="student-thumb"></td>
-                        <td>${s.name}</td>
-                        <td>${s.qaid}</td>
-                        <td><button class="btn-del" onclick="deleteStudent('${doc.id}')">حذف</button></td>
-                    </tr>`;
-                });
+            const q = query(studentsCol, orderBy("timestamp", "desc"));
+            onSnapshot(q, (snapshot) => {
+                let list = [];
+                snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+                window.allStudentsData = list;
+                render(list);
             });
         }
 
-        window.deleteStudent = async (id) => {
-            if(confirm('هل تريد حذف الطالب؟')) await deleteDoc(doc(db, 'students', id));
+        window.importExcel = async (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = async (evt) => {
+                const data = new Uint8Array(evt.target.result);
+                const wb = XLSX.read(data, {type: 'array'});
+                const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                const batch = writeBatch(db);
+                json.forEach(row => {
+                    const newDoc = doc(studentsCol);
+                    batch.set(newDoc, {
+                        name: row['الاسم الرباعي'] || row['الاسم'] || "",
+                        mother: row['اسم الأم'] || "",
+                        qaid: String(row['رقم القيد'] || ""),
+                        page: String(row['رقم الصفحة'] || ""),
+                        note: row['الملاحظات'] || "",
+                        timestamp: Date.now()
+                    });
+                });
+                await batch.commit();
+                alert("تم الاستيراد!");
+            };
+            reader.readAsArrayBuffer(file);
         };
 
-        function resetForm() {
-            document.getElementById('editId').value = '';
-            document.getElementById('fName').value = '';
-            document.getElementById('qNum').value = '';
-            document.getElementById('studentImg').value = '';
-        }
+        window.exportExcel = () => {
+            const ws = XLSX.utils.json_to_sheet(window.allStudentsData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
+            XLSX.writeFile(wb, "سجل_الطلاب.xlsx");
+        };
     </script>
 
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; direction: rtl; background: #eef2f3; padding: 15px; }
-        .card { background: white; padding: 25px; border-radius: 15px; max-width: 500px; margin: auto; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
-        input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ddd; outline: none; }
-        button { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        button:hover { background: #0056b3; }
-        .student-thumb { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #007bff; }
-        table { width: 100%; background: white; margin-top: 20px; border-radius: 10px; overflow: hidden; border-collapse: collapse; }
-        th, td { padding: 12px; text-align: center; border-bottom: 1px solid #eee; }
-        th { background: #f8f9fa; color: #333; }
-        .btn-del { background: #ff4757; padding: 5px 10px; font-size: 12px; }
+        body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding: 10px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 800px; margin: auto; }
+        input, button { width: 100%; padding: 10px; margin-top: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { background: #1a73e8; color: white; border: none; font-weight: bold; cursor: pointer; }
+        table { width: 100%; margin-top: 20px; border-collapse: collapse; background: white; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background: #f8f9fa; }
     </style>
 </head>
 <body>
 
-<div id="loginPage" class="card" style="margin-top: 50px;">
-    <h2 style="text-align: center;">دخول النظام</h2>
-    <input type="email" id="email" placeholder="البريد الإلكتروني">
-    <input type="password" id="pass" placeholder="كلمة السر">
+<div id="loginPage" class="card" style="margin-top: 50px; text-align: center;">
+    <h2>تسجيل دخول الإدارة</h2>
+    <input type="email" id="loginEmail" placeholder="البريد الإلكتروني">
+    <input type="password" id="loginPass" placeholder="كلمة السر">
     <button onclick="login()">دخول</button>
 </div>
 
-<div id="appContent" style="display:none;" class="card">
-    <h3 style="text-align: center;">إضافة طالب وصورة (ضغط ذكي)</h3>
-    <input type="hidden" id="editId">
-    <input type="hidden" id="currentImgUrl">
-    <input type="text" id="fName" placeholder="الاسم الكامل للطلب">
-    <input type="text" id="qNum" placeholder="رقم القيد">
-    <label style="font-size: 13px; color: #666;">صورة الطالب (حتى لو كانت 15MP سيتم ضغطها):</label>
-    <input type="file" id="studentImg" accept="image/*">
-    <button id="saveBtn" onclick="saveData()">حفظ البيانات والصورة</button>
+<div id="appContent" style="display:none;">
+    <div class="card">
+        <button onclick="logout()" style="background:#dc3545; width:auto; float:left;">خروج</button>
+        <h3 style="text-align:center;">إضافة طالب جديد</h3>
+        <input type="hidden" id="editId">
+        <input type="text" id="fName" placeholder="الاسم الرباعي">
+        <input type="text" id="mName" placeholder="اسم الأم">
+        <input type="text" id="qNum" placeholder="رقم القيد">
+        <input type="number" id="pNum" placeholder="رقم الصفحة">
+        <input type="text" id="note" placeholder="ملاحظات">
+        <button id="saveBtn" onclick="saveData()">حفظ في السحابة</button>
+        
+        <div style="display:flex; gap:10px;">
+            <button onclick="document.getElementById('fileInput').click()" style="background:#6f42c1;">📥 استيراد</button>
+            <button onclick="exportExcel()" style="background:#fd7e14;">📤 تصدير</button>
+        </div>
+        <input type="file" id="fileInput" hidden onchange="importExcel(event)">
+    </div>
 
-    <table>
+    <table class="card">
         <thead>
-            <tr><th>الصورة</th><th>الاسم</th><th>القيد</th><th>إجراء</th></tr>
+            <tr><th>الاسم</th><th>الأم</th><th>القيد</th><th>الصفحة</th><th>إجراء</th></tr>
         </thead>
         <tbody id="tableBody"></tbody>
     </table>
 </div>
 
+<script>
+    function render(data) {
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+        data.forEach(s => {
+            tbody.innerHTML += `<tr>
+                <td>${s.name}</td><td>${s.mother}</td><td>${s.qaid}</td><td>${s.page}</td>
+                <td><span onclick="edit('${s.id}')" style="color:blue; cursor:pointer;">تعديل</span></td>
+            </tr>`;
+        });
+    }
+
+    window.edit = (id) => {
+        const s = window.allStudentsData.find(x => x.id === id);
+        document.getElementById('editId').value = s.id;
+        document.getElementById('fName').value = s.name;
+        document.getElementById('mName').value = s.mother;
+        document.getElementById('qNum').value = s.qaid;
+        document.getElementById('pNum').value = s.page;
+        document.getElementById('note').value = s.note || '';
+        document.getElementById('saveBtn').innerText = 'تحديث';
+    };
+
+    function resetForm() {
+        document.getElementById('editId').value = '';
+        document.getElementById('fName').value = '';
+        document.getElementById('mName').value = '';
+        document.getElementById('qNum').value = '';
+        document.getElementById('pNum').value = '';
+        document.getElementById('note').value = '';
+        document.getElementById('saveBtn').innerText = 'حفظ في السحابة';
+    }
+</script>
 </body>
 </html>
