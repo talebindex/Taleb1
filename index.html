@@ -46,13 +46,9 @@
             const alertBox = document.getElementById('smartAlert');
             const mName = document.getElementById('mName').value.trim();
             if(val.length < 3) { alertBox.style.display = 'none'; return; }
-            
-            const found = window.allStudentsData.find(s => 
-                (s.name.trim() === val.trim() && s.mother.trim() === mName)
-            );
-
+            const found = window.allStudentsData.find(s => (s.name.trim() === val.trim() && s.mother.trim() === mName));
             if(found) {
-                alertBox.innerHTML = `<i class="fas fa-exclamation-triangle"></i> مضاف مسبقاً في: قيد (${found.qaid}) - صفحة (${found.page})`;
+                alertBox.innerHTML = `<i class="fas fa-exclamation-triangle"></i> مضاف مسبقاً: قيد (${found.qaid}) - ص (${found.page})`;
                 alertBox.style.display = 'block';
             } else { alertBox.style.display = 'none'; }
         };
@@ -77,12 +73,10 @@
             const container = document.getElementById('printTablesContainer');
             const printDate = document.getElementById('printDate');
             printDate.innerText = "تاريخ الاستخراج: " + new Date().toLocaleString('ar-EG');
-            
             container.innerHTML = '';
             const mid = Math.ceil(data.length / 2);
             const leftData = data.slice(0, mid);
             const rightData = data.slice(mid);
-
             const createTable = (subset, startIdx) => {
                 let html = '<table><thead><tr><th>ت</th><th>الاسم واللقب</th><th>الأم</th><th>قيد</th><th>ص</th></tr></thead><tbody>';
                 subset.forEach((s, i) => {
@@ -91,13 +85,7 @@
                 html += '</tbody></table>';
                 return html;
             };
-
-            container.innerHTML = `
-                <div style="display: flex; gap: 15px; width: 100%;">
-                    <div style="flex: 1;">${createTable(leftData, 0)}</div>
-                    <div style="flex: 1;">${createTable(rightData, mid)}</div>
-                </div>`;
-            
+            container.innerHTML = `<div style="display: flex; gap: 15px; width: 100%;"><div style="flex: 1;">${createTable(leftData, 0)}</div><div style="flex: 1;">${createTable(rightData, mid)}</div></div>`;
             window.closePrintOptions();
             setTimeout(() => { window.print(); window.applyFilters(); }, 500);
         };
@@ -123,19 +111,14 @@
             const page = document.getElementById('pNum').value.trim();
             const note = document.getElementById('note').value.trim();
 
-            if(!name || !mother || !qaid || !page) return alert("يرجى ملء كافة الحقول الأساسية");
+            if(!name || !mother || !qaid || !page) return alert("يرجى ملء كافة الحقول");
 
             const isDuplicate = window.allStudentsData.some(s => {
                 if (s.id === id) return false;
-                const nameMatch = (s.name === name && s.mother === mother);
-                const qaidMatch = (String(s.qaid) === String(qaid) && String(s.page) === String(page));
-                return nameMatch || qaidMatch;
+                return (s.name === name && s.mother === mother) || (String(s.qaid) === String(qaid) && String(s.page) === String(page));
             });
 
-            if (isDuplicate) {
-                const found = window.allStudentsData.find(s => (s.name === name && s.mother === mother) || (String(s.qaid) === String(qaid) && String(s.page) === String(page)));
-                return alert(`خطأ تكرار: الطالب مضاف مسبقاً في قيد (${found.qaid}) صفحة (${found.page})`);
-            }
+            if (isDuplicate) return alert("خطأ: هذا الطالب أو رقم القيد والصفحة مكرر مسبقاً!");
 
             try {
                 const studentData = { name, surname, mother, qaid, page, note, timestamp: Date.now() };
@@ -143,7 +126,7 @@
                 else await addDoc(studentsCol, studentData);
                 window.closeAddModal();
                 window.resetForm();
-            } catch (e) { alert("حدث خطأ أثناء الحفظ"); }
+            } catch (e) { alert("حدث خطأ"); }
         };
 
         window.importExcel = (event) => {
@@ -156,6 +139,7 @@
                 const json = XLSX.utils.sheet_to_json(sheet);
                 const batch = writeBatch(db);
                 let addedCount = 0;
+                let skipCount = 0;
 
                 json.forEach(row => {
                     const rName = String(row.name || row["الاسم"] || "").trim();
@@ -163,12 +147,13 @@
                     const rQaid = String(row.qaid || row["القيد"] || "").trim();
                     const rPage = String(row.page || row["الصفحة"] || "").trim();
 
+                    // التدقيق الصارم: منع استيراد لو القيد والصفحة مكررين في القاعدة
                     const duplicate = window.allStudentsData.find(s => 
                         (s.name === rName && s.mother === rMother) || 
                         (String(s.qaid) === rQaid && String(s.page) === rPage)
                     );
 
-                    if (!duplicate && rName) {
+                    if (!duplicate && rName && rQaid && rPage) {
                         const newDoc = doc(collection(db, "students"));
                         batch.set(newDoc, {
                             name: rName, surname: String(row.surname || row["اللقب"] || ""),
@@ -177,10 +162,12 @@
                             timestamp: Date.now()
                         });
                         addedCount++;
+                    } else {
+                        skipCount++;
                     }
                 });
                 await batch.commit();
-                alert(`تم استيراد ${addedCount} طالب بنجاح`);
+                alert(`اكتملت العملية:\n- تم استيراد: ${addedCount} طالب\n- تم تجاهل المكرر (قيد وصفحة): ${skipCount}`);
             };
             reader.readAsArrayBuffer(file);
         };
@@ -276,7 +263,7 @@
         .search-wrapper { display: flex; align-items: center; gap: 8px; background: var(--card); padding: 5px 15px; border-radius: 50px; border: 2px solid var(--blue); margin-bottom: 15px; }
         .search-wrapper input { border: none; background: transparent; flex: 1; outline: none; color: var(--text); }
         input, select, textarea { width: 100%; padding: 10px; margin-top: 6px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; background: var(--card); color: var(--text); }
-        .smart-alert { background: #fff3cd; color: #856404; padding: 10px; border-radius: 6px; font-size: 0.85rem; display: none; margin-top: 5px; border: 1px solid #ffeeba; text-align: center; font-weight: bold; }
+        .smart-alert { background: #fff3cd; color: #856404; padding: 10px; border-radius: 6px; font-size: 0.85rem; display: none; margin-top: 5px; border: 1px solid #ffeeba; text-align: center; }
 
         @media print {
             .no-print, .theme-toggle, i, .modal, .index-badge, .search-wrapper, .action-bar { display: none !important; }
