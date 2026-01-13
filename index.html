@@ -9,7 +9,7 @@
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc } 
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, writeBatch } 
         from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } 
         from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
@@ -55,7 +55,9 @@
         window.showPrintOptions = () => {
             const qaidSelect = document.getElementById('qaidSelect');
             qaidSelect.innerHTML = '<option value="">-- اختر رقم القيد للطباعة --</option>';
-            const uniqueQaids = [...new Set(window.allStudentsData.map(s => s.qaid))].filter(q => q && q.trim() !== "").sort((a, b) => Number(a) - Number(b));
+            const uniqueQaids = [...new Set(window.allStudentsData.map(s => s.qaid))]
+                                .filter(q => q && q.trim() !== "")
+                                .sort((a, b) => Number(a) - Number(b));
             uniqueQaids.forEach(q => {
                 const count = window.allStudentsData.filter(s => s.qaid == q).length;
                 qaidSelect.innerHTML += `<option value="${q}">قيد رقم ${q} (${count} طالب)</option>`;
@@ -63,12 +65,34 @@
             document.getElementById('printModal').style.display = 'flex';
         };
 
-        window.closePrintOptions = () => document.getElementById('printModal').style.display = 'none';
+        window.closePrintOptions = () => {
+            document.getElementById('printModal').style.display = 'none';
+        };
 
-        // --- تعديل خصائص الطباعة فقط ---
+        window.printAllAlpha = () => {
+            let dataToPrint = [...window.allStudentsData];
+            dataToPrint.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+            window.executePrint(dataToPrint);
+        };
+
+        window.printSelectedQaidOption = () => {
+            const selectedQaid = document.getElementById('qaidSelect').value;
+            if (!selectedQaid) return alert("الرجاء اختيار رقم القيد من القائمة أولاً");
+            let dataToPrint = window.allStudentsData.filter(s => String(s.qaid) === String(selectedQaid));
+            dataToPrint.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+            window.executePrint(dataToPrint);
+        };
+
+        window.printQaid = (qaidNum) => {
+            let filtered = window.allStudentsData.filter(s => String(s.qaid) === String(qaidNum));
+            filtered.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+            window.executePrint(filtered);
+        };
+
+        // دالة الطباعة المعدلة لضمان عدم تكرار الأسماء
         window.executePrint = (data) => {
             const printBody = document.getElementById('printBody');
-            // التأكد من مسح الجدول تماماً قبل إضافة البيانات الجديدة
+            // خطوة هامة: إفراغ جدول الطباعة تماماً قبل تعبئته بالفلتر الجديد
             printBody.innerHTML = ''; 
             
             data.forEach(s => {
@@ -77,64 +101,11 @@
 
             window.closePrintOptions();
             
-            // تأخير بسيط جداً لضمان معالجة المتصفح للجدول الجديد
             setTimeout(() => { 
-                window.print();
-                // إعادة تحميل الجدول الأصلي بعد الطباعة لضمان بقاء العرض سليماً
+                window.print(); 
+                // استعادة القائمة الأصلية في الواجهة بعد إغلاق نافذة الطباعة
                 window.applyFilters(); 
             }, 300);
-        };
-
-        window.printAllAlpha = () => {
-            let data = [...window.allStudentsData].sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-            window.executePrint(data);
-        };
-
-        window.printSelectedQaidOption = () => {
-            const qaid = document.getElementById('qaidSelect').value;
-            if (!qaid) return alert("يرجى اختيار رقم القيد أولاً");
-            let data = window.allStudentsData.filter(s => String(s.qaid) === String(qaid)).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-            window.executePrint(data);
-        };
-
-        window.printQaid = (qaidNum) => {
-            let data = window.allStudentsData.filter(s => String(s.qaid) === String(qaidNum)).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-            window.executePrint(data);
-        };
-        // ---------------------------------
-
-        window.applyFilters = () => {
-            const term = document.getElementById('searchInput').value.toLowerCase();
-            const sortBy = document.getElementById('sortSelect').value;
-            let filtered = (window.allStudentsData || []).filter(s => 
-                s.name.toLowerCase().includes(term) || (s.surname || "").toLowerCase().includes(term) || String(s.qaid).includes(term)
-            );
-            if (sortBy === "alpha") filtered.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-            else filtered.sort((a, b) => b.timestamp - a.timestamp);
-            window.render(filtered);
-        };
-
-        window.render = (data) => {
-            const list = document.getElementById('studentsList');
-            list.innerHTML = '';
-            data.forEach(s => {
-                list.innerHTML += `
-                    <div class="student-item card">
-                        <div class="student-details">
-                            <p class="student-name">${s.name} ${s.surname ? '<span style="color:var(--orange)">['+s.surname+']</span>' : ''}</p>
-                            <div class="student-meta">
-                                <span>الأم: ${s.mother}</span>
-                                <span class="highlight-badge qaid-badge">قيد: ${s.qaid}</span>
-                                <span class="highlight-badge page-badge">صفحة: ${s.page}</span>
-                            </div>
-                        </div>
-                        <div style="display: flex; gap: 15px; align-items:center;">
-                            <i class="fas fa-print" style="color:#10b981; cursor:pointer;" onclick="printQaid('${s.qaid}')"></i>
-                            <i class="fas fa-edit" style="color:var(--blue); cursor:pointer;" onclick="edit('${s.id}')"></i>
-                            <i class="fas fa-trash" style="color:#ef4444; cursor:pointer;" onclick="del('${s.id}')"></i>
-                        </div>
-                    </div>`;
-            });
         };
 
         window.saveData = async () => {
@@ -154,6 +125,41 @@
                 else await addDoc(studentsCol, student);
                 window.resetForm();
             } catch (e) { alert("خطأ في الحفظ"); }
+        };
+
+        window.applyFilters = () => {
+            const term = document.getElementById('searchInput').value.toLowerCase();
+            const sortBy = document.getElementById('sortSelect').value;
+            let filtered = (window.allStudentsData || []).filter(s => 
+                s.name.toLowerCase().includes(term) || (s.surname || "").toLowerCase().includes(term) || String(s.qaid).includes(term)
+            );
+            if (sortBy === "alpha") filtered.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+            else filtered.sort((a, b) => b.timestamp - a.timestamp);
+            window.render(filtered);
+        };
+
+        window.render = (data) => {
+            const list = document.getElementById('studentsList');
+            list.innerHTML = ''; 
+            // لاحظ هنا: قمنا بإزالة مسح printBody من دالة render العادية لتبقى دالة executePrint هي المسؤولة الوحيدة عنه عند الطباعة
+            data.forEach(s => {
+                list.innerHTML += `
+                    <div class="student-item card">
+                        <div class="student-details">
+                            <p class="student-name">${s.name} ${s.surname ? '<span style="color:var(--orange)">['+s.surname+']</span>' : ''}</p>
+                            <div class="student-meta">
+                                <span>الأم: ${s.mother}</span>
+                                <span class="highlight-badge qaid-badge">قيد: ${s.qaid}</span>
+                                <span class="highlight-badge page-badge">صفحة: ${s.page}</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 12px; align-items:center;">
+                            <i class="fas fa-print" style="color:#10b981; cursor:pointer;" title="طباعة هذا القيد" onclick="printQaid('${s.qaid}')"></i>
+                            <i class="fas fa-edit" style="color:var(--blue); cursor:pointer;" onclick="edit('${s.id}')"></i>
+                            <i class="fas fa-trash" style="color:#ef4444; cursor:pointer;" onclick="del('${s.id}')"></i>
+                        </div>
+                    </div>`;
+            });
         };
 
         window.edit = (id) => {
@@ -176,11 +182,13 @@
             const pass = document.getElementById('loginPass').value;
             try { await signInWithEmailAndPassword(auth, email, pass); } catch (e) { alert("خطأ دخول"); }
         };
+
         window.exportExcel = () => {
             const ws = XLSX.utils.json_to_sheet(window.allStudentsData.map(({id, timestamp, ...rest}) => rest));
             const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
             XLSX.writeFile(wb, "سجل_الطلاب.xlsx");
         };
+
         window.toggleDarkMode = () => document.body.classList.toggle('dark-mode');
         window.resetForm = () => {
             document.getElementById('editId').value = '';
@@ -189,7 +197,7 @@
             document.getElementById('saveBtn').innerHTML = '<i class="fas fa-save"></i> حفظ السجل';
         };
     </script>
-
+    
     <style>
         :root { --main: #1e293b; --blue: #0ea5e9; --orange: #f59e0b; --bg: #f1f5f9; --card: #ffffff; --text: #334155; }
         body.dark-mode { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --main: #38bdf8; }
@@ -198,21 +206,24 @@
         .card { background: var(--card); padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px; border: 1px solid rgba(0,0,0,0.05); }
         .search-wrapper { display: flex; align-items: center; gap: 8px; background: var(--card); padding: 5px 15px; border-radius: 50px; border: 2px solid var(--blue); margin-bottom: 15px; }
         .search-wrapper input { border: none; background: transparent; padding: 8px; flex: 1; color: var(--text); outline: none; }
-        input, select, textarea { background: var(--card); color: var(--text); width: 100%; padding: 12px; margin-top: 8px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        .btn { border: none; border-radius: 8px; cursor: pointer; padding: 12px; font-weight: bold; color: white; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .grid-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        input, select, textarea { background: var(--card); color: var(--text); width: 100%; padding: 10px; margin-top: 6px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .btn { border: none; border-radius: 8px; cursor: pointer; padding: 10px; font-weight: bold; color: white; display: flex; align-items: center; justify-content: center; gap: 5px; }
         .btn-save { background: var(--main); width: 100%; margin-top: 8px; }
-        .action-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-        .student-item { display: flex; align-items: center; justify-content: space-between; border-right: 5px solid var(--blue); padding: 12px; }
+        .action-bar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 8px; }
+        .student-item { display: flex; align-items: center; justify-content: space-between; border-right: 4px solid var(--blue); padding: 10px; }
         .student-name { font-size: 1rem; font-weight: bold; color: var(--main); margin: 0; }
-        .student-meta { display: flex; gap: 10px; margin-top: 6px; font-size: 0.85rem; }
-        .highlight-badge { padding: 2px 8px; border-radius: 5px; font-weight: bold; }
+        .student-meta { display: flex; gap: 8px; margin-top: 5px; font-size: 0.85rem; }
+        .highlight-badge { padding: 1px 6px; border-radius: 4px; font-weight: bold; }
         .qaid-badge { background: #e0f2fe; color: #0369a1; }
         .page-badge { background: #fef9c3; color: #854d0e; }
-        .smart-alert { background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 8px; margin-top: 8px; display: none; font-size: 0.9rem; }
-        .theme-toggle { position: fixed; bottom: 20px; left: 20px; width: 50px; height: 50px; border-radius: 50%; background: var(--main); color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1000; }
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 2000; }
-        .modal-content { background: var(--card); padding: 25px; border-radius: 15px; width: 90%; max-width: 350px; text-align: center; }
-        .modal-btn { width: 100%; margin: 8px 0; padding: 14px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
+        .smart-alert { background: #fee2e2; color: #b91c1c; padding: 8px; border-radius: 6px; margin-top: 6px; font-size: 0.8rem; display: none; }
+        .theme-toggle { position: fixed; bottom: 20px; left: 20px; width: 45px; height: 45px; border-radius: 50%; background: var(--main); color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 2000; }
+        .modal-content { background: var(--card); padding: 25px; border-radius: 15px; width: 320px; text-align: center; }
+        .modal-btn { width: 100%; margin: 8px 0; padding: 12px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 0.95rem; }
+        .modal-select { width: 100%; padding: 12px; margin: 10px 0; border: 2px solid var(--blue); border-radius: 10px; background: var(--bg); color: var(--text); font-size: 1rem; }
 
         @media print {
             @page { margin: 0.3cm; }
@@ -224,8 +235,9 @@
             .print-header h2 { margin: 0; font-size: 15pt; }
             .print-header p { margin: 0; font-size: 10pt; font-weight: bold; }
             table { width: 100%; border-collapse: collapse; margin-top: 2px; }
-            th, td { border: 1.2px solid black !important; padding: 3px 6px; text-align: center; font-size: 10pt; }
+            th, td { border: 1.2px solid black !important; padding: 3px 6px; text-align: center; font-size: 10pt; line-height: 1.1; }
             th { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; }
+            tr { page-break-inside: avoid; }
         }
         .print-area { display: none; }
     </style>
@@ -235,11 +247,15 @@
 <div id="printModal" class="modal">
     <div class="modal-content card">
         <h3 style="margin-top:0; color:var(--blue)">خيارات الطباعة</h3>
-        <button class="modal-btn" style="background:#f1f5f9; color:#334155; border:1px solid #ccc" onclick="printAllAlpha()">طباعة السجل كاملاً (أبجدي)</button>
+        <button class="modal-btn" style="background:#f1f5f9; color:#334155; border:1px solid #ccc" onclick="printAllAlpha()">
+            <i class="fas fa-list-ul"></i> طباعة السجل كاملاً (أبجدي)
+        </button>
         <hr style="margin: 15px 0; border: 0; border-top: 1px solid #eee;">
-        <h4 style="margin:0 0 10px 0; text-align:right">طباعة قيد محدد:</h4>
-        <select id="qaidSelect" style="margin-bottom:15px; border:2px solid var(--blue)"></select>
-        <button class="modal-btn" style="background:var(--blue); color:white" onclick="printSelectedQaidOption()">تأكيد طباعة القيد</button>
+        <h4 style="margin:0 0 5px 0; text-align:right">طباعة قيد محدد:</h4>
+        <select id="qaidSelect" class="modal-select"></select>
+        <button class="modal-btn" style="background:var(--blue); color:white" onclick="printSelectedQaidOption()">
+            <i class="fas fa-print"></i> تأكيد طباعة القيد المختار
+        </button>
         <button class="modal-btn" style="background:#ef4444; color:white; margin-top:10px" onclick="closePrintOptions()">إلغاء</button>
     </div>
 </div>
@@ -267,8 +283,8 @@
     </div>
 
     <div class="no-print">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <span>العدد الإجمالي: <b id="totalCount" style="color: var(--blue);">0</b></span>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span>الإجمالي: <b id="totalCount" style="color: var(--blue);">0</b></span>
             <button onclick="logout()" style="color:#ef4444; border:none; background:none; font-weight:bold; cursor:pointer;">خروج</button>
         </div>
 
@@ -277,22 +293,24 @@
             <input type="text" id="fName" placeholder="الاسم الرباعي" oninput="checkDuplicate(this.value)">
             <div id="smartAlert" class="smart-alert"></div>
             <input type="text" id="surname" placeholder="اللقب">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="grid-inputs">
                 <input type="text" id="mName" placeholder="اسم الأم">
                 <input type="text" id="qNum" placeholder="رقم القيد">
+                <input type="number" id="pNum" placeholder="رقم الصفحة">
             </div>
-            <input type="number" id="pNum" placeholder="رقم الصفحة">
             <textarea id="note" placeholder="ملاحظات..." rows="1"></textarea>
             <button id="saveBtn" class="btn btn-save" onclick="saveData()"><i class="fas fa-save"></i> حفظ السجل</button>
             <div class="action-bar">
-                <button class="btn" style="background:var(--orange)" onclick="exportExcel()">تصدير Excel</button>
-                <button class="btn" style="background:var(--blue)" onclick="showPrintOptions()"><i class="fas fa-print"></i> الطباعة</button>
+                <button class="btn" style="background:#6366f1" onclick="document.getElementById('file').click()">استيراد</button>
+                <button class="btn" style="background:var(--orange)" onclick="exportExcel()">تصدير</button>
+                <button class="btn" style="background:var(--blue)" onclick="showPrintOptions()"><i class="fas fa-print"></i> طباعة</button>
             </div>
+            <input type="file" id="file" hidden>
         </div>
 
         <div class="search-wrapper">
             <i class="fas fa-search"></i>
-            <input type="text" id="searchInput" placeholder="بحث باسم الطالب أو رقم القيد..." onkeyup="applyFilters()">
+            <input type="text" id="searchInput" placeholder="بحث..." onkeyup="applyFilters()">
             <select id="sortSelect" onchange="applyFilters()" style="width: auto; margin:0; border:none;">
                 <option value="newest">الأحدث</option>
                 <option value="alpha">أبجدي</option>
