@@ -115,10 +115,12 @@
 
             const isDuplicate = window.allStudentsData.some(s => {
                 if (s.id === id) return false;
-                return (s.name === name && s.mother === mother) || (String(s.qaid) === String(qaid) && String(s.page) === String(page));
+                const matchName = (s.name.trim() === name && s.mother.trim() === mother);
+                const matchQaid = (String(s.qaid).trim() === String(qaid).trim() && String(s.page).trim() === String(page).trim());
+                return matchName || matchQaid;
             });
 
-            if (isDuplicate) return alert("خطأ: هذا الطالب أو رقم القيد والصفحة مكرر مسبقاً!");
+            if (isDuplicate) return alert("خطأ: هذا الطالب أو رقم القيد والصفحة مكرر مسبقاً في النظام!");
 
             try {
                 const studentData = { name, surname, mother, qaid, page, note, timestamp: Date.now() };
@@ -141,19 +143,22 @@
                 let addedCount = 0;
                 let skipCount = 0;
 
+                // تحديث الذاكرة المحلية قبل الفحص لضمان الدقة
+                const currentData = window.allStudentsData;
+
                 json.forEach(row => {
                     const rName = String(row.name || row["الاسم"] || "").trim();
                     const rMother = String(row.mother || row["الأم"] || "").trim();
                     const rQaid = String(row.qaid || row["القيد"] || "").trim();
                     const rPage = String(row.page || row["الصفحة"] || "").trim();
 
-                    // التدقيق الصارم: منع استيراد لو القيد والصفحة مكررين في القاعدة
-                    const duplicate = window.allStudentsData.find(s => 
-                        (s.name === rName && s.mother === rMother) || 
-                        (String(s.qaid) === rQaid && String(s.page) === rPage)
+                    // منع الاستيراد في حال تطابق (الاسم والأم) أو (القيد والصفحة)
+                    const isExisting = currentData.some(s => 
+                        (s.name.trim() === rName && s.mother.trim() === rMother) || 
+                        (String(s.qaid).trim() === rQaid && String(s.page).trim() === rPage)
                     );
 
-                    if (!duplicate && rName && rQaid && rPage) {
+                    if (!isExisting && rName && rQaid && rPage) {
                         const newDoc = doc(collection(db, "students"));
                         batch.set(newDoc, {
                             name: rName, surname: String(row.surname || row["اللقب"] || ""),
@@ -162,14 +167,22 @@
                             timestamp: Date.now()
                         });
                         addedCount++;
+                        // إضافة السجل الجديد مؤقتاً للقائمة لمنع تكراره داخل نفس ملف الإكسل أيضاً
+                        currentData.push({ name: rName, mother: rMother, qaid: rQaid, page: rPage });
                     } else {
                         skipCount++;
                     }
                 });
-                await batch.commit();
-                alert(`اكتملت العملية:\n- تم استيراد: ${addedCount} طالب\n- تم تجاهل المكرر (قيد وصفحة): ${skipCount}`);
+                
+                if (addedCount > 0) {
+                    await batch.commit();
+                    alert(`اكتمل الاستيراد:\n- تمت إضافة: ${addedCount} طالب\n- تم تجاهل المكرر: ${skipCount}`);
+                } else {
+                    alert(`لم يتم إضافة أي بيانات. (تم تجاهل ${skipCount} سجل مكرر أو غير مكتمل)`);
+                }
             };
             reader.readAsArrayBuffer(file);
+            event.target.value = ''; // لتمكين اختيار نفس الملف مرة أخرى
         };
 
         window.applyFilters = () => {
