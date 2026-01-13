@@ -74,6 +74,12 @@
 
         window.executePrint = (data) => {
             const printBody = document.getElementById('printBody');
+            const printDate = document.getElementById('printDate');
+            
+            // إضافة التاريخ والوقت الحالي
+            const now = new Date();
+            printDate.innerText = "تاريخ الاستخراج: " + now.toLocaleString('ar-EG');
+            
             printBody.innerHTML = ''; 
             data.forEach((s, index) => {
                 printBody.innerHTML += `<tr><td>${index + 1}</td><td>${s.name} ${s.surname || ''}</td><td>${s.mother}</td><td>${s.qaid}</td><td>${s.page}</td></tr>`;
@@ -89,7 +95,7 @@
 
         window.printSelectedQaidOption = () => {
             const qaid = document.getElementById('qaidSelect').value;
-            if (!qaid) return alert("يرجى اختيار رقم القيد أولاً");
+            if (!qaid) return alert("يرجى اختيار رقم القيد");
             let data = window.allStudentsData.filter(s => String(s.qaid) === String(qaid)).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
             window.executePrint(data);
         };
@@ -111,7 +117,7 @@
                 else await addDoc(studentsCol, student);
                 window.closeAddModal();
                 window.resetForm();
-            } catch (e) { alert("حدث خطأ أثناء الحفظ"); }
+            } catch (e) { alert("حدث خطأ"); }
         };
 
         window.importExcel = (event) => {
@@ -136,7 +142,7 @@
                     });
                 });
                 await batch.commit();
-                alert("تم استيراد البيانات بنجاح");
+                alert("تم الاستيراد بنجاح");
             };
             reader.readAsArrayBuffer(file);
         };
@@ -170,8 +176,8 @@
                             </div>
                         </div>
                         <div style="display: flex; gap: 15px; align-items:center;">
-                            <i class="fas fa-edit" style="color:var(--blue); cursor:pointer; font-size: 1.2rem;" title="تعديل" onclick="edit('${s.id}')"></i>
-                            <i class="fas fa-trash" style="color:#ef4444; cursor:pointer; font-size: 1.2rem;" title="حذف" onclick="del('${s.id}')"></i>
+                            <i class="fas fa-edit" style="color:var(--blue); cursor:pointer;" title="تعديل" onclick="edit('${s.id}')"></i>
+                            <i class="fas fa-trash" style="color:#ef4444; cursor:pointer;" title="حذف" onclick="del('${s.id}')"></i>
                         </div>
                     </div>`;
             });
@@ -190,12 +196,12 @@
             document.getElementById('entryModal').style.display = 'flex';
         };
 
-        window.del = async (id) => { if(confirm('هل أنت متأكد من حذف هذا السجل؟')) await deleteDoc(doc(db, "students", id)); };
+        window.del = async (id) => { if(confirm('حذف؟')) await deleteDoc(doc(db, "students", id)); };
         window.logout = () => signOut(auth);
         window.login = async () => {
             const email = document.getElementById('loginEmail').value;
             const pass = document.getElementById('loginPass').value;
-            try { await signInWithEmailAndPassword(auth, email, pass); } catch (e) { alert("بيانات الدخول غير صحيحة"); }
+            try { await signInWithEmailAndPassword(auth, email, pass); } catch (e) { alert("خطأ دخول"); }
         };
         window.exportExcel = () => {
             const ws = XLSX.utils.json_to_sheet(window.allStudentsData.map(({id, timestamp, ...rest}) => rest));
@@ -217,32 +223,52 @@
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 10px; direction: rtl; }
         .container { max-width: 700px; margin: auto; }
         .card { background: var(--card); padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px; border: 1px solid rgba(0,0,0,0.05); }
-        .search-wrapper { display: flex; align-items: center; gap: 8px; background: var(--card); padding: 5px 15px; border-radius: 50px; border: 2px solid var(--blue); margin-bottom: 15px; }
-        .search-wrapper input { border: none; background: transparent; padding: 8px; flex: 1; color: var(--text); outline: none; }
-        .grid-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        input, select, textarea { background: var(--card); color: var(--text); width: 100%; padding: 10px; margin-top: 6px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
         .btn { border: none; border-radius: 8px; cursor: pointer; padding: 10px; font-weight: bold; color: white; display: flex; align-items: center; justify-content: center; gap: 5px; }
         .btn-save { background: var(--main); width: 100%; margin-top: 8px; }
         .action-bar { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; margin-bottom: 15px; }
         .student-item { display: flex; align-items: center; justify-content: space-between; border-right: 4px solid var(--blue); padding: 10px; }
         .student-name { font-size: 1rem; font-weight: bold; color: var(--main); margin: 0; }
         .student-meta { display: flex; gap: 8px; margin-top: 5px; font-size: 0.85rem; }
-        .index-badge { background: var(--bg); color: var(--text); width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.7rem; font-weight: bold; border: 1px solid #ddd; }
         .highlight-badge { padding: 1px 6px; border-radius: 4px; font-weight: bold; }
         .qaid-badge { background: #e0f2fe; color: #0369a1; }
         .page-badge { background: #fef9c3; color: #854d0e; }
-        .smart-alert { background: #fee2e2; color: #b91c1c; padding: 8px; border-radius: 6px; margin-top: 6px; font-size: 0.8rem; display: none; }
+        .index-badge { background: var(--bg); color: var(--text); width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.7rem; font-weight: bold; border: 1px solid #ddd; }
         .theme-toggle { position: fixed; bottom: 20px; left: 20px; width: 45px; height: 45px; border-radius: 50%; background: var(--main); color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1000; }
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 2000; }
         .modal-content { background: var(--card); padding: 25px; border-radius: 15px; width: 90%; max-width: 400px; text-align: center; }
         .modal-btn { width: 100%; margin: 8px 0; padding: 12px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
+        .search-wrapper { display: flex; align-items: center; gap: 8px; background: var(--card); padding: 5px 15px; border-radius: 50px; border: 2px solid var(--blue); margin-bottom: 15px; }
+        .search-wrapper input { border: none; background: transparent; padding: 8px; flex: 1; color: var(--text); outline: none; }
+        .grid-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        input, select, textarea { background: var(--card); color: var(--text); width: 100%; padding: 10px; margin-top: 6px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .smart-alert { background: #fee2e2; color: #b91c1c; padding: 8px; border-radius: 6px; margin-top: 6px; font-size: 0.8rem; display: none; }
+
+        /* تسيق الطباعة المتطور */
         @media print {
-            .no-print, .theme-toggle, .search-wrapper, .action-bar, .card, i, .modal { display: none !important; }
-            body { background: white !important; padding: 0 !important; }
-            .print-area { display: block !important; }
-            .print-header { text-align: center; margin-bottom: 10px; border-bottom: 2px solid #000; }
-            table { width: 100%; border-collapse: collapse; }
-            th, td { border: 1px solid black !important; padding: 4px; text-align: center; font-size: 10pt; }
+            .no-print, .theme-toggle, .search-wrapper, .action-bar, .card, i, .modal, .index-badge { display: none !important; }
+            body { background: white !important; padding: 0 !important; margin: 0 !important; }
+            .print-area { display: block !important; padding: 10px; }
+            .print-header { text-align: center; border-bottom: 2px solid #000; margin-bottom: 15px; padding-bottom: 5px; }
+            .print-header h2 { margin: 5px 0; font-size: 16pt; }
+            .print-header p { margin: 2px 0; font-size: 10pt; }
+            
+            /* تقسيم الصفحة لعمودين */
+            .table-container { 
+                column-count: 2; 
+                column-gap: 20px; 
+                column-rule: 1px solid #ccc;
+            }
+            
+            table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                break-inside: avoid; 
+                margin-bottom: 10px;
+            }
+            th, td { border: 1px solid black !important; padding: 3px; text-align: center; font-size: 9pt; }
+            th { background-color: #f2f2f2 !important; -webkit-print-color-adjust: exact; }
+            
+            #printDate { font-size: 8pt; color: #555; margin-top: 5px; display: block; text-align: left; }
         }
         .print-area { display: none; }
     </style>
@@ -253,13 +279,13 @@
     <div class="modal-content card">
         <h3 style="margin:0 0 10px 0; color:var(--blue)">بيانات الطالب</h3>
         <input type="hidden" id="editId">
-        <input type="text" id="fName" placeholder="الاسم الرباعي الكامل" oninput="checkDuplicate(this.value)">
+        <input type="text" id="fName" placeholder="الاسم الرباعي" oninput="checkDuplicate(this.value)">
         <div id="smartAlert" class="smart-alert"></div>
         <input type="text" id="surname" placeholder="اللقب">
         <div class="grid-inputs">
-            <input type="text" id="mName" placeholder="اسم الأم">
-            <input type="text" id="qNum" placeholder="رقم القيد">
-            <input type="number" id="pNum" placeholder="رقم الصفحة">
+            <input type="text" id="mName" placeholder="الأم">
+            <input type="text" id="qNum" placeholder="القيد">
+            <input type="number" id="pNum" placeholder="الصفحة">
         </div>
         <textarea id="note" placeholder="ملاحظات..." rows="2"></textarea>
         <button id="saveBtn" class="btn btn-save" onclick="saveData()"><i class="fas fa-save"></i> حفظ السجل</button>
@@ -270,9 +296,8 @@
 <div id="printModal" class="modal">
     <div class="modal-content card">
         <h3 style="margin:0 0 10px 0; color:var(--blue)">خيارات الطباعة</h3>
-        <button class="modal-btn" style="background:#f1f5f9; color:#334155; border:1px solid #ccc" onclick="printAllAlpha()">طباعة السجل بالكامل (أبجدياً)</button>
+        <button class="modal-btn" style="background:#f1f5f9; color:#334155; border:1px solid #ccc" onclick="printAllAlpha()">طباعة الكل (أبجدي)</button>
         <hr style="margin: 15px 0; border: 0; border-top: 1px solid #eee;">
-        <p style="font-size: 0.9rem; margin-bottom: 5px;">أو طباعة قيد محدد:</p>
         <select id="qaidSelect" style="width:100%; padding:10px; border-radius:8px; margin-bottom:10px;"></select>
         <button class="modal-btn" style="background:var(--blue); color:white" onclick="printSelectedQaidOption()">تأكيد طباعة القيد</button>
         <button class="modal-btn" style="background:#ef4444; color:white; margin-top:10px" onclick="closePrintOptions()">إلغاء</button>
@@ -283,7 +308,7 @@
     <div class="card" style="width: 300px; text-align: center;">
         <i class="fas fa-user-shield fa-3x" style="color: var(--blue); margin-bottom: 10px;"></i>
         <h3>دخول النظام</h3>
-        <input type="email" id="loginEmail" placeholder="البريد الإلكتروني">
+        <input type="email" id="loginEmail" placeholder="البريد">
         <input type="password" id="loginPass" placeholder="كلمة السر">
         <button class="btn btn-save" onclick="login()">دخول</button>
     </div>
@@ -294,16 +319,19 @@
         <div class="print-header">
             <h2>فهرس القيد العام</h2>
             <p>ثانوية الشهيد محمد عبد العزيز الكنعان للبنين</p>
+            <span id="printDate"></span>
         </div>
-        <table>
-            <thead><tr><th>ت</th><th style="width:40%">الاسم واللقب</th><th>اسم الأم</th><th>القيد</th><th>ص</th></tr></thead>
-            <tbody id="printBody"></tbody>
-        </table>
+        <div class="table-container">
+            <table>
+                <thead><tr><th>ت</th><th style="width:45%">الاسم واللقب</th><th>الأم</th><th>قيد</th><th>ص</th></tr></thead>
+                <tbody id="printBody"></tbody>
+            </table>
+        </div>
     </div>
 
     <div class="no-print">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <span>المجموع: <b id="totalCount" style="color: var(--blue);">0</b> طالب</span>
+            <span>المجموع: <b id="totalCount" style="color: var(--blue);">0</b></span>
             <button onclick="logout()" style="color:#ef4444; border:none; background:none; font-weight:bold; cursor:pointer;">خروج</button>
         </div>
 
