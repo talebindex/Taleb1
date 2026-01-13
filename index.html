@@ -9,7 +9,7 @@
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, writeBatch } 
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc } 
         from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } 
         from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
@@ -65,22 +65,23 @@
 
         window.closePrintOptions = () => document.getElementById('printModal').style.display = 'none';
 
-        // دالة الطباعة المحسنة: تضمن تنظيف الجدول قبل الطباعة
+        // --- تعديل خصائص الطباعة فقط ---
         window.executePrint = (data) => {
-            // 1. مسح محتوى جدول الطباعة أولاً
             const printBody = document.getElementById('printBody');
-            printBody.innerHTML = '';
+            // التأكد من مسح الجدول تماماً قبل إضافة البيانات الجديدة
+            printBody.innerHTML = ''; 
             
-            // 2. تعبئة الجدول بالبيانات المفلترة فقط
             data.forEach(s => {
                 printBody.innerHTML += `<tr><td>${s.name} ${s.surname || ''}</td><td>${s.mother}</td><td>${s.qaid}</td><td>${s.page}</td></tr>`;
             });
 
             window.closePrintOptions();
-
-            // 3. إعطاء وقت قصير جداً للمتصفح لمعالجة البيانات ثم الطباعة
+            
+            // تأخير بسيط جداً لضمان معالجة المتصفح للجدول الجديد
             setTimeout(() => { 
-                window.print(); 
+                window.print();
+                // إعادة تحميل الجدول الأصلي بعد الطباعة لضمان بقاء العرض سليماً
+                window.applyFilters(); 
             }, 300);
         };
 
@@ -91,7 +92,7 @@
 
         window.printSelectedQaidOption = () => {
             const qaid = document.getElementById('qaidSelect').value;
-            if (!qaid) return alert("الرجاء اختيار قيد");
+            if (!qaid) return alert("يرجى اختيار رقم القيد أولاً");
             let data = window.allStudentsData.filter(s => String(s.qaid) === String(qaid)).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
             window.executePrint(data);
         };
@@ -100,6 +101,7 @@
             let data = window.allStudentsData.filter(s => String(s.qaid) === String(qaidNum)).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
             window.executePrint(data);
         };
+        // ---------------------------------
 
         window.applyFilters = () => {
             const term = document.getElementById('searchInput').value.toLowerCase();
@@ -196,7 +198,7 @@
         .card { background: var(--card); padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px; border: 1px solid rgba(0,0,0,0.05); }
         .search-wrapper { display: flex; align-items: center; gap: 8px; background: var(--card); padding: 5px 15px; border-radius: 50px; border: 2px solid var(--blue); margin-bottom: 15px; }
         .search-wrapper input { border: none; background: transparent; padding: 8px; flex: 1; color: var(--text); outline: none; }
-        input, select, textarea { background: var(--card); color: var(--text); width: 100%; padding: 12px; margin-top: 8px; border: 1px solid #ddd; border-radius: 8px; }
+        input, select, textarea { background: var(--card); color: var(--text); width: 100%; padding: 12px; margin-top: 8px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
         .btn { border: none; border-radius: 8px; cursor: pointer; padding: 12px; font-weight: bold; color: white; display: flex; align-items: center; justify-content: center; gap: 5px; }
         .btn-save { background: var(--main); width: 100%; margin-top: 8px; }
         .action-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
@@ -208,7 +210,6 @@
         .page-badge { background: #fef9c3; color: #854d0e; }
         .smart-alert { background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 8px; margin-top: 8px; display: none; font-size: 0.9rem; }
         .theme-toggle { position: fixed; bottom: 20px; left: 20px; width: 50px; height: 50px; border-radius: 50%; background: var(--main); color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1000; }
-        
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 2000; }
         .modal-content { background: var(--card); padding: 25px; border-radius: 15px; width: 90%; max-width: 350px; text-align: center; }
         .modal-btn { width: 100%; margin: 8px 0; padding: 14px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
@@ -234,4 +235,73 @@
 <div id="printModal" class="modal">
     <div class="modal-content card">
         <h3 style="margin-top:0; color:var(--blue)">خيارات الطباعة</h3>
-        <button class="modal-btn
+        <button class="modal-btn" style="background:#f1f5f9; color:#334155; border:1px solid #ccc" onclick="printAllAlpha()">طباعة السجل كاملاً (أبجدي)</button>
+        <hr style="margin: 15px 0; border: 0; border-top: 1px solid #eee;">
+        <h4 style="margin:0 0 10px 0; text-align:right">طباعة قيد محدد:</h4>
+        <select id="qaidSelect" style="margin-bottom:15px; border:2px solid var(--blue)"></select>
+        <button class="modal-btn" style="background:var(--blue); color:white" onclick="printSelectedQaidOption()">تأكيد طباعة القيد</button>
+        <button class="modal-btn" style="background:#ef4444; color:white; margin-top:10px" onclick="closePrintOptions()">إلغاء</button>
+    </div>
+</div>
+
+<div id="loginPage" style="height: 100vh; flex-direction: column; align-items: center; justify-content: center; display: none;">
+    <div class="card" style="width: 300px; text-align: center;">
+        <i class="fas fa-user-shield fa-3x" style="color: var(--blue); margin-bottom: 10px;"></i>
+        <h3>دخول النظام</h3>
+        <input type="email" id="loginEmail" placeholder="البريد">
+        <input type="password" id="loginPass" placeholder="كلمة السر">
+        <button class="btn btn-save" onclick="login()">دخول</button>
+    </div>
+</div>
+
+<div id="appContent" class="container" style="display: none;">
+    <div class="print-area">
+        <div class="print-header">
+            <h2>فهرس القيد العام</h2>
+            <p>ثانوية الشهيد محمد عبد العزيز الكنعان للبنين</p>
+        </div>
+        <table>
+            <thead><tr><th style="width:45%">الاسم الكامل واللقب</th><th style="width:25%">اسم الأم</th><th style="width:15%">القيد</th><th style="width:15%">الصفحة</th></tr></thead>
+            <tbody id="printBody"></tbody>
+        </table>
+    </div>
+
+    <div class="no-print">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span>العدد الإجمالي: <b id="totalCount" style="color: var(--blue);">0</b></span>
+            <button onclick="logout()" style="color:#ef4444; border:none; background:none; font-weight:bold; cursor:pointer;">خروج</button>
+        </div>
+
+        <div class="card">
+            <input type="hidden" id="editId">
+            <input type="text" id="fName" placeholder="الاسم الرباعي" oninput="checkDuplicate(this.value)">
+            <div id="smartAlert" class="smart-alert"></div>
+            <input type="text" id="surname" placeholder="اللقب">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <input type="text" id="mName" placeholder="اسم الأم">
+                <input type="text" id="qNum" placeholder="رقم القيد">
+            </div>
+            <input type="number" id="pNum" placeholder="رقم الصفحة">
+            <textarea id="note" placeholder="ملاحظات..." rows="1"></textarea>
+            <button id="saveBtn" class="btn btn-save" onclick="saveData()"><i class="fas fa-save"></i> حفظ السجل</button>
+            <div class="action-bar">
+                <button class="btn" style="background:var(--orange)" onclick="exportExcel()">تصدير Excel</button>
+                <button class="btn" style="background:var(--blue)" onclick="showPrintOptions()"><i class="fas fa-print"></i> الطباعة</button>
+            </div>
+        </div>
+
+        <div class="search-wrapper">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchInput" placeholder="بحث باسم الطالب أو رقم القيد..." onkeyup="applyFilters()">
+            <select id="sortSelect" onchange="applyFilters()" style="width: auto; margin:0; border:none;">
+                <option value="newest">الأحدث</option>
+                <option value="alpha">أبجدي</option>
+            </select>
+        </div>
+        <div id="studentsList"></div>
+    </div>
+</div>
+
+<div class="theme-toggle no-print" onclick="toggleDarkMode()"><i class="fas fa-moon"></i></div>
+</body>
+</html>
