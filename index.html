@@ -61,7 +61,7 @@
 
         window.showPrintOptions = () => {
             const qaidSelect = document.getElementById('qaidSelect');
-            qaidSelect.innerHTML = '<option value="">-- اختر رقم القيد --</option>';
+            qaidSelect.innerHTML = '<option value="">-- اختر رقم القيد للطباعة --</option>';
             const uniqueQaids = [...new Set(window.allStudentsData.map(s => s.qaid))].filter(q => q && String(q).trim() !== "").sort((a, b) => Number(a) - Number(b));
             uniqueQaids.forEach(q => {
                 const count = window.allStudentsData.filter(s => s.qaid == q).length;
@@ -89,7 +89,7 @@
 
         window.printSelectedQaidOption = () => {
             const qaid = document.getElementById('qaidSelect').value;
-            if (!qaid) return alert("اختر القيد");
+            if (!qaid) return alert("يرجى اختيار رقم القيد أولاً");
             let data = window.allStudentsData.filter(s => String(s.qaid) === String(qaid)).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
             window.executePrint(data);
         };
@@ -111,7 +111,7 @@
                 else await addDoc(studentsCol, student);
                 window.closeAddModal();
                 window.resetForm();
-            } catch (e) { alert("خطأ في الحفظ"); }
+            } catch (e) { alert("حدث خطأ أثناء الحفظ"); }
         };
 
         window.importExcel = (event) => {
@@ -169,9 +169,9 @@
                                 </div>
                             </div>
                         </div>
-                        <div style="display: flex; gap: 12px; align-items:center;">
-                            <i class="fas fa-edit" style="color:var(--blue); cursor:pointer;" title="تعديل" onclick="edit('${s.id}')"></i>
-                            <i class="fas fa-trash" style="color:#ef4444; cursor:pointer;" title="حذف" onclick="del('${s.id}')"></i>
+                        <div style="display: flex; gap: 15px; align-items:center;">
+                            <i class="fas fa-edit" style="color:var(--blue); cursor:pointer; font-size: 1.2rem;" title="تعديل" onclick="edit('${s.id}')"></i>
+                            <i class="fas fa-trash" style="color:#ef4444; cursor:pointer; font-size: 1.2rem;" title="حذف" onclick="del('${s.id}')"></i>
                         </div>
                     </div>`;
             });
@@ -186,16 +186,16 @@
             document.getElementById('qNum').value = s.qaid;
             document.getElementById('pNum').value = s.page;
             document.getElementById('note').value = s.note || '';
-            document.getElementById('saveBtn').innerHTML = '<i class="fas fa-sync"></i> تحديث';
+            document.getElementById('saveBtn').innerHTML = '<i class="fas fa-sync"></i> تحديث السجل';
             document.getElementById('entryModal').style.display = 'flex';
         };
 
-        window.del = async (id) => { if(confirm('حذف؟')) await deleteDoc(doc(db, "students", id)); };
+        window.del = async (id) => { if(confirm('هل أنت متأكد من حذف هذا السجل؟')) await deleteDoc(doc(db, "students", id)); };
         window.logout = () => signOut(auth);
         window.login = async () => {
             const email = document.getElementById('loginEmail').value;
             const pass = document.getElementById('loginPass').value;
-            try { await signInWithEmailAndPassword(auth, email, pass); } catch (e) { alert("خطأ دخول"); }
+            try { await signInWithEmailAndPassword(auth, email, pass); } catch (e) { alert("بيانات الدخول غير صحيحة"); }
         };
         window.exportExcel = () => {
             const ws = XLSX.utils.json_to_sheet(window.allStudentsData.map(({id, timestamp, ...rest}) => rest));
@@ -207,7 +207,7 @@
             document.getElementById('editId').value = '';
             document.querySelectorAll('#entryModal input, #entryModal textarea').forEach(i => i.value = '');
             document.getElementById('smartAlert').style.display = 'none';
-            document.getElementById('saveBtn').innerHTML = '<i class="fas fa-save"></i> حفظ';
+            document.getElementById('saveBtn').innerHTML = '<i class="fas fa-save"></i> حفظ السجل';
         };
     </script>
     
@@ -253,16 +253,16 @@
     <div class="modal-content card">
         <h3 style="margin:0 0 10px 0; color:var(--blue)">بيانات الطالب</h3>
         <input type="hidden" id="editId">
-        <input type="text" id="fName" placeholder="الاسم الرباعي" oninput="checkDuplicate(this.value)">
+        <input type="text" id="fName" placeholder="الاسم الرباعي الكامل" oninput="checkDuplicate(this.value)">
         <div id="smartAlert" class="smart-alert"></div>
         <input type="text" id="surname" placeholder="اللقب">
         <div class="grid-inputs">
-            <input type="text" id="mName" placeholder="الأم">
-            <input type="text" id="qNum" placeholder="القيد">
-            <input type="number" id="pNum" placeholder="الصفحة">
+            <input type="text" id="mName" placeholder="اسم الأم">
+            <input type="text" id="qNum" placeholder="رقم القيد">
+            <input type="number" id="pNum" placeholder="رقم الصفحة">
         </div>
         <textarea id="note" placeholder="ملاحظات..." rows="2"></textarea>
-        <button id="saveBtn" class="btn btn-save" onclick="saveData()"><i class="fas fa-save"></i> حفظ</button>
+        <button id="saveBtn" class="btn btn-save" onclick="saveData()"><i class="fas fa-save"></i> حفظ السجل</button>
         <button class="modal-btn" style="background:#ef4444; color:white; margin-top:10px" onclick="closeAddModal()">إلغاء</button>
     </div>
 </div>
@@ -270,8 +270,9 @@
 <div id="printModal" class="modal">
     <div class="modal-content card">
         <h3 style="margin:0 0 10px 0; color:var(--blue)">خيارات الطباعة</h3>
-        <button class="modal-btn" style="background:#f1f5f9; color:#334155; border:1px solid #ccc" onclick="printAllAlpha()">طباعة الكل (أبجدي)</button>
+        <button class="modal-btn" style="background:#f1f5f9; color:#334155; border:1px solid #ccc" onclick="printAllAlpha()">طباعة السجل بالكامل (أبجدياً)</button>
         <hr style="margin: 15px 0; border: 0; border-top: 1px solid #eee;">
+        <p style="font-size: 0.9rem; margin-bottom: 5px;">أو طباعة قيد محدد:</p>
         <select id="qaidSelect" style="width:100%; padding:10px; border-radius:8px; margin-bottom:10px;"></select>
         <button class="modal-btn" style="background:var(--blue); color:white" onclick="printSelectedQaidOption()">تأكيد طباعة القيد</button>
         <button class="modal-btn" style="background:#ef4444; color:white; margin-top:10px" onclick="closePrintOptions()">إلغاء</button>
@@ -282,7 +283,7 @@
     <div class="card" style="width: 300px; text-align: center;">
         <i class="fas fa-user-shield fa-3x" style="color: var(--blue); margin-bottom: 10px;"></i>
         <h3>دخول النظام</h3>
-        <input type="email" id="loginEmail" placeholder="البريد">
+        <input type="email" id="loginEmail" placeholder="البريد الإلكتروني">
         <input type="password" id="loginPass" placeholder="كلمة السر">
         <button class="btn btn-save" onclick="login()">دخول</button>
     </div>
@@ -295,14 +296,14 @@
             <p>ثانوية الشهيد محمد عبد العزيز الكنعان للبنين</p>
         </div>
         <table>
-            <thead><tr><th>ت</th><th style="width:40%">الاسم واللقب</th><th>الأم</th><th>القيد</th><th>ص</th></tr></thead>
+            <thead><tr><th>ت</th><th style="width:40%">الاسم واللقب</th><th>اسم الأم</th><th>القيد</th><th>ص</th></tr></thead>
             <tbody id="printBody"></tbody>
         </table>
     </div>
 
     <div class="no-print">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <span>العدد: <b id="totalCount" style="color: var(--blue);">0</b></span>
+            <span>المجموع: <b id="totalCount" style="color: var(--blue);">0</b> طالب</span>
             <button onclick="logout()" style="color:#ef4444; border:none; background:none; font-weight:bold; cursor:pointer;">خروج</button>
         </div>
 
