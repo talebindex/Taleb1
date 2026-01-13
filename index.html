@@ -52,13 +52,10 @@
             } else { alertBox.style.display = 'none'; }
         };
 
-        // دالة عرض خيارات الطباعة وتعبئة القائمة
         window.showPrintOptions = () => {
-            // ملء القائمة المنسدلة بأرقام القيود الموجودة فقط
             const qaidSelect = document.getElementById('qaidSelect');
             qaidSelect.innerHTML = '<option value="">-- اختر رقم القيد للطباعة --</option>';
             
-            // استخراج القيود الفريدة وترتيبها
             const uniqueQaids = [...new Set(window.allStudentsData.map(s => s.qaid))]
                                 .filter(q => q && q.trim() !== "")
                                 .sort((a, b) => Number(a) - Number(b));
@@ -75,41 +72,45 @@
             document.getElementById('printModal').style.display = 'none';
         };
 
-        // طباعة الكل أبجدياً
         window.printAllAlpha = () => {
             let dataToPrint = [...window.allStudentsData];
             dataToPrint.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
             window.executePrint(dataToPrint);
         };
 
-        // طباعة القيد المختار من القائمة
         window.printSelectedQaidOption = () => {
             const selectedQaid = document.getElementById('qaidSelect').value;
             if (!selectedQaid) return alert("الرجاء اختيار رقم القيد من القائمة أولاً");
 
             let dataToPrint = window.allStudentsData.filter(s => String(s.qaid) === String(selectedQaid));
-            // الترتيب الأبجدي داخل القيد
             dataToPrint.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
             
             window.executePrint(dataToPrint);
         };
 
-        // زر الطباعة الصغير بجانب الاسم
         window.printQaid = (qaidNum) => {
             let filtered = window.allStudentsData.filter(s => String(s.qaid) === String(qaidNum));
-            // الترتيب الأبجدي
             filtered.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
             window.executePrint(filtered);
         };
 
         window.executePrint = (data) => {
+            // عرض البيانات المفلترة فقط
             window.render(data);
             window.closePrintOptions();
+            
+            // تأخير الطباعة قليلاً لضمان تحديث الصفحة
             setTimeout(() => { 
-                window.print(); 
-                window.applyFilters(); // استعادة القائمة الأصلية بعد الطباعة
+                window.print();
+                // ملاحظة: تم إزالة دالة التحديث التلقائي الفوري لمنع تداخلها مع عملية الطباعة في الهواتف
+                // سيتم التحديث عند العودة يدوياً أو عبر حدث "بعد الطباعة"
             }, 500);
         };
+
+        // إعادة عرض الكل بعد الانتهاء من الطباعة (للمتصفحات التي تدعمها)
+        window.addEventListener("afterprint", () => {
+            window.applyFilters();
+        });
 
         window.saveData = async () => {
             const id = document.getElementById('editId').value;
@@ -251,22 +252,17 @@
 <div id="printModal" class="modal">
     <div class="modal-content card">
         <h3 style="margin-top:0; color:var(--blue)">خيارات الطباعة</h3>
-        
         <button class="modal-btn" style="background:#f1f5f9; color:#334155; border:1px solid #ccc" onclick="printAllAlpha()">
             <i class="fas fa-list-ul"></i> طباعة السجل كاملاً (أبجدي)
         </button>
-
         <hr style="margin: 15px 0; border: 0; border-top: 1px solid #eee;">
-
         <h4 style="margin:0 0 5px 0; text-align:right">طباعة قيد محدد:</h4>
         <select id="qaidSelect" class="modal-select">
             <option value="">جارِ تحميل القيود...</option>
         </select>
-        
         <button class="modal-btn" style="background:var(--blue); color:white" onclick="printSelectedQaidOption()">
             <i class="fas fa-print"></i> تأكيد طباعة القيد المختار
         </button>
-
         <button class="modal-btn" style="background:#ef4444; color:white; margin-top:10px" onclick="closePrintOptions()">إلغاء</button>
     </div>
 </div>
