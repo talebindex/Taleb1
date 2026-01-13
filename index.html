@@ -243,26 +243,26 @@
         @media print {
             .no-print, .theme-toggle, .search-wrapper, .action-bar, .card, i, .modal, .index-badge { display: none !important; }
             body { background: white !important; padding: 0 !important; margin: 0 !important; }
-            .print-area { display: block !important; padding: 5px; }
+            .print-area { display: block !important; padding: 10px; }
             
-            /* دمج الترويسة داخل منطقة الأعمدة لمنع الصفحة البيضاء */
-            .print-header { text-align: center; border-bottom: 1px solid #000; margin-bottom: 10px; }
-            .print-header h2 { margin: 2px 0; font-size: 14pt; }
-            .print-header p { margin: 0; font-size: 9pt; }
-            #printDate { font-size: 7pt; display: block; margin-bottom: 5px; }
+            .print-header { text-align: center; border-bottom: 1.5px solid #000; margin-bottom: 12px; }
+            .print-header h2 { margin: 5px 0; font-size: 18pt; }
+            .print-header p { margin: 2px 0; font-size: 12pt; font-weight: bold; }
+            #printDate { font-size: 9pt; display: block; margin-bottom: 8px; color: #333; }
 
             .table-container { 
                 column-count: 2; 
-                column-gap: 15px; 
-                column-rule: 1px solid #eee;
+                column-gap: 20px; 
+                column-rule: 1px solid #ddd;
             }
             table { 
                 width: 100%; 
                 border-collapse: collapse; 
                 margin-top: 0;
+                break-inside: avoid;
             }
-            th, td { border: 1px solid black !important; padding: 2px; text-align: center; font-size: 8.5pt; }
-            th { background-color: #f2f2f2 !important; -webkit-print-color-adjust: exact; }
+            th, td { border: 1.2px solid black !important; padding: 5px; text-align: center; font-size: 11pt; font-weight: 500; }
+            th { background-color: #f0f0f0 !important; -webkit-print-color-adjust: exact; font-weight: bold; }
         }
         .print-area { display: none; }
     </style>
