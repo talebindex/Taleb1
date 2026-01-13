@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام الأرشيف الإلكتروني | ثانوية ش محمد عبدالعزيز الكنعان</title>
+    <title>نظام الأرشيف الإلكتروني | ثانوية محمد عبدالعزيز الكنعان</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     
@@ -312,4 +312,25 @@
             <textarea id="note" placeholder="ملاحظات..." rows="1"></textarea>
             <button id="saveBtn" class="btn btn-save" onclick="saveData()"><i class="fas fa-save"></i> حفظ السجل</button>
             <div class="action-bar">
-                <button class="btn" style="background:#6366f1" onclick="document.getElementById('file').click()">استيراد</
+                <button class="btn" style="background:#6366f1" onclick="document.getElementById('file').click()">استيراد</button>
+                <button class="btn" style="background:var(--orange)" onclick="exportExcel()">تصدير</button>
+                <button class="btn" style="background:var(--blue)" onclick="showPrintOptions()"><i class="fas fa-print"></i> طباعة</button>
+            </div>
+            <input type="file" id="file" hidden onchange="importExcel(event)">
+        </div>
+
+        <div class="search-wrapper">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchInput" placeholder="بحث..." onkeyup="applyFilters()">
+            <select id="sortSelect" onchange="applyFilters()" style="width: auto; margin:0; border:none;">
+                <option value="newest">الأحدث</option>
+                <option value="alpha">أبجدي</option>
+            </select>
+        </div>
+        <div id="studentsList"></div>
+    </div>
+</div>
+
+<div class="theme-toggle no-print" onclick="toggleDarkMode()"><i class="fas fa-moon"></i></div>
+</body>
+</html>
