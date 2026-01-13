@@ -96,6 +96,7 @@
             window.render(filtered);
         };
 
+        // منع التكرار عند الاستيراد
         window.importExcel = (event) => {
             const file = event.target.files[0];
             if(!file) return;
@@ -114,6 +115,7 @@
                         const rPage = String(row.page || row["الصفحة"] || "").trim();
                         const rMother = String(row.mother || row["الأم"] || "").trim();
 
+                        // فحص التكرار: (نفس الاسم والأم) أو (نفس القيد والصفحة)
                         const isDuplicate = window.allStudentsData.some(s => 
                             (s.name === rName && s.mother === rMother) || 
                             (String(s.qaid) === rQaid && String(s.page) === rPage)
@@ -144,6 +146,28 @@
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
             XLSX.writeFile(wb, "الارشيف.xlsx");
+        };
+
+        // مسح كافة البيانات
+        window.openMasterDelete = () => {
+            document.getElementById('masterDeleteInput').value = '';
+            document.getElementById('masterDeleteModal').style.display = 'flex';
+        };
+
+        window.confirmMasterDelete = async () => {
+            const input = document.getElementById('masterDeleteInput').value;
+            if(input !== 'حذف') return showToast("يرجى كتابة كلمة حذف بشكل صحيح", "error");
+
+            document.getElementById('loader').style.display = 'flex';
+            try {
+                const snapshot = await getDocs(studentsCol);
+                const batch = writeBatch(db);
+                snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+                await batch.commit();
+                showToast("تم مسح السجل بالكامل");
+                document.getElementById('masterDeleteModal').style.display = 'none';
+            } catch(e) { showToast("حدث خطأ أثناء المسح", "error"); }
+            document.getElementById('loader').style.display = 'none';
         };
 
         window.showPrintOptions = () => {
@@ -204,31 +228,7 @@
 
         window.del = (id) => { deleteTargetId = id; document.getElementById('deleteModal').style.display = 'flex'; };
         window.confirmDel = async () => { if(deleteTargetId) { await deleteDoc(doc(db, "students", deleteTargetId)); showToast("تم الحذف"); document.getElementById('deleteModal').style.display = 'none'; } };
-
-        // ميزة حذف جميع البيانات
-        window.openMasterDelete = () => {
-            document.getElementById('masterDeleteInput').value = '';
-            document.getElementById('masterDeleteModal').style.display = 'flex';
-        };
-
-        window.confirmMasterDelete = async () => {
-            const input = document.getElementById('masterDeleteInput').value;
-            if(input !== 'حذف') return showToast("يرجى كتابة كلمة حذف بشكل صحيح", "error");
-
-            document.getElementById('loader').style.display = 'flex';
-            try {
-                const snapshot = await getDocs(studentsCol);
-                const batch = writeBatch(db);
-                snapshot.docs.forEach((doc) => batch.delete(doc.ref));
-                await batch.commit();
-                showToast("تم مسح السجل بالكامل");
-                document.getElementById('masterDeleteModal').style.display = 'none';
-            } catch(e) {
-                showToast("حدث خطأ أثناء المسح", "error");
-            }
-            document.getElementById('loader').style.display = 'none';
-        };
-
+        
         window.render = (data) => {
             const list = document.getElementById('studentsList');
             list.innerHTML = ''; 
@@ -288,9 +288,9 @@
         .stat-val { display: block; font-size: 1.3rem; font-weight: 800; color: var(--blue); }
         .stat-label { font-size: 0.7rem; color: #64748b; font-weight: bold; }
 
-        .action-bar { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 10px; }
+        .action-bar { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 15px; }
         .action-bar-sub { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 15px; }
-
+        
         .search-wrapper { display: flex; align-items: center; gap: 10px; background: var(--card); padding: 5px 15px; border-radius: 50px; border: 2.5px solid var(--blue); margin-bottom: 15px; }
         .student-item { display: flex; align-items: center; justify-content: space-between; border-right: 5px solid var(--blue); }
         .card-body-wrapper { display: flex; align-items: center; gap: 12px; }
@@ -327,10 +327,10 @@
 <div id="masterDeleteModal" class="modal">
     <div class="modal-content">
         <h3 style="text-align:center; color:#ef4444;">تحذير نهائي!</h3>
-        <p style="text-align:center; font-size:0.9rem;">سيتم مسح جميع الأسماء نهائياً. لتأكيد ذلك، اكتب كلمة <b>حذف</b> في المربع أدناه:</p>
+        <p style="text-align:center;">سيتم مسح جميع الأسماء نهائياً. لتأكيد ذلك، اكتب كلمة <b>حذف</b> أدناه:</p>
         <input type="text" id="masterDeleteInput" placeholder="اكتب حذف هنا..." style="text-align:center;">
         <div style="display:flex; gap:10px; margin-top:20px;">
-            <button class="btn" style="background:#ef4444; flex:1;" onclick="confirmMasterDelete()">تأكيد المسح الشامل</button>
+            <button class="btn" style="background:#ef4444; flex:1;" onclick="confirmMasterDelete()">تأكيد المسح</button>
             <button class="btn" style="background:#ccc; flex:1; color:#333;" onclick="document.getElementById('masterDeleteModal').style.display='none'">إلغاء</button>
         </div>
     </div>
@@ -406,8 +406,8 @@
         </div>
 
         <div class="action-bar">
-            <button class="btn" style="background:var(--main)" onclick="openAddModal()">إضافة طالب</button>
-            <button class="btn" style="background:#ef4444" onclick="openMasterDelete()"><i class="fas fa-exclamation-triangle"></i> مسح السجل</button>
+            <button class="btn" style="background:var(--main)" onclick="openAddModal()">إضافة</button>
+            <button class="btn" style="background:#ef4444" onclick="openMasterDelete()">مسح السجل</button>
         </div>
         <div class="action-bar-sub">
             <button class="btn" style="background:var(--accent)" onclick="document.getElementById('fileInput').click()">استيراد</button>
