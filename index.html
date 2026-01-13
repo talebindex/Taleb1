@@ -96,7 +96,7 @@
             window.render(filtered);
         };
 
-        // منع التكرار عند الاستيراد
+        // نظام الاستيراد الصارم (منع التكرار)
         window.importExcel = (event) => {
             const file = event.target.files[0];
             if(!file) return;
@@ -110,33 +110,58 @@
                     let skipped = 0, added = 0;
 
                     json.forEach(row => {
+                        // تنظيف البيانات القادمة من الإكسيل بشكل صارم
                         const rName = String(row.name || row["الاسم"] || "").trim();
                         const rQaid = String(row.qaid || row["القيد"] || "").trim();
                         const rPage = String(row.page || row["الصفحة"] || "").trim();
                         const rMother = String(row.mother || row["الأم"] || "").trim();
 
-                        // فحص التكرار: (نفس الاسم والأم) أو (نفس القيد والصفحة)
-                        const isDuplicate = window.allStudentsData.some(s => 
-                            (s.name === rName && s.mother === rMother) || 
-                            (String(s.qaid) === rQaid && String(s.page) === rPage)
-                        );
+                        if (rName === "") return; // تخطي الأسطر الفارغة
 
-                        if (!isDuplicate && rName !== "") {
+                        // فحص التكرار الصارم بمقارنة دقيقة جداً
+                        const isDuplicate = window.allStudentsData.some(s => {
+                            const dbName = String(s.name).trim();
+                            const dbMother = String(s.mother).trim();
+                            const dbQaid = String(s.qaid).trim();
+                            const dbPage = String(s.page).trim();
+
+                            // الشرط الأول: الاسم والأم متطابقان
+                            const nameMatch = (dbName === rName && dbMother === rMother);
+                            // الشرط الثاني: القيد والصفحة متطابقان
+                            const qaidPageMatch = (dbQaid === rQaid && dbPage === rPage);
+
+                            return nameMatch || qaidPageMatch;
+                        });
+
+                        if (!isDuplicate) {
                             const newDoc = doc(collection(db, "students"));
                             batch.set(newDoc, {
-                                name: rName, surname: String(row.surname || row["اللقب"] || ""),
-                                mother: rMother, qaid: rQaid, page: rPage,
-                                note: String(row.note || row["ملاحظات"] || ""),
+                                name: rName, 
+                                surname: String(row.surname || row["اللقب"] || "").trim(),
+                                mother: rMother, 
+                                qaid: rQaid, 
+                                page: rPage,
+                                note: String(row.note || row["ملاحظات"] || "").trim(),
                                 timestamp: Date.now()
                             });
                             added++;
-                        } else { skipped++; }
+                        } else {
+                            skipped++;
+                        }
                     });
 
-                    if(added > 0) await batch.commit();
-                    showToast(`تم إضافة ${added} وتجاهل ${skipped} مكرر`);
-                } catch(err) { showToast("خطأ في الملف", "error"); }
+                    if(added > 0) {
+                        await batch.commit();
+                        showToast(`تم إضافة ${added} وتجاهل ${skipped} مكرر`);
+                    } else {
+                        showToast(`لم يتم إضافة أي جديد، جميع الأسماء (${skipped}) مكررة بالفعل`, "error");
+                    }
+                } catch(err) { 
+                    console.error(err);
+                    showToast("خطأ في قراءة ملف الإكسيل", "error"); 
+                }
                 document.getElementById('loader').style.display = 'none';
+                event.target.value = ''; // إعادة تعيين مدخل الملف
             };
             reader.readAsArrayBuffer(file);
         };
@@ -148,7 +173,6 @@
             XLSX.writeFile(wb, "الارشيف.xlsx");
         };
 
-        // مسح كافة البيانات
         window.openMasterDelete = () => {
             document.getElementById('masterDeleteInput').value = '';
             document.getElementById('masterDeleteModal').style.display = 'flex';
@@ -164,9 +188,9 @@
                 const batch = writeBatch(db);
                 snapshot.docs.forEach((doc) => batch.delete(doc.ref));
                 await batch.commit();
-                showToast("تم مسح السجل بالكامل");
+                showToast("تم مسح السجل بالكامل بنجاح");
                 document.getElementById('masterDeleteModal').style.display = 'none';
-            } catch(e) { showToast("حدث خطأ أثناء المسح", "error"); }
+            } catch(e) { showToast("حدث خطأ أثناء عملية المسح", "error"); }
             document.getElementById('loader').style.display = 'none';
         };
 
@@ -215,15 +239,15 @@
 
             if(!name || !mother || !qaid || !page) return showToast("أكمل البيانات", "error");
 
-            const isDup = window.allStudentsData.some(s => s.id !== id && ((s.name === name && s.mother === mother) || (s.qaid === qaid && s.page === page)));
-            if(isDup) return showToast("هذا الطالب مضاف مسبقاً", "error");
+            const isDup = window.allStudentsData.some(s => s.id !== id && ((s.name === name && s.mother === mother) || (String(s.qaid) === qaid && String(s.page) === page)));
+            if(isDup) return showToast("هذا الطالب مضاف مسبقاً بنفس البيانات", "error");
 
             try {
                 const data = { name, surname: document.getElementById('surname').value, mother, qaid, page, note: document.getElementById('note').value, timestamp: Date.now() };
                 if(id) await updateDoc(doc(db, "students", id), data);
                 else await addDoc(studentsCol, data);
-                showToast("تم الحفظ"); window.closeAddModal(); window.resetForm();
-            } catch(e) { showToast("خطأ بالشبكة", "error"); }
+                showToast("تم الحفظ بنجاح"); window.closeAddModal(); window.resetForm();
+            } catch(e) { showToast("خطأ في الاتصال", "error"); }
         };
 
         window.del = (id) => { deleteTargetId = id; document.getElementById('deleteModal').style.display = 'flex'; };
@@ -232,7 +256,7 @@
         window.render = (data) => {
             const list = document.getElementById('studentsList');
             list.innerHTML = ''; 
-            data.forEach((s, index) => {
+            data.forEach((s) => {
                 list.innerHTML += `
                     <div class="student-item card fade-in">
                         <div class="card-body-wrapper">
@@ -270,7 +294,7 @@
         window.openAddModal = () => { window.resetForm(); document.getElementById('entryModal').style.display = 'flex'; };
         window.closeAddModal = () => document.getElementById('entryModal').style.display = 'none';
         window.resetForm = () => { document.getElementById('editId').value = ''; document.querySelectorAll('input, textarea').forEach(i => i.value = ''); document.getElementById('saveBtn').innerText = "حفظ"; };
-        window.login = async () => { try { await signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value, document.getElementById('loginPass').value); } catch(e) { showToast("فشل الدخول", "error"); } };
+        window.login = async () => { try { await signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value, document.getElementById('loginPass').value); } catch(e) { showToast("البريد أو كلمة المرور غير صحيحة", "error"); } };
         window.logout = () => signOut(auth);
         window.toggleDarkMode = () => document.body.classList.toggle('dark-mode');
     </script>
@@ -288,7 +312,7 @@
         .stat-val { display: block; font-size: 1.3rem; font-weight: 800; color: var(--blue); }
         .stat-label { font-size: 0.7rem; color: #64748b; font-weight: bold; }
 
-        .action-bar { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 15px; }
+        .action-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
         .action-bar-sub { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 15px; }
         
         .search-wrapper { display: flex; align-items: center; gap: 10px; background: var(--card); padding: 5px 15px; border-radius: 50px; border: 2.5px solid var(--blue); margin-bottom: 15px; }
@@ -327,10 +351,10 @@
 <div id="masterDeleteModal" class="modal">
     <div class="modal-content">
         <h3 style="text-align:center; color:#ef4444;">تحذير نهائي!</h3>
-        <p style="text-align:center;">سيتم مسح جميع الأسماء نهائياً. لتأكيد ذلك، اكتب كلمة <b>حذف</b> أدناه:</p>
+        <p style="text-align:center;">سيتم مسح جميع الأسماء نهائياً من الأرشيف. لتأكيد ذلك، اكتب كلمة <b>حذف</b> في المربع:</p>
         <input type="text" id="masterDeleteInput" placeholder="اكتب حذف هنا..." style="text-align:center;">
         <div style="display:flex; gap:10px; margin-top:20px;">
-            <button class="btn" style="background:#ef4444; flex:1;" onclick="confirmMasterDelete()">تأكيد المسح</button>
+            <button class="btn" style="background:#ef4444; flex:1;" onclick="confirmMasterDelete()">تأكيد مسح الأرشيف</button>
             <button class="btn" style="background:#ccc; flex:1; color:#333;" onclick="document.getElementById('masterDeleteModal').style.display='none'">إلغاء</button>
         </div>
     </div>
@@ -338,10 +362,10 @@
 
 <div id="deleteModal" class="modal">
     <div class="modal-content">
-        <h3 style="text-align:center;">تأكيد الحذف؟</h3>
+        <h3 style="text-align:center;">تأكيد حذف الطالب؟</h3>
         <div style="display:flex; gap:10px; margin-top:20px;">
-            <button class="btn" style="background:#ef4444; flex:1;" onclick="confirmDel()">حذف</button>
-            <button class="btn" style="background:#ccc; flex:1;" onclick="document.getElementById('deleteModal').style.display='none'">إلغاء</button>
+            <button class="btn" style="background:#ef4444; flex:1;" onclick="confirmDel()">نعم، حذف</button>
+            <button class="btn" style="background:#ccc; flex:1;" onclick="document.getElementById('deleteModal').style.display='none'">تراجع</button>
         </div>
     </div>
 </div>
@@ -354,10 +378,10 @@
         <input type="text" id="surname" placeholder="اللقب">
         <input type="text" id="mName" placeholder="اسم الأم">
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-            <input type="text" id="qNum" placeholder="القيد">
-            <input type="number" id="pNum" placeholder="ص">
+            <input type="text" id="qNum" placeholder="رقم القيد">
+            <input type="number" id="pNum" placeholder="رقم الصفحة">
         </div>
-        <textarea id="note" placeholder="ملاحظات..." rows="2"></textarea>
+        <textarea id="note" placeholder="ملاحظات إضافية..." rows="2"></textarea>
         <button id="saveBtn" class="btn" style="background:var(--main); width:100%; margin-top:15px;" onclick="saveData()">حفظ</button>
         <button class="btn" style="background:#eee; color:#334155; width:100%; margin-top:5px;" onclick="closeAddModal()">إغلاق</button>
     </div>
@@ -365,10 +389,10 @@
 
 <div id="printModal" class="modal">
     <div class="modal-content">
-        <h3>خيارات الطباعة</h3>
-        <button class="btn" style="background:var(--accent); width:100%; margin-bottom:10px" onclick="printAllAlpha()">طباعة الكل (أبجدي)</button>
+        <h3>خيارات طباعة السجل</h3>
+        <button class="btn" style="background:var(--accent); width:100%; margin-bottom:10px" onclick="printAllAlpha()">طباعة السجل العام (أبجدي)</button>
         <select id="qaidSelect"></select>
-        <button class="btn" style="background:var(--blue); width:100%; margin-top:10px" onclick="printSelectedQaid()">طباعة القيد المختار</button>
+        <button class="btn" style="background:var(--blue); width:100%; margin-top:10px" onclick="printSelectedQaid()">طباعة القيد المحدد</button>
         <button class="btn" style="background:#eee; color:#334155; width:100%; margin-top:10px;" onclick="document.getElementById('printModal').style.display='none'">إلغاء</button>
     </div>
 </div>
@@ -377,7 +401,7 @@
     <div class="card" style="width: 300px; text-align: center;">
         <i class="fas fa-university fa-3x" style="color:var(--blue); margin-bottom:15px;"></i>
         <h2>دخول الأرشيف</h2>
-        <input type="email" id="loginEmail" placeholder="البريد">
+        <input type="email" id="loginEmail" placeholder="البريد الإلكتروني">
         <input type="password" id="loginPass" placeholder="كلمة المرور">
         <button class="btn" style="background:var(--main); width:100%; margin-top:20px;" onclick="login()">دخول</button>
     </div>
@@ -406,8 +430,8 @@
         </div>
 
         <div class="action-bar">
-            <button class="btn" style="background:var(--main)" onclick="openAddModal()">إضافة</button>
-            <button class="btn" style="background:#ef4444" onclick="openMasterDelete()">مسح السجل</button>
+            <button class="btn" style="background:var(--main)" onclick="openAddModal()"><i class="fas fa-plus"></i> إضافة طالب</button>
+            <button class="btn" style="background:#ef4444" onclick="openMasterDelete()"><i class="fas fa-trash-sweep"></i> مسح السجل</button>
         </div>
         <div class="action-bar-sub">
             <button class="btn" style="background:var(--accent)" onclick="document.getElementById('fileInput').click()">استيراد</button>
