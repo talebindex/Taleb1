@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام الأرشيف الذكي - النسخة الاحترافية</title>
+    <title>نظام الأرشيف الذكي - النسخة المتقدمة</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     
@@ -31,7 +31,6 @@
         let deleteTargetId = null;
         window.activeLetter = null;
 
-        // نظام الإشعارات (Toast) بدلاً من alert المتصفح
         window.showToast = (msg, type = 'success') => {
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
@@ -50,9 +49,23 @@
         function loadData() {
             onSnapshot(query(studentsCol, orderBy("timestamp", "desc")), (snapshot) => {
                 window.allStudentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                document.getElementById('totalCount').innerText = window.allStudentsData.length;
+                updateQuickStats(); // تحديث الإحصائيات السريعة
                 window.applyFilters(); 
             });
+        }
+
+        // ميزة الإحصائيات السريعة
+        function updateQuickStats() {
+            const now = new Date();
+            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+            
+            const total = window.allStudentsData.length;
+            const addedToday = window.allStudentsData.filter(s => s.timestamp >= startOfDay).length;
+            const uniqueQaids = new Set(window.allStudentsData.map(s => s.qaid)).size;
+
+            document.getElementById('statTotal').innerText = total;
+            document.getElementById('statToday').innerText = addedToday;
+            document.getElementById('statQaids').innerText = uniqueQaids;
         }
 
         function createLetterFilter() {
@@ -100,9 +113,6 @@
             const note = document.getElementById('note').value.trim();
 
             if(!name || !mother || !qaid || !page) return showToast("يرجى إكمال البيانات", "error");
-
-            const isDup = window.allStudentsData.some(s => (s.id !== id) && ((s.name.trim() === name && s.mother.trim() === mother) || (String(s.qaid).trim() === String(qaid).trim() && String(s.page).trim() === String(page).trim())));
-            if (isDup) return showToast("هذا القيد مكرر مسبقاً!", "error");
 
             try {
                 const data = { name, surname, mother, qaid, page, note, timestamp: Date.now() };
@@ -161,93 +171,59 @@
             document.getElementById('entryModal').style.display = 'flex';
         };
 
-        // وظائف الطباعة المحسنة بترويسة رسمية
-        function executePrint(data) {
-            const container = document.getElementById('printTablesContainer');
-            container.innerHTML = '';
-            const mid = Math.ceil(data.length / 2);
-            const table = (subset, start) => {
-                let h = '<table><thead><tr><th>ت</th><th>الاسم</th><th>الأم</th><th>قيد</th><th>ص</th></tr></thead><tbody>';
-                subset.forEach((s, i) => h += `<tr><td>${start+i+1}</td><td>${s.name}</td><td>${s.mother}</td><td>${s.qaid}</td><td>${s.page}</td></tr>`);
-                return h + '</tbody></table>';
-            };
-            container.innerHTML = `<div style="display:flex; gap:15px;"><div style="flex:1">${table(data.slice(0,mid),0)}</div><div style="flex:1">${table(data.slice(mid),mid)}</div></div>`;
-            document.getElementById('printDate').innerText = "تاريخ الاستخراج: " + new Date().toLocaleDateString('ar-EG');
-            setTimeout(()=>window.print(), 500);
-        }
-
         window.openAddModal = () => { window.resetForm(); document.getElementById('entryModal').style.display = 'flex'; };
         window.closeAddModal = () => document.getElementById('entryModal').style.display = 'none';
         window.resetForm = () => { document.getElementById('editId').value = ''; document.querySelectorAll('#entryModal input, #entryModal textarea').forEach(i => i.value = ''); document.getElementById('saveBtn').innerHTML = '<i class="fas fa-save"></i> حفظ'; };
         window.logout = () => signOut(auth);
         window.toggleDarkMode = () => document.body.classList.toggle('dark-mode');
-        window.exportExcel = () => {
-            const ws = XLSX.utils.json_to_sheet(window.allStudentsData.map(({id, timestamp, ...rest}) => rest));
-            const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "الأرشيف");
-            XLSX.writeFile(wb, "ارشيف_الطلاب.xlsx");
-        };
         window.showPrintOptions = () => document.getElementById('printModal').style.display = 'flex';
         window.closePrintOptions = () => document.getElementById('printModal').style.display = 'none';
-        window.printAllAlpha = () => executePrint([...window.allStudentsData].sort((a,b)=>a.name.localeCompare(b.name,'ar')));
     </script>
     
     <style>
-        :root { --main: #1e293b; --blue: #0ea5e9; --bg: #f8fafc; --card: #ffffff; --text: #334155; --accent: #6366f1; }
+        :root { --main: #1e293b; --blue: #0ea5e9; --bg: #f8fafc; --card: #ffffff; --text: #334155; --accent: #6366f1; --success: #10b981; }
         body.dark-mode { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 10px; direction: rtl; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 10px; direction: rtl; }
         .container { max-width: 850px; margin: auto; }
         
-        .card { background: var(--card); padding: 16px; border-radius: 20px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.03); }
-        .btn { border: none; border-radius: 12px; cursor: pointer; padding: 12px; font-weight: 600; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.3s; }
-        .btn:active { transform: scale(0.98); }
-        .action-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+        .card { background: var(--card); padding: 16px; border-radius: 20px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); transition: 0.3s; }
+        .btn { border: none; border-radius: 12px; cursor: pointer; padding: 12px; font-weight: 600; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .action-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px; }
 
-        /* تصميم البطاقات المطور */
-        .student-item { display: flex; align-items: center; justify-content: space-between; position: relative; overflow: hidden; }
-        .student-item::after { content: ''; position: absolute; right: 0; top: 0; height: 100%; width: 5px; background: var(--blue); }
-        .card-body-wrapper { display: flex; align-items: center; gap: 15px; }
-        .user-icon { width: 45px; height: 45px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--blue); font-size: 1.2rem; }
-        .student-name { font-weight: bold; font-size: 1.1rem; margin: 0; }
-        .surname-tag { color: var(--accent); font-size: 0.85rem; }
-        .student-meta { font-size: 0.85rem; color: #64748b; margin-top: 5px; display: flex; gap: 10px; align-items: center; }
-        .highlight-badge { padding: 3px 8px; border-radius: 6px; font-weight: bold; }
+        /* شريط الإحصائيات الجديد */
+        .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
+        .stat-item { background: var(--card); padding: 12px; border-radius: 15px; text-align: center; border: 1px solid rgba(0,0,0,0.05); }
+        .stat-val { display: block; font-size: 1.4rem; font-weight: 800; color: var(--blue); }
+        .stat-label { font-size: 0.75rem; color: #64748b; font-weight: 600; }
+
+        .student-item { display: flex; align-items: center; justify-content: space-between; position: relative; }
+        .student-item::after { content: ''; position: absolute; right: 0; top: 0; height: 100%; width: 5px; background: var(--blue); border-radius: 0 5px 5px 0; }
+        .card-body-wrapper { display: flex; align-items: center; gap: 12px; }
+        .user-icon { width: 40px; height: 40px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--blue); }
+        .student-name { font-weight: bold; margin: 0; }
+        .student-meta { font-size: 0.8rem; color: #64748b; margin-top: 4px; display: flex; gap: 8px; }
+        .highlight-badge { padding: 2px 6px; border-radius: 5px; font-weight: bold; font-size: 0.75rem; }
         .qaid-badge { background: #e0f2fe; color: #0369a1; }
         .page-badge { background: #fef9c3; color: #854d0e; }
 
-        /* شريط الأحرف */
-        .letter-bar { display: none; flex-wrap: wrap; gap: 6px; margin-bottom: 15px; justify-content: center; background: var(--card); padding: 12px; border-radius: 15px; border: 1.5px solid var(--blue); animation: fadeIn 0.3s; }
-        .letter-btn { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; background: #f1f5f9; border-radius: 10px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .letter-bar { display: none; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; justify-content: center; background: var(--card); padding: 10px; border-radius: 15px; border: 1.5px solid var(--blue); }
+        .letter-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: #f1f5f9; border-radius: 8px; cursor: pointer; font-weight: bold; }
         .letter-btn.active { background: var(--blue); color: white; }
 
-        /* نظام النوافذ (Modals) */
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(5px); display: none; align-items: center; justify-content: center; z-index: 5000; }
-        .modal-content { background: var(--card); padding: 25px; border-radius: 24px; width: 90%; max-width: 400px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 5000; }
+        .modal-content { background: var(--card); padding: 25px; border-radius: 20px; width: 90%; max-width: 380px; }
+        
+        .search-wrapper { display: flex; align-items: center; gap: 10px; background: var(--card); padding: 5px 15px; border-radius: 50px; border: 2px solid var(--blue); margin-bottom: 15px; }
+        input, select { border: none; background: transparent; padding: 10px; outline: none; color: var(--text); }
 
-        /* نظام التنبيهات Toast */
         #toastContainer { position: fixed; bottom: 20px; left: 20px; z-index: 6000; }
-        .toast { padding: 14px 24px; border-radius: 15px; color: white; margin-top: 10px; display: flex; align-items: center; gap: 12px; box-shadow: 0 10px 15px rgba(0,0,0,0.1); animation: slideUp 0.4s; }
-        .toast.success { background: #10b981; } .toast.error { background: #ef4444; }
+        .toast { padding: 12px 20px; border-radius: 12px; color: white; margin-top: 10px; display: flex; align-items: center; gap: 10px; animation: slideUp 0.3s; }
+        .toast.success { background: var(--success); }
+        .toast.error { background: #ef4444; }
 
-        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        .item-actions button { background: #f8fafc; border: none; width: 35px; height: 35px; border-radius: 10px; cursor: pointer; color: var(--blue); transition: 0.2s; }
-        .item-actions .del-btn { color: #ef4444; }
-        .item-actions .del-btn:hover { background: #fef2f2; }
-
-        .search-wrapper { display: flex; align-items: center; gap: 12px; background: var(--card); padding: 5px 15px; border-radius: 50px; border: 2.5px solid var(--blue); margin-bottom: 15px; }
-        input { border: none; background: transparent; padding: 10px; width: 100%; outline: none; color: var(--text); }
-
-        /* تنسيق الطباعة */
-        .print-header { display: none; text-align: center; border-bottom: 3px double #000; padding-bottom: 15px; margin-bottom: 20px; }
-        @media print {
-            .no-print { display: none !important; }
-            .print-header { display: block !important; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
-            th, td { border: 1px solid #000; padding: 5px; text-align: center; }
-            th { background: #f2f2f2 !important; }
-            .print-footer { display: flex; justify-content: space-between; margin-top: 30px; font-weight: bold; }
-        }
+        .fade-in { animation: fadeIn 0.4s ease-in; }
     </style>
 </head>
 <body>
@@ -256,15 +232,10 @@
 
 <div id="deleteModal" class="modal">
     <div class="modal-content">
-        <div style="text-align:center;">
-            <div style="width:60px; height:60px; background:#fef2f2; color:#ef4444; border-radius:50%; display:flex; align-items:center; justify-content:center; margin: 0 auto 15px; font-size:1.5rem;">
-                <i class="fas fa-trash-alt"></i>
-            </div>
-            <h3 style="margin:0;">تأكيد الحذف؟</h3>
-            <p style="color:#64748b; font-size:0.9rem;">هل أنت متأكد من حذف هذا السجل؟ لا يمكن التراجع عن هذا الإجراء.</p>
-        </div>
+        <h3 style="text-align:center;">تأكيد الحذف؟</h3>
+        <p style="text-align:center; color:#64748b;">هل أنت متأكد من مسح هذا السجل نهائياً؟</p>
         <div style="display:flex; gap:10px; margin-top:20px;">
-            <button class="btn" style="background:#ef4444; flex:1;" onclick="confirmDel()">حذف السجل</button>
+            <button class="btn" style="background:#ef4444; flex:1;" onclick="confirmDel()">حذف</button>
             <button class="btn" style="background:#f1f5f9; color:#64748b; flex:1;" onclick="closeDel()">إلغاء</button>
         </div>
     </div>
@@ -272,94 +243,75 @@
 
 <div id="entryModal" class="modal">
     <div class="modal-content">
-        <h3 style="margin-top:0; color:var(--blue); border-bottom:1px solid #eee; padding-bottom:10px;">إضافة بيانات طالب</h3>
+        <h3 style="margin-top:0; color:var(--blue);">بيانات الطالب</h3>
         <input type="hidden" id="editId">
-        <input type="text" id="fName" placeholder="الاسم الرباعي">
-        <input type="text" id="surname" placeholder="اللقب">
-        <input type="text" id="mName" placeholder="اسم الأم">
+        <input type="text" id="fName" placeholder="الاسم الرباعي" style="width:100%; border:1px solid #ddd; margin-bottom:10px; border-radius:8px;">
+        <input type="text" id="surname" placeholder="اللقب" style="width:100%; border:1px solid #ddd; margin-bottom:10px; border-radius:8px;">
+        <input type="text" id="mName" placeholder="اسم الأم" style="width:100%; border:1px solid #ddd; margin-bottom:10px; border-radius:8px;">
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-            <input type="text" id="qNum" placeholder="القيد">
-            <input type="number" id="pNum" placeholder="الصفحة">
+            <input type="text" id="qNum" placeholder="القيد" style="border:1px solid #ddd; border-radius:8px;">
+            <input type="number" id="pNum" placeholder="الصفحة" style="border:1px solid #ddd; border-radius:8px;">
         </div>
-        <textarea id="note" placeholder="ملاحظات إضافية..." rows="2" style="width:100%; margin-top:10px; border-radius:10px; border:1px solid #e2e8f0; padding:10px;"></textarea>
-        <button id="saveBtn" class="btn" style="background:var(--main); width:100%; margin-top:20px;" onclick="saveData()">حفظ البيانات</button>
-        <button class="btn" style="background:#f1f5f9; color:#64748b; width:100%; margin-top:8px;" onclick="closeAddModal()">إغلاق</button>
+        <button id="saveBtn" class="btn" style="background:var(--main); width:100%; margin-top:20px;" onclick="saveData()">حفظ</button>
+        <button class="btn" style="background:#f1f5f9; color:#64748b; width:100%; margin-top:8px;" onclick="closeAddModal()">إلغاء</button>
     </div>
 </div>
 
 <div id="loginPage" style="height: 100vh; flex-direction: column; align-items: center; justify-content: center; display: none;">
-    <div class="card" style="width: 320px; text-align: center; padding: 40px 20px;">
-        <i class="fas fa-shield-alt fa-3x" style="color:var(--blue); margin-bottom:20px;"></i>
-        <h2>أرشيف المدرسة</h2>
-        <input type="email" id="loginEmail" placeholder="البريد الإلكتروني">
-        <input type="password" id="loginPass" placeholder="كلمة المرور">
-        <button class="btn" style="background:var(--main); width:100%; margin-top:25px;" onclick="login()">تسجيل الدخول</button>
+    <div class="card" style="width: 300px; text-align: center;">
+        <i class="fas fa-university fa-3x" style="color:var(--blue); margin-bottom:15px;"></i>
+        <h2>دخول الأرشيف</h2>
+        <input type="email" id="loginEmail" placeholder="البريد" style="width:90%; border:1px solid #ddd; margin-bottom:10px; border-radius:8px;">
+        <input type="password" id="loginPass" placeholder="كلمة المرور" style="width:90%; border:1px solid #ddd; border-radius:8px;">
+        <button class="btn" style="background:var(--main); width:100%; margin-top:20px;" onclick="login()">دخول</button>
     </div>
 </div>
 
 <div id="appContent" class="container" style="display: none;">
-    <div class="print-header">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div style="text-align:right;">
-                <p>جمهورية العراق</p>
-                <p>وزارة التربية</p>
-                <p>ثانوية الشهيد محمد عبد العزيز الكنعان</p>
-            </div>
-            <div style="text-align:center;">
-                <h2 style="margin:0;">سجل قيد الطلاب الموحد</h2>
-                <span id="printDate"></span>
-            </div>
-            <div style="width:80px; height:80px; border:1px solid #000; display:flex; align-items:center; justify-content:center;">شعار المدرسة</div>
-        </div>
-    </div>
-
-    <div id="printTablesContainer"></div>
-
     <div class="no-print">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <div style="background:var(--blue); color:white; padding:6px 16px; border-radius:25px; font-weight:bold; font-size:0.9rem;">
-                إجمالي المسجلين: <span id="totalCount">0</span>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin:0; color:var(--blue);">لوحة التحكم</h3>
+            <button onclick="logout()" style="background:none; border:none; color:#ef4444; cursor:pointer;">خروج <i class="fas fa-sign-out-alt"></i></button>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat-item">
+                <span class="stat-val" id="statTotal">0</span>
+                <span class="stat-label">إجمالي الطلاب</span>
             </div>
-            <button onclick="logout()" style="background:none; border:none; color:#ef4444; cursor:pointer; font-weight:bold;"><i class="fas fa-power-off"></i> خروج</button>
+            <div class="stat-item">
+                <span class="stat-val" style="color:var(--success)" id="statToday">0</span>
+                <span class="stat-label">مضاف اليوم</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-val" style="color:var(--accent)" id="statQaids">0</span>
+                <span class="stat-label">عدد القيود</span>
+            </div>
         </div>
 
         <div class="action-bar">
-            <button class="btn" style="background:var(--main)" onclick="openAddModal()"><i class="fas fa-plus"></i> إضافة</button>
-            <button class="btn" style="background:var(--accent)" onclick="document.getElementById('fileInput').click()"><i class="fas fa-upload"></i> استيراد</button>
-            <button class="btn" style="background:#f59e0b" onclick="exportExcel()"><i class="fas fa-download"></i> تصدير</button>
-            <button class="btn" style="background:var(--blue)" onclick="showPrintOptions()"><i class="fas fa-print"></i> طباعة</button>
+            <button class="btn" style="background:var(--main)" onclick="openAddModal()">إضافة</button>
+            <button class="btn" style="background:var(--accent)" onclick="document.getElementById('fileInput').click()">استيراد</button>
+            <button class="btn" style="background:#f59e0b" onclick="exportExcel()">تصدير</button>
+            <button class="btn" style="background:var(--blue)" onclick="showPrintOptions()">طباعة</button>
         </div>
         <input type="file" id="fileInput" hidden onchange="importExcel(event)" accept=".xlsx, .xls">
 
         <div class="search-wrapper">
-            <i class="fas fa-font" style="color:var(--blue); cursor:pointer;" onclick="toggleLetterBar()" title="بحث بالحرف الأول"></i>
-            <input type="text" id="searchInput" placeholder="ابحث باسم الطالب أو رقم القيد..." onkeyup="applyFilters()">
-            <select id="sortSelect" onchange="applyFilters()" style="width: auto; border:none; color:var(--blue); font-weight:bold; background:transparent; outline:none;">
+            <i class="fas fa-font" style="color:var(--blue); cursor:pointer;" onclick="toggleLetterBar()"></i>
+            <input type="text" id="searchInput" placeholder="بحث بالاسم أو القيد..." onkeyup="applyFilters()" style="flex:1">
+            <select id="sortSelect" onchange="applyFilters()">
                 <option value="newest">الأحدث</option>
-                <option value="alpha">أبجدياً</option>
+                <option value="alpha">أبجدي</option>
             </select>
         </div>
 
         <div id="letterBar" class="letter-bar"></div>
         <div id="studentsList"></div>
     </div>
-    
-    <div class="print-footer no-print">
-        <div>توقيع مدقق السجل</div>
-        <div>ختم إدارة المدرسة</div>
-        <div>توقيع مدير المدرسة</div>
-    </div>
 </div>
 
-<div id="printModal" class="modal">
-    <div class="modal-content">
-        <h3 style="text-align:center;">إعدادات الطباعة</h3>
-        <button class="btn" style="background:var(--accent); width:100%; margin-bottom:10px" onclick="printAllAlpha()">طباعة السجل الكامل (أبجدي)</button>
-        <button class="btn" style="background:#f1f5f9; color:#64748b; width:100%;" onclick="closePrintOptions()">إلغاء</button>
-    </div>
-</div>
-
-<div class="theme-toggle no-print" style="position:fixed; bottom:25px; left:25px; background:var(--main); color:white; width:55px; height:55px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 10px 20px rgba(0,0,0,0.2);" onclick="toggleDarkMode()">
+<div class="theme-toggle" style="position:fixed; bottom:25px; left:25px; background:var(--main); color:white; width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:1000;" onclick="toggleDarkMode()">
     <i class="fas fa-moon"></i>
 </div>
 
