@@ -127,12 +127,12 @@
                 json.forEach(row => {
                     const newDoc = doc(collection(db, "students"));
                     batch.set(newDoc, {
-                        name: row.name || row["الاسم"] || "",
-                        surname: row.surname || row["اللقب"] || "",
-                        mother: row.mother || row["الأم"] || "",
+                        name: String(row.name || row["الاسم"] || ""),
+                        surname: String(row.surname || row["اللقب"] || ""),
+                        mother: String(row.mother || row["الأم"] || ""),
                         qaid: String(row.qaid || row["القيد"] || ""),
                         page: String(row.page || row["الصفحة"] || ""),
-                        note: row.note || row["ملاحظات"] || "",
+                        note: String(row.note || row["ملاحظات"] || ""),
                         timestamp: Date.now()
                     });
                 });
@@ -171,9 +171,9 @@
                             </div>
                         </div>
                         <div style="display: flex; gap: 12px; align-items:center;">
-                            <i class="fas fa-print" style="color:#10b981; cursor:pointer;" onclick="printQaid('${s.qaid}')"></i>
-                            <i class="fas fa-edit" style="color:var(--blue); cursor:pointer;" onclick="edit('${s.id}')"></i>
-                            <i class="fas fa-trash" style="color:#ef4444; cursor:pointer;" onclick="del('${s.id}')"></i>
+                            <i class="fas fa-print" style="color:#10b981; cursor:pointer;" title="طباعة القيد" onclick="printQaid('${s.qaid}')"></i>
+                            <i class="fas fa-edit" style="color:var(--blue); cursor:pointer;" title="تعديل" onclick="edit('${s.id}')"></i>
+                            <i class="fas fa-trash" style="color:#ef4444; cursor:pointer;" title="حذف" onclick="del('${s.id}')"></i>
                         </div>
                     </div>`;
             });
@@ -192,12 +192,12 @@
             document.getElementById('entryModal').style.display = 'flex';
         };
 
-        window.del = async (id) => { if(confirm('حذف؟')) await deleteDoc(doc(db, "students", id)); };
+        window.del = async (id) => { if(confirm('هل أنت متأكد من الحذف؟')) await deleteDoc(doc(db, "students", id)); };
         window.logout = () => signOut(auth);
         window.login = async () => {
             const email = document.getElementById('loginEmail').value;
             const pass = document.getElementById('loginPass').value;
-            try { await signInWithEmailAndPassword(auth, email, pass); } catch (e) { alert("خطأ دخول"); }
+            try { await signInWithEmailAndPassword(auth, email, pass); } catch (e) { alert("خطأ في تسجيل الدخول"); }
         };
         window.exportExcel = () => {
             const ws = XLSX.utils.json_to_sheet(window.allStudentsData.map(({id, timestamp, ...rest}) => rest));
@@ -216,7 +216,7 @@
     <style>
         :root { --main: #1e293b; --blue: #0ea5e9; --orange: #f59e0b; --bg: #f1f5f9; --card: #ffffff; --text: #334155; }
         body.dark-mode { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --main: #38bdf8; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 10px; direction: rtl; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 10px; direction: rtl; }
         .container { max-width: 700px; margin: auto; }
         .card { background: var(--card); padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px; border: 1px solid rgba(0,0,0,0.05); }
         .search-wrapper { display: flex; align-items: center; gap: 8px; background: var(--card); padding: 5px 15px; border-radius: 50px; border: 2px solid var(--blue); margin-bottom: 15px; }
@@ -229,9 +229,7 @@
         .student-item { display: flex; align-items: center; justify-content: space-between; border-right: 4px solid var(--blue); padding: 10px; }
         .student-name { font-size: 1rem; font-weight: bold; color: var(--main); margin: 0; }
         .student-meta { display: flex; gap: 8px; margin-top: 5px; font-size: 0.85rem; }
-        
         .index-badge { background: var(--bg); color: var(--text); width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.75rem; font-weight: bold; border: 1px solid #ddd; }
-        
         .highlight-badge { padding: 1px 6px; border-radius: 4px; font-weight: bold; }
         .qaid-badge { background: #e0f2fe; color: #0369a1; }
         .page-badge { background: #fef9c3; color: #854d0e; }
@@ -242,10 +240,11 @@
         .modal-btn { width: 100%; margin: 8px 0; padding: 12px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
         @media print {
             .no-print, .theme-toggle, .search-wrapper, .action-bar, .card, i, .modal { display: none !important; }
-            body { background: white !important; }
+            body { background: white !important; padding: 0 !important; }
             .print-area { display: block !important; }
+            .print-header { text-align: center; margin-bottom: 10px; border-bottom: 2px solid #000; }
             table { width: 100%; border-collapse: collapse; }
-            th, td { border: 1.2px solid black !important; padding: 4px; text-align: center; font-size: 10pt; }
+            th, td { border: 1px solid black !important; padding: 5px; text-align: center; font-size: 11pt; }
         }
         .print-area { display: none; }
     </style>
@@ -254,7 +253,7 @@
 
 <div id="entryModal" class="modal">
     <div class="modal-content card">
-        <h3 style="margin-top:0; color:var(--blue)">إدخال بيانات الطالب</h3>
+        <h3 style="margin-top:0; color:var(--blue)">بيانات الطالب</h3>
         <input type="hidden" id="editId">
         <input type="text" id="fName" placeholder="الاسم الرباعي" oninput="checkDuplicate(this.value)">
         <div id="smartAlert" class="smart-alert"></div>
@@ -273,7 +272,7 @@
 <div id="printModal" class="modal">
     <div class="modal-content card">
         <h3 style="margin-top:0; color:var(--blue)">خيارات الطباعة</h3>
-        <button class="modal-btn" style="background:#f1f5f9; color:#334155; border:1px solid #ccc" onclick="printAllAlpha()">طباعة السجل كاملاً</button>
+        <button class="modal-btn" style="background:#f1f5f9; color:#334155; border:1px solid #ccc" onclick="printAllAlpha()">طباعة السجل أبجدياً (الكل)</button>
         <hr style="margin: 15px 0; border: 0; border-top: 1px solid #eee;">
         <select id="qaidSelect" style="width:100%; padding:10px; border-radius:8px; margin-bottom:10px;"></select>
         <button class="modal-btn" style="background:var(--blue); color:white" onclick="printSelectedQaidOption()">تأكيد طباعة القيد</button>
@@ -285,7 +284,7 @@
     <div class="card" style="width: 300px; text-align: center;">
         <i class="fas fa-user-shield fa-3x" style="color: var(--blue); margin-bottom: 10px;"></i>
         <h3>دخول النظام</h3>
-        <input type="email" id="loginEmail" placeholder="البريد">
+        <input type="email" id="loginEmail" placeholder="البريد الإلكتروني">
         <input type="password" id="loginPass" placeholder="كلمة السر">
         <button class="btn btn-save" onclick="login()">دخول</button>
     </div>
@@ -293,19 +292,19 @@
 
 <div id="appContent" class="container" style="display: none;">
     <div class="print-area">
-        <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px;">
+        <div class="print-header">
             <h2>فهرس القيد العام</h2>
             <p>ثانوية الشهيد محمد عبد العزيز الكنعان للبنين</p>
         </div>
         <table>
-            <thead><tr><th style="width:5%">ت</th><th style="width:40%">الاسم واللقب</th><th style="width:25%">اسم الأم</th><th style="width:15%">القيد</th><th style="width:15%">الصفحة</th></tr></thead>
+            <thead><tr><th>ت</th><th style="width:40%">الاسم واللقب</th><th>اسم الأم</th><th>القيد</th><th>الصفحة</th></tr></thead>
             <tbody id="printBody"></tbody>
         </table>
     </div>
 
     <div class="no-print">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <span>الإجمالي: <b id="totalCount" style="color: var(--blue);">0</b></span>
+            <span>إجمالي المسجلين: <b id="totalCount" style="color: var(--blue);">0</b></span>
             <button onclick="logout()" style="color:#ef4444; border:none; background:none; font-weight:bold; cursor:pointer;">خروج</button>
         </div>
 
@@ -320,7 +319,7 @@
 
         <div class="search-wrapper">
             <i class="fas fa-search"></i>
-            <input type="text" id="searchInput" placeholder="بحث..." onkeyup="applyFilters()">
+            <input type="text" id="searchInput" placeholder="بحث بالاسم أو القيد..." onkeyup="applyFilters()">
             <select id="sortSelect" onchange="applyFilters()" style="width: auto; margin:0; border:none;">
                 <option value="newest">الأحدث</option>
                 <option value="alpha">أبجدي</option>
