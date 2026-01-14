@@ -14,7 +14,6 @@
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } 
         from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
 
-        // إعدادات Firebase الثابتة
         const firebaseConfig = {
             apiKey: "AIzaSyC-RyeNVI6aNmWSJIYhQCG_4J_RQDAovds",
             authDomain: "student-archive-f8689.firebaseapp.com",
@@ -33,23 +32,17 @@
         window.allStudentsData = [];
         window.activeLetter = null;
 
-        // --- نظام الإشعارات (ملون وغير شفاف) ---
+        // نظام الإشعارات
         window.showToast = (msg, type = 'success') => {
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
             toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'}"></i> <span>${msg}</span>`;
             container.appendChild(toast);
-            
-            // التأكد من وضوح الإشعار وتفاعله
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateX(-20px)';
-                setTimeout(() => toast.remove(), 500);
-            }, 3500);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
         };
 
-        // --- إدارة الجلسة والدخول ---
+        // مراقبة حالة الدخول
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 document.getElementById('loginPage').style.display = 'none';
@@ -62,7 +55,6 @@
             }
         });
 
-        // --- جلب البيانات وتحديث الإحصائيات ---
         function loadData() {
             onSnapshot(query(studentsCol, orderBy("timestamp", "desc")), (snapshot) => {
                 window.allStudentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -72,27 +64,141 @@
         }
 
         function updateQuickStats() {
-            const now = new Date();
-            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-            
+            const startOfDay = new Date().setHours(0,0,0,0);
             document.getElementById('statTotal').innerText = window.allStudentsData.length;
             document.getElementById('statToday').innerText = window.allStudentsData.filter(s => s.timestamp >= startOfDay).length;
             document.getElementById('statQaids').innerText = new Set(window.allStudentsData.map(s => s.qaid)).size;
         }
 
-        // --- نظام الفلترة والبحث ---
-        function createLetterFilter() {
+        // فحص تكرار الاسم الرباعي فوراً تحت الحقل
+        window.checkInstantName = () => {
+            const nameInput = document.getElementById('fName').value.trim();
+            const warningEl = document.getElementById('nameWarning');
+            const editId = document.getElementById('editId').value;
+            
+            if (nameInput.length < 3) { warningEl.style.display = 'none'; return; }
+
+            const exists = window.allStudentsData.find(s => s.name.trim() === nameInput && s.id !== editId);
+            if (exists) {
+                warningEl.innerText = `⚠️ هذا الاسم مكرر (مضاف مسبقاً في قيد: ${exists.qaid})`;
+                warningEl.style.display = 'block';
+            } else {
+                warningEl.style.display = 'none';
+            }
+        };
+
+        // حفظ البيانات مع فحص القيد والصفحة
+        window.saveData = async () => {
+            const id = document.getElementById('editId').value;
+            const name = document.getElementById('fName').value.trim();
+            const surname = document.getElementById('surname').value.trim();
+            const mother = document.getElementById('mName').value.trim();
+            const qaid = document.getElementById('qNum').value.trim();
+            const page = document.getElementById('pNum').value.trim();
+            const note = document.getElementById('note').value.trim();
+
+            if(!name || !mother || !qaid || !page) return showToast("يرجى ملء الحقول المطلوبة", "error");
+
+            // فحص القيد والصفحة
+            const isDup = window.allStudentsData.find(s => String(s.qaid) === qaid && String(s.page) === page && s.id !== id);
+            if(isDup) return showToast(`القيد ${qaid} والصفحة ${page} مسجلان لـ (${isDup.name})`, "error");
+
+            try {
+                const payload = { name, surname, mother, qaid, page, note, timestamp: Date.now() };
+                if(id) await updateDoc(doc(db, "students", id), payload);
+                else await addDoc(studentsCol, payload);
+                showToast("تم الحفظ بنجاح");
+                window.closeAddModal();
+            } catch(e) { showToast("خطأ في الاتصال", "error"); }
+        };
+
+        // نظام الطباعة الاحترافي
+        function executePrint(data, title) {
+            document.getElementById('printTitle').innerText = title;
+            const container = document.getElementById('printTablesContainer');
+            container.innerHTML = '';
+            const rowsPerPage = 64; 
+            for (let i = 0; i < data.length; i += rowsPerPage) {
+                const pageData = data.slice(i, i + rowsPerPage);
+                const mid = Math.ceil(pageData.length / 2);
+                const pageDiv = document.createElement('div');
+                pageDiv.className = 'print-page';
+                const tableHTML = (subset, startIdx) => {
+                    let h = '<table><thead><tr><th>ت</th><th>الاسم</th><th>الأم</th><th>قيد</th><th>ص</th></tr></thead><tbody>';
+                    subset.forEach((s, idx) => {
+                        h += `<tr><td>${startIdx + idx + 1}</td><td>${s.name} ${s.surname||''}</td><td>${s.mother}</td><td>${s.qaid}</td><td>${s.page}</td></tr>`;
+                    });
+                    for(let j=subset.length; j<32; j++) h += '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>';
+                    return h + '</tbody></table>';
+                };
+                pageDiv.innerHTML = `<div class="print-grid"><div class="print-col">${tableHTML(pageData.slice(0, mid), i)}</div><div class="print-col">${tableHTML(pageData.slice(mid), i + mid)}</div></div>`;
+                container.appendChild(pageDiv);
+            }
+            document.getElementById('printDate').innerText = "تاريخ الاستخراج: " + new Date().toLocaleDateString('ar-EG');
+            document.getElementById('printModal').style.display = 'none';
+            setTimeout(() => { window.print(); }, 500);
+        }
+
+        window.printAllAlpha = () => {
+            const data = [...window.allStudentsData].sort((a,b) => a.name.localeCompare(b.name, 'ar'));
+            executePrint(data, "سجل الطلاب العام");
+        };
+
+        window.printSelectedQaid = () => {
+            const q = document.getElementById('qaidSelect').value;
+            if(!q) return showToast("اختر القيد", "error");
+            const data = window.allStudentsData.filter(s => String(s.qaid) === String(q)).sort((a,b) => a.name.localeCompare(b.name, 'ar'));
+            executePrint(data, `سجل القيد رقم: ${q}`);
+        };
+
+        // الاستيراد والتصدير
+        window.importExcel = (event) => {
+            const file = event.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            document.getElementById('loader').style.display = 'flex';
+            reader.onload = async (e) => {
+                try {
+                    const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                    const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                    const batch = writeBatch(db);
+                    json.forEach(row => {
+                        const name = (row.name || row["الاسم"] || "").toString().trim();
+                        if(name){
+                            const newDoc = doc(collection(db, "students"));
+                            batch.set(newDoc, {
+                                name, surname: (row.surname || row["اللقب"] || "").toString(),
+                                mother: (row.mother || row["الأم"] || "").toString(),
+                                qaid: (row.qaid || row["القيد"] || "").toString(),
+                                page: (row.page || row["الصفحة"] || "").toString(),
+                                note: (row.note || row["ملاحظات"] || "").toString(),
+                                timestamp: Date.now()
+                            });
+                        }
+                    });
+                    await batch.commit();
+                    showToast("تم الاستيراد بنجاح");
+                } catch(err) { showToast("خطأ في الملف", "error"); }
+                document.getElementById('loader').style.display = 'none';
+            };
+            reader.readAsArrayBuffer(file);
+        };
+
+        window.exportExcel = () => {
+            const ws = XLSX.utils.json_to_sheet(window.allStudentsData.map(({id, timestamp, ...rest}) => rest));
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Students");
+            XLSX.writeFile(wb, "Archive.xlsx");
+        };
+
+        // إدارة الواجهة
+        window.createLetterFilter = () => {
             const letters = "اأبتثجحخدذرزسشصضطظعغفقكلمنهوي";
             const container = document.getElementById('letterBar');
             container.innerHTML = `<span class="letter-btn active" id="btn-all" onclick="filterByLetter(null)">الكل</span>`;
             letters.split('').forEach(l => {
                 container.innerHTML += `<span class="letter-btn" id="btn-${l}" onclick="filterByLetter('${l}')">${l}</span>`;
             });
-        }
-
-        window.toggleLetterBar = () => {
-            const bar = document.getElementById('letterBar');
-            bar.style.display = (bar.style.display === 'flex') ? 'none' : 'flex';
         };
 
         window.filterByLetter = (l) => {
@@ -106,211 +212,15 @@
         window.applyFilters = () => {
             const term = document.getElementById('searchInput').value.toLowerCase();
             const sortBy = document.getElementById('sortSelect').value;
-            
             let filtered = window.allStudentsData.filter(s => {
-                const nameMatch = (s.name || '').toLowerCase().includes(term);
-                const qaidMatch = String(s.qaid || '').includes(term);
-                const letterMatch = window.activeLetter ? (s.name || '').trim().startsWith(window.activeLetter) : true;
-                return (nameMatch || qaidMatch) && letterMatch;
+                const matchSearch = (s.name || '').toLowerCase().includes(term) || String(s.qaid).includes(term);
+                const matchLetter = window.activeLetter ? s.name.trim().startsWith(window.activeLetter) : true;
+                return matchSearch && matchLetter;
             });
-
-            if (sortBy === "alpha") {
-                filtered.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'));
-            } else {
-                filtered.sort((a, b) => b.timestamp - a.timestamp);
-            }
+            if (sortBy === "alpha") filtered.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
             window.render(filtered);
         };
 
-        // --- إضافة وتعديل البيانات (مع فحص التكرار) ---
-        window.saveData = async () => {
-            const id = document.getElementById('editId').value;
-            const name = document.getElementById('fName').value.trim();
-            const surname = document.getElementById('surname').value.trim();
-            const mother = document.getElementById('mName').value.trim();
-            const qaid = document.getElementById('qNum').value.trim();
-            const page = document.getElementById('pNum').value.trim();
-            const note = document.getElementById('note').value.trim();
-
-            if(!name || !mother || !qaid || !page) {
-                return showToast("يرجى ملء الحقول الأساسية", "error");
-            }
-
-            // فحص التكرار (القيد والصفحة)
-            const duplicate = window.allStudentsData.find(s => 
-                String(s.qaid) === qaid && String(s.page) === page && s.id !== id
-            );
-
-            if(duplicate) {
-                return showToast(`خطأ: القيد ${qaid} والصفحة ${page} مسجلان باسم (${duplicate.name})`, "error");
-            }
-
-            try {
-                const payload = { name, surname, mother, qaid, page, note, timestamp: Date.now() };
-                if(id) {
-                    await updateDoc(doc(db, "students", id), payload);
-                    showToast("تم تحديث البيانات بنجاح");
-                } else {
-                    await addDoc(studentsCol, payload);
-                    showToast("تمت إضافة الطالب الجديد");
-                }
-                window.closeAddModal();
-                window.resetForm();
-            } catch(e) {
-                showToast("حدث خطأ في الاتصال بالخادم", "error");
-            }
-        };
-
-        // --- نظام الطباعة المتقدم (تنسيق الصفحة المتقابلة) ---
-        window.showPrintOptions = () => {
-            const qSelect = document.getElementById('qaidSelect');
-            qSelect.innerHTML = '<option value="">-- اختر رقم القيد --</option>';
-            const uniqueQaids = [...new Set(window.allStudentsData.map(s => s.qaid))].sort((a, b) => a - b);
-            uniqueQaids.forEach(q => {
-                qSelect.innerHTML += `<option value="${q}">قيد رقم ${q}</option>`;
-            });
-            document.getElementById('printModal').style.display = 'flex';
-        };
-
-        window.printSelectedQaid = () => {
-            const q = document.getElementById('qaidSelect').value;
-            if(!q) return showToast("اختر القيد أولاً", "error");
-            const data = window.allStudentsData
-                .filter(s => String(s.qaid) === String(q))
-                .sort((a,b) => (a.name || '').localeCompare(b.name || '', 'ar'));
-            executePrint(data, `سجل الطلاب - القيد رقم (${q})`);
-        };
-
-        window.printAllAlpha = () => {
-            const data = [...window.allStudentsData].sort((a,b) => (a.name || '').localeCompare(b.name || '', 'ar'));
-            executePrint(data, "السجل العام للطلاب - ترتيب أبجدي");
-        };
-
-        function executePrint(data, title) {
-            document.getElementById('printTitle').innerText = title;
-            const container = document.getElementById('printTablesContainer');
-            container.innerHTML = '';
-            
-            const rowsPerPage = 64; // 32 يمين + 32 يسار
-            for (let i = 0; i < data.length; i += rowsPerPage) {
-                const pageData = data.slice(i, i + rowsPerPage);
-                const mid = Math.ceil(pageData.length / 2);
-                
-                const pageDiv = document.createElement('div');
-                pageDiv.className = 'print-page';
-                
-                const tableHTML = (subset, startIdx) => {
-                    let html = '<table><thead><tr><th>ت</th><th>الاسم الكامل</th><th>اسم الأم</th><th>قيد</th><th>ص</th></tr></thead><tbody>';
-                    subset.forEach((s, idx) => {
-                        html += `<tr>
-                            <td>${startIdx + idx + 1}</td>
-                            <td>${s.name} ${s.surname || ''}</td>
-                            <td>${s.mother}</td>
-                            <td>${s.qaid}</td>
-                            <td>${s.page}</td>
-                        </tr>`;
-                    });
-                    // ملء الفراغات لضمان تناسق الجدول
-                    for(let j = subset.length; j < 32; j++) {
-                        html += '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>';
-                    }
-                    return html + '</tbody></table>';
-                };
-
-                pageDiv.innerHTML = `
-                    <div class="print-grid">
-                        <div class="print-col">${tableHTML(pageData.slice(0, mid), i)}</div>
-                        <div class="print-col">${tableHTML(pageData.slice(mid), i + mid)}</div>
-                    </div>
-                    <div class="page-footer">صفحة رقم: ${(i/rowsPerPage)+1}</div>
-                `;
-                container.appendChild(pageDiv);
-            }
-            
-            document.getElementById('printDate').innerText = "تاريخ الطباعة: " + new Date().toLocaleDateString('ar-EG');
-            document.getElementById('printModal').style.display = 'none';
-            setTimeout(() => { window.print(); }, 700);
-        }
-
-        // --- الاستيراد والتصدير ---
-        window.importExcel = (event) => {
-            const file = event.target.files[0];
-            if(!file) return;
-            const reader = new FileReader();
-            document.getElementById('loader').style.display = 'flex';
-            
-            reader.onload = async (e) => {
-                try {
-                    const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-                    const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                    const batch = writeBatch(db);
-                    let count = 0;
-                    
-                    json.forEach(row => {
-                        const name = String(row.name || row["الاسم"] || "").trim();
-                        if(name) {
-                            const newDoc = doc(collection(db, "students"));
-                            batch.set(newDoc, {
-                                name: name,
-                                surname: String(row.surname || row["اللقب"] || "").trim(),
-                                mother: String(row.mother || row["الأم"] || "").trim(),
-                                qaid: String(row.qaid || row["القيد"] || "").trim(),
-                                page: String(row.page || row["الصفحة"] || "").trim(),
-                                note: String(row.note || row["ملاحظات"] || "").trim(),
-                                timestamp: Date.now()
-                            });
-                            count++;
-                        }
-                    });
-                    await batch.commit();
-                    showToast(`تم استيراد ${count} سجل بنجاح`);
-                } catch(err) { showToast("فشل الاستيراد: تأكد من صيغة الملف", "error"); }
-                document.getElementById('loader').style.display = 'none';
-                event.target.value = '';
-            };
-            reader.readAsArrayBuffer(file);
-        };
-
-        window.exportExcel = () => {
-            const dataToExport = window.allStudentsData.map(({id, timestamp, ...rest}) => rest);
-            const ws = XLSX.utils.json_to_sheet(dataToExport);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
-            XLSX.writeFile(wb, "ارشيف_الطلاب.xlsx");
-        };
-
-        // --- وظائف الحذف الفردي والكلي ---
-        window.del = (id) => { deleteTargetId = id; document.getElementById('deleteModal').style.display = 'flex'; };
-        window.confirmDel = async () => { 
-            if(deleteTargetId) { 
-                await deleteDoc(doc(db, "students", deleteTargetId)); 
-                showToast("تم الحذف بنجاح", "error"); 
-                document.getElementById('deleteModal').style.display = 'none'; 
-            } 
-        };
-
-        window.openMasterDelete = () => {
-            document.getElementById('masterDeleteInput').value = '';
-            document.getElementById('masterDeleteModal').style.display = 'flex';
-        };
-
-        window.confirmMasterDelete = async () => {
-            if(document.getElementById('masterDeleteInput').value !== 'حذف') {
-                return showToast("يرجى كتابة كلمة حذف بشكل صحيح", "error");
-            }
-            document.getElementById('loader').style.display = 'flex';
-            try {
-                const snapshot = await getDocs(studentsCol);
-                const batch = writeBatch(db);
-                snapshot.docs.forEach((doc) => batch.delete(doc.ref));
-                await batch.commit();
-                showToast("تم تصفير الأرشيف بالكامل", "error");
-                document.getElementById('masterDeleteModal').style.display = 'none';
-            } catch(e) { showToast("خطأ في العملية", "error"); }
-            document.getElementById('loader').style.display = 'none';
-        };
-
-        // --- تنسيق العرض في القائمة ---
         window.render = (data) => {
             const list = document.getElementById('studentsList');
             list.innerHTML = ''; 
@@ -320,7 +230,7 @@
                         <div class="card-body-wrapper">
                             <div class="user-icon"><i class="fas fa-user-graduate"></i></div>
                             <div class="student-details">
-                                <p class="student-name">${s.name} <span class="surname-text">${s.surname || ''}</span></p>
+                                <p class="student-name">${s.name} <small style="color:var(--accent)">${s.surname || ''}</small></p>
                                 <div class="student-meta">
                                     <span>الأم: ${s.mother}</span>
                                     <span class="badge-q">قيد: ${s.qaid}</span>
@@ -329,8 +239,8 @@
                             </div>
                         </div>
                         <div class="item-actions">
-                            <button onclick="edit('${s.id}')" class="btn-edit"><i class="fas fa-pen"></i></button>
-                            <button onclick="del('${s.id}')" class="btn-del"><i class="fas fa-trash"></i></button>
+                            <button onclick="edit('${s.id}')" class="btn-sml"><i class="fas fa-edit"></i></button>
+                            <button onclick="del('${s.id}')" class="btn-sml"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>`;
             });
@@ -345,157 +255,158 @@
             document.getElementById('qNum').value = s.qaid;
             document.getElementById('pNum').value = s.page;
             document.getElementById('note').value = s.note;
-            document.getElementById('saveBtn').innerText = "تحديث البيانات";
+            document.getElementById('saveBtn').innerText = "تحديث";
             document.getElementById('entryModal').style.display = 'flex';
         };
 
-        // --- المساعدات العامة ---
+        window.del = (id) => { deleteTargetId = id; document.getElementById('deleteModal').style.display = 'flex'; };
+        window.confirmDel = async () => { 
+            if(deleteTargetId) { 
+                await deleteDoc(doc(db, "students", deleteTargetId)); 
+                showToast("تم الحذف", "error"); 
+                document.getElementById('deleteModal').style.display = 'none'; 
+            } 
+        };
+
         window.openAddModal = () => { window.resetForm(); document.getElementById('entryModal').style.display = 'flex'; };
         window.closeAddModal = () => document.getElementById('entryModal').style.display = 'none';
         window.resetForm = () => { 
             document.getElementById('editId').value = ''; 
             document.querySelectorAll('#entryModal input, #entryModal textarea').forEach(i => i.value = ''); 
+            document.getElementById('nameWarning').style.display = 'none';
             document.getElementById('saveBtn').innerText = "حفظ"; 
         };
+
         window.login = async () => {
             const email = document.getElementById('loginEmail').value;
             const pass = document.getElementById('loginPass').value;
             try { await signInWithEmailAndPassword(auth, email, pass); } 
-            catch(e) { showToast("البريد أو كلمة المرور غير صحيحة", "error"); }
+            catch(e) { showToast("خطأ في الدخول", "error"); }
         };
         window.logout = () => signOut(auth);
         window.toggleDarkMode = () => document.body.classList.toggle('dark-mode');
+        window.toggleLetterBar = () => { const b = document.getElementById('letterBar'); b.style.display = (b.style.display==='flex')?'none':'flex'; };
     </script>
     
     <style>
-        :root { --main: #0f172a; --blue: #3b82f6; --bg: #f1f5f9; --card: #ffffff; --text: #1e293b; --accent: #4f46e5; }
-        body.dark-mode { --bg: #020617; --card: #1e293b; --text: #f1f5f9; }
+        :root { --main: #0f172a; --blue: #3b82f6; --bg: #f1f5f9; --card: #ffffff; --text: #1e293b; --accent: #6366f1; }
+        body.dark-mode { --bg: #020617; --card: #1e293b; --text: #f8fafc; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); direction: rtl; margin: 0; padding: 10px; }
         
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); direction: rtl; margin: 0; padding: 0; transition: 0.3s; }
-        .container { max-width: 900px; margin: auto; padding: 10px; }
+        /* التوسيط المثالي للنوافذ */
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 9999; }
+        .modal-content { background: var(--card); padding: 25px; border-radius: 20px; width: 90%; max-width: 400px; box-shadow: 0 20px 25px rgba(0,0,0,0.2); }
         
-        /* البطاقات والقائمة */
-        .card { background: var(--card); padding: 12px; border-radius: 12px; margin-bottom: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        /* تنبيه الاسم تحت الحقل */
+        .name-warning { color: #ef4444; font-size: 0.8rem; font-weight: bold; margin-top: 5px; display: none; background: #fee2e2; padding: 6px; border-radius: 8px; border: 1px solid #fecaca; }
+
+        input, textarea, select { width: 100%; padding: 12px; margin-top: 10px; border: 1px solid #cbd5e1; border-radius: 10px; background: var(--card); color: inherit; box-sizing: border-box; }
+        .card { background: var(--card); padding: 12px; border-radius: 12px; margin-bottom: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
         .student-item { display: flex; align-items: center; justify-content: space-between; border-right: 5px solid var(--blue); }
-        .student-name { margin: 0; font-weight: bold; font-size: 1rem; }
-        .surname-text { color: var(--accent); font-size: 0.85rem; margin-right: 5px; }
-        .student-meta { font-size: 0.8rem; color: #64748b; display: flex; gap: 12px; margin-top: 5px; }
-        .badge-q { background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
-        .badge-p { background: #fef9c3; color: #854d0e; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
-        
-        .user-icon { width: 40px; height: 40px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--blue); }
-        .card-body-wrapper { display: flex; align-items: center; gap: 15px; }
-        
-        /* الأزرار */
-        .btn { border: none; border-radius: 8px; cursor: pointer; padding: 12px; font-weight: bold; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; }
-        .btn:active { transform: scale(0.95); }
-        .btn-edit { background: none; border: 1px solid #e2e8f0; color: #3b82f6; padding: 8px; border-radius: 8px; cursor: pointer; }
-        .btn-del { background: none; border: 1px solid #e2e8f0; color: #ef4444; padding: 8px; border-radius: 8px; cursor: pointer; }
-
-        /* شريط الإحصائيات */
+        .student-name { margin: 0; font-weight: bold; }
+        .student-meta { font-size: 0.8rem; color: #64748b; margin-top: 5px; display: flex; gap: 10px; }
+        .badge-q { background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 5px; font-weight: bold; }
+        .badge-p { background: #fef9c3; color: #854d0e; padding: 2px 8px; border-radius: 5px; font-weight: bold; }
+        .btn { border: none; border-radius: 10px; cursor: pointer; padding: 12px; font-weight: bold; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-sml { background: none; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 12px; cursor: pointer; color: #64748b; }
+        .toast { position: fixed; bottom: 20px; left: 20px; padding: 15px 25px; border-radius: 12px; color: white; z-index: 10000; font-weight: bold; box-shadow: 0 10px 15px rgba(0,0,0,0.2); }
+        .toast.success { background: #10b981; } .toast.error { background: #ef4444; }
         .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
-        .stat-item { background: var(--card); padding: 10px; border-radius: 12px; text-align: center; }
-        .stat-val { display: block; font-size: 1.4rem; font-weight: 800; color: var(--blue); }
-        .stat-label { font-size: 0.75rem; color: #64748b; }
-
-        /* البحث والفلترة */
-        .search-wrapper { display: flex; align-items: center; gap: 10px; background: var(--card); padding: 5px 15px; border-radius: 50px; border: 2px solid var(--blue); margin-bottom: 15px; }
-        .search-wrapper input { border: none; padding: 10px; width: 100%; outline: none; background: transparent; color: inherit; font-size: 1rem; }
-        
-        .letter-bar { display: none; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; justify-content: center; background: var(--card); padding: 10px; border-radius: 12px; }
-        .letter-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: #e2e8f0; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .stat-item { background: var(--card); padding: 15px; border-radius: 15px; text-align: center; }
+        .stat-val { display: block; font-size: 1.5rem; font-weight: 800; color: var(--blue); }
+        .search-wrapper { display: flex; align-items: center; gap: 10px; background: var(--card); padding: 5px 20px; border-radius: 50px; border: 2px solid var(--blue); margin-bottom: 15px; }
+        .search-wrapper input { border: none; outline: none; background: transparent; }
+        .letter-bar { display: none; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; justify-content: center; }
+        .letter-btn { width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; background: var(--card); border-radius: 8px; cursor: pointer; font-weight: bold; }
         .letter-btn.active { background: var(--blue); color: white; }
-
-        /* النوافذ المنبثقة */
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 5000; padding: 20px; }
-        .modal-content { background: var(--card); padding: 25px; border-radius: 20px; width: 100%; max-width: 400px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
-        input, select, textarea { width: 100%; padding: 12px; margin-top: 10px; border: 1px solid #cbd5e1; border-radius: 10px; background: var(--card); color: inherit; box-sizing: border-box; }
-
-        /* الإشعارات المحسنة */
-        .toast { position: fixed; top: 20px; left: 20px; padding: 15px 25px; border-radius: 12px; color: white; z-index: 9999; font-weight: bold; display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2); transition: 0.4s; min-width: 250px; opacity: 1; }
-        .toast.success { background: #059669; border-right: 8px solid #064e3b; }
-        .toast.error { background: #dc2626; border-right: 8px solid #7f1d1d; }
-
-        .loader { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index:10000; display:none; align-items:center; justify-content:center; flex-direction: column; }
-        
-        /* الطباعة */
-        @media print {
-            .no-print { display: none !important; }
-            .print-area { display: block !important; background: white; }
-            .print-page { page-break-after: always; padding: 20px; position: relative; min-height: 100vh; }
-            .print-grid { display: flex; gap: 20px; }
-            .print-col { flex: 1; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-            th, td { border: 1px solid #000; padding: 6px; text-align: center; font-size: 12px; }
-            th { background: #f0f0f0 !important; }
-            .page-footer { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font-size: 10px; }
-        }
+        .loader { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:10000; display:none; align-items:center; justify-content:center; }
+        @media print { .no-print { display: none !important; } .print-area { display: block !important; } .print-page { page-break-after: always; padding: 20px; } .print-grid { display: flex; gap: 20px; } .print-col { flex: 1; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid black; padding: 6px; text-align: center; font-size: 12px; } }
         .print-area { display: none; }
     </style>
 </head>
 <body>
 
-<div id="loader" class="loader">
-    <i class="fas fa-spinner fa-spin fa-3x" style="color:var(--blue)"></i>
-    <p style="margin-top:15px; font-weight:bold;">جاري معالجة البيانات...</p>
-</div>
-
+<div id="loader" class="loader">جاري المعالجة...</div>
 <div id="toastContainer"></div>
 
-<div id="loginPage" style="height: 100vh; flex-direction: column; align-items: center; justify-content: center; display: none; background: var(--main);">
-    <div class="card" style="width: 320px; padding: 30px; text-align: center;">
-        <i class="fas fa-shield-alt fa-4x" style="color:var(--blue); margin-bottom: 20px;"></i>
-        <h2 style="margin-bottom:20px;">دخول النظام</h2>
+<div id="entryModal" class="modal">
+    <div class="modal-content">
+        <h3 style="margin-top:0; color:var(--blue);">بيانات الطالب</h3>
+        <input type="hidden" id="editId">
+        <input type="text" id="fName" placeholder="الاسم الرباعي الكامل" oninput="checkInstantName()">
+        <div id="nameWarning" class="name-warning"></div>
+        <input type="text" id="surname" placeholder="اللقب">
+        <input type="text" id="mName" placeholder="اسم الأم">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <input type="text" id="qNum" placeholder="القيد">
+            <input type="number" id="pNum" placeholder="الصفحة">
+        </div>
+        <textarea id="note" placeholder="ملاحظات..." rows="2"></textarea>
+        <button id="saveBtn" class="btn" style="background:var(--main); width:100%; margin-top:15px;" onclick="saveData()">حفظ البيانات</button>
+        <button class="btn" style="background:#f1f5f9; color:#333; width:100%; margin-top:8px;" onclick="closeAddModal()">إغلاق</button>
+    </div>
+</div>
+
+<div id="deleteModal" class="modal">
+    <div class="modal-content" style="text-align:center;">
+        <h3>حذف الطالب؟</h3>
+        <p>لا يمكن التراجع عن هذه العملية.</p>
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="btn" style="background:#ef4444; flex:1;" onclick="confirmDel()">نعم، حذف</button>
+            <button class="btn" style="background:#cbd5e1; color:#333; flex:1;" onclick="document.getElementById('deleteModal').style.display='none'">إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<div id="loginPage" style="height: 100vh; flex-direction: column; align-items: center; justify-content: center; display: none;">
+    <div class="card" style="width: 300px; padding: 30px; text-align: center;">
+        <h2 style="color:var(--blue);">تسجيل الدخول</h2>
         <input type="email" id="loginEmail" placeholder="البريد الإلكتروني">
         <input type="password" id="loginPass" placeholder="كلمة المرور">
-        <button class="btn" style="background:var(--blue); width:100%; margin-top:20px;" onclick="login()">دخول آمن</button>
+        <button class="btn" style="background:var(--main); width:100%; margin-top:20px;" onclick="login()">دخول</button>
     </div>
 </div>
 
 <div id="appContent" class="container" style="display: none;">
-    
     <div class="print-area">
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #000; padding-bottom:10px; margin-bottom:20px;">
-            <div style="font-size:12px;">جمهورية العراق<br>وزارة التربية</div>
-            <h2 id="printTitle" style="margin:0;"></h2>
-            <div id="printDate" style="font-size:12px;"></div>
+        <div style="text-align:center; border-bottom: 2px solid #000; margin-bottom: 20px;">
+            <h2 id="printTitle" style="margin: 10px 0;"></h2>
+            <span id="printDate" style="font-size: 14px;"></span>
         </div>
         <div id="printTablesContainer"></div>
     </div>
 
     <div class="no-print">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h3 style="margin:0; color:var(--blue);"><i class="fas fa-archive"></i> أرشيف الطلاب الذكي</h3>
-            <button onclick="logout()" class="btn" style="background:#ef4444; padding:5px 15px; font-size:0.8rem;">خروج</button>
+            <h3 style="margin:0; color:var(--blue);"><i class="fas fa-archive"></i> أرشيف الطلاب</h3>
+            <button onclick="logout()" class="btn-sml" style="color:#ef4444; border-color:#ef4444;">خروج</button>
         </div>
 
         <div class="stats-bar">
-            <div class="stat-item"><span class="stat-val" id="statTotal">0</span><span class="stat-label">إجمالي الطلاب</span></div>
-            <div class="stat-item"><span class="stat-val" style="color:#10b981" id="statToday">0</span><span class="stat-label">إضافات اليوم</span></div>
-            <div class="stat-item"><span class="stat-val" style="color:var(--accent)" id="statQaids">0</span><span class="stat-label">عدد القيود</span></div>
+            <div class="stat-item"><span class="stat-val" id="statTotal">0</span><span class="stat-label">الإجمالي</span></div>
+            <div class="stat-item"><span class="stat-val" id="statToday" style="color:#10b981">0</span><span class="stat-label">اليوم</span></div>
+            <div class="stat-item"><span class="stat-val" id="statQaids" style="color:var(--accent)">0</span><span class="stat-label">القيود</span></div>
         </div>
 
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:10px;">
-            <button class="btn" style="background:var(--blue)" onclick="openAddModal()"><i class="fas fa-plus-circle"></i> إضافة طالب جديد</button>
-            <button class="btn" style="background:#ef4444" onclick="openMasterDelete()"><i class="fas fa-user-slash"></i> تصفير الأرشيف</button>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px;">
+            <button class="btn" style="background:var(--main)" onclick="openAddModal()"><i class="fas fa-plus"></i> إضافة طالب</button>
+            <button class="btn" style="background:var(--blue)" onclick="document.getElementById('printModal').style.display='flex'"><i class="fas fa-print"></i> طباعة</button>
         </div>
-        
-        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-bottom:15px;">
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px;">
             <button class="btn" style="background:var(--accent)" onclick="document.getElementById('fileInput').click()"><i class="fas fa-file-import"></i> استيراد</button>
             <button class="btn" style="background:#f59e0b" onclick="exportExcel()"><i class="fas fa-file-export"></i> تصدير</button>
-            <button class="btn" style="background:#0f172a" onclick="showPrintOptions()"><i class="fas fa-print"></i> طباعة</button>
         </div>
-
         <input type="file" id="fileInput" hidden onchange="importExcel(event)" accept=".xlsx, .xls">
 
         <div class="search-wrapper">
             <i class="fas fa-search" style="color:var(--blue)"></i>
-            <input type="text" id="searchInput" placeholder="ابحث بالاسم أو رقم القيد..." onkeyup="applyFilters()">
-            <select id="sortSelect" onchange="applyFilters()" style="width: auto; border:none; color:var(--blue); font-weight:bold; cursor:pointer;">
+            <input type="text" id="searchInput" placeholder="ابحث بالاسم أو القيد..." onkeyup="applyFilters()">
+            <select id="sortSelect" onchange="applyFilters()" style="width: auto; border:none; background:transparent; font-weight:bold;">
                 <option value="newest">الأحدث</option>
                 <option value="alpha">أبجدي</option>
             </select>
-            <i class="fas fa-filter" style="color:#94a3b8; cursor:pointer; margin-right:10px;" onclick="toggleLetterBar()"></i>
+            <i class="fas fa-filter" style="cursor:pointer; color:#94a3b8" onclick="toggleLetterBar()"></i>
         </div>
 
         <div id="letterBar" class="letter-bar"></div>
@@ -503,61 +414,20 @@
     </div>
 </div>
 
-<div id="entryModal" class="modal">
-    <div class="modal-content">
-        <h3 style="margin-top:0; color:var(--blue);"><i class="fas fa-user-edit"></i> بيانات الطالب</h3>
-        <input type="hidden" id="editId">
-        <input type="text" id="fName" placeholder="الاسم الرباعي الكامل">
-        <input type="text" id="surname" placeholder="اللقب / العشيرة">
-        <input type="text" id="mName" placeholder="اسم الأم">
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-            <input type="text" id="qNum" placeholder="رقم القيد">
-            <input type="number" id="pNum" placeholder="رقم الصفحة">
-        </div>
-        <textarea id="note" placeholder="ملاحظات إضافية..." rows="3"></textarea>
-        <button id="saveBtn" class="btn" style="background:var(--blue); width:100%; margin-top:15px;" onclick="saveData()">حفظ البيانات</button>
-        <button class="btn" style="background:#f1f5f9; color:#1e293b; width:100%; margin-top:8px;" onclick="closeAddModal()">إلغاء</button>
-    </div>
-</div>
-
-<div id="deleteModal" class="modal">
-    <div class="modal-content" style="text-align:center;">
-        <i class="fas fa-trash-alt fa-3x" style="color:#ef4444; margin-bottom:15px;"></i>
-        <h3>هل أنت متأكد؟</h3>
-        <p>سيتم حذف بيانات الطالب نهائياً من الأرشيف.</p>
-        <div style="display:flex; gap:10px; margin-top:20px;">
-            <button class="btn" style="background:#ef4444; flex:1;" onclick="confirmDel()">نعم، احذف</button>
-            <button class="btn" style="background:#cbd5e1; color:#1e293b; flex:1;" onclick="document.getElementById('deleteModal').style.display='none'">تراجع</button>
-        </div>
-    </div>
-</div>
-
-<div id="masterDeleteModal" class="modal">
-    <div class="modal-content">
-        <h3 style="text-align:center; color:#ef4444;">تنبيه أمني!</h3>
-        <p style="text-align:center;">هذا الإجراء سيحذف <b>جميع الطلاب</b>. للتأكيد، اكتب كلمة "حذف" أدناه:</p>
-        <input type="text" id="masterDeleteInput" style="text-align:center; border:2px solid #ef4444;">
-        <div style="display:flex; gap:10px; margin-top:20px;">
-            <button class="btn" style="background:#ef4444; flex:1;" onclick="confirmMasterDelete()">تأكيد الحذف الكلي</button>
-            <button class="btn" style="background:#cbd5e1; color:#1e293b; flex:1;" onclick="document.getElementById('masterDeleteModal').style.display='none'">إلغاء</button>
-        </div>
-    </div>
-</div>
-
 <div id="printModal" class="modal">
     <div class="modal-content">
-        <h3><i class="fas fa-print"></i> خيارات الطباعة</h3>
-        <button class="btn" style="background:var(--accent); width:100%; margin-bottom:15px" onclick="printAllAlpha()">طباعة السجل العام (أبجدي)</button>
-        <div style="border-top:1px solid #e2e8f0; padding-top:15px;">
-            <label style="font-size:0.8rem;">أو طباعة قيد محدد:</label>
+        <h3 style="margin-top:0;">خيارات الطباعة</h3>
+        <button class="btn" style="background:var(--accent); width:100%; margin-bottom:15px" onclick="printAllAlpha()">طباعة السجل العام</button>
+        <div style="border-top:1px solid #eee; padding-top:15px;">
+            <label>طباعة قيد محدد:</label>
             <select id="qaidSelect"></select>
-            <button class="btn" style="background:var(--blue); width:100%; margin-top:10px" onclick="printSelectedQaid()">طباعة القيد المختار</button>
+            <button class="btn" style="background:var(--blue); width:100%; margin-top:10px" onclick="printSelectedQaid()">تنفيذ الطباعة</button>
         </div>
-        <button class="btn" style="background:#f1f5f9; color:#1e293b; width:100%; margin-top:15px;" onclick="document.getElementById('printModal').style.display='none'">إغلاق</button>
+        <button class="btn" style="background:#f1f5f9; color:#333; width:100%; margin-top:15px;" onclick="document.getElementById('printModal').style.display='none'">إلغاء</button>
     </div>
 </div>
 
-<div class="theme-toggle no-print" style="position:fixed; bottom:25px; left:25px; background:var(--main); color:white; width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 4px 15px rgba(0,0,0,0.3);" onclick="toggleDarkMode()">
+<div class="theme-toggle no-print" style="position:fixed; bottom:25px; left:25px; background:var(--main); color:white; width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer;" onclick="toggleDarkMode()">
     <i class="fas fa-moon"></i>
 </div>
 
