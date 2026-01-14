@@ -97,7 +97,26 @@
             window.render(filtered);
         };
 
-        // دالة للتحقق من التكرار الصارم (الاسم + القيد + الصفحة)
+        // دالة لتحميل نموذج Excel جاهز
+        window.downloadExcelTemplate = () => {
+            const templateData = [
+                ["الاسم", "اللقب", "الأم", "القيد", "الصفحة", "ملاحظات"],
+                ["أحمد محمد علي", "الكبيسي", "فاطمة", "12345", "25", "-"],
+                ["سارة خالد حسن", "العبيدي", "لمياء", "12346", "26", "طالبة متفوقة"],
+                ["علي محمود سعيد", "الجبوري", "نادية", "12347", "27", "-"],
+                ["لمياء فارس عبدالله", "التميمي", "رنا", "12348", "28", "-"],
+                ["محمد خالد إبراهيم", "الراوي", "سعاد", "12349", "29", "-"],
+                ["فاطمة عماد حسين", "الخالدي", "إخلاص", "12350", "30", "-"]
+            ];
+            
+            const ws = XLSX.utils.aoa_to_sheet(templateData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
+            XLSX.writeFile(wb, "نموذج_اسماء_الطلاب.xlsx");
+            showToast("تم تحميل النموذج بنجاح");
+        };
+
+        // دالة للتحقق من التكرار الصارم
         function isDuplicateStudent(name, qaid, page, existingStudents) {
             return existingStudents.some(student => 
                 student.name.trim().toLowerCase() === name.trim().toLowerCase() &&
@@ -116,15 +135,12 @@
                     const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
                     const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
                     
-                    // الحصول على البيانات الحالية من قاعدة البيانات
                     const existingStudents = window.allStudentsData;
-                    
                     const batch = writeBatch(db);
                     let added = 0;
                     let skipped = 0;
-                    let duplicates = [];
                     
-                    json.forEach((row, index) => {
+                    json.forEach((row) => {
                         const rName = String(row.name || row["الاسم"] || "").trim();
                         const rQaid = String(row.qaid || row["القيد"] || "").trim();
                         const rPage = String(row.page || row["الصفحة"] || "").trim();
@@ -134,9 +150,7 @@
                             return;
                         }
                         
-                        // التحقق من التكرار الصارم
                         if (isDuplicateStudent(rName, rQaid, rPage, existingStudents)) {
-                            duplicates.push(`${rName} (قيد: ${rQaid}, صفحة: ${rPage})`);
                             skipped++;
                             return;
                         }
@@ -161,16 +175,7 @@
                         showToast("لم يتم استيراد أي بيانات جديدة", "error");
                     }
                     
-                    // عرض معلومات عن المكررات إذا وجدت
-                    if (duplicates.length > 0) {
-                        setTimeout(() => {
-                            showToast(`تم تخطي ${duplicates.length} سجل مكرر`, "error");
-                        }, 1000);
-                    }
-                    
-                } catch(err) { 
-                    showToast("خطأ في الملف", "error"); 
-                }
+                } catch(err) { showToast("خطأ في الملف", "error"); }
                 document.getElementById('loader').style.display = 'none';
             };
             reader.readAsArrayBuffer(file);
@@ -222,13 +227,12 @@
             executePrint([...window.allStudentsData].sort((a,b)=>a.name.localeCompare(b.name,'ar')), "السجل العام");
         };
 
-        // وظيفة الطباعة المحسنة لضمان تسلسل الأرقام في نفس الصفحة
         function executePrint(data, title) {
             document.getElementById('printTitle').innerText = title;
             const container = document.getElementById('printTablesContainer');
             container.innerHTML = '';
             
-            const rowsPerPage = 64; // (32 يمين + 32 يسار)
+            const rowsPerPage = 64;
             for (let i = 0; i < data.length; i += rowsPerPage) {
                 const pageData = data.slice(i, i + rowsPerPage);
                 const mid = Math.ceil(pageData.length / 2);
@@ -267,8 +271,7 @@
             
             if(!name || !mother || !qaid || !page) return showToast("أكمل البيانات", "error");
             
-            // التحقق من التكرار الصارم عند الحفظ
-            if (!id) { // فقط للطلاب الجدد، ليس عند التحديث
+            if (!id) {
                 const existingStudent = window.allStudentsData.find(student => 
                     student.name.trim().toLowerCase() === name.toLowerCase() &&
                     String(student.qaid).trim() === String(qaid).trim() &&
@@ -358,7 +361,6 @@
             document.getElementById('editId').value = ''; 
             document.querySelectorAll('input, textarea').forEach(i => i.value = ''); 
             document.getElementById('saveBtn').innerText = "حفظ"; 
-            // إخفاء التنبيه عند إعادة تعيين النموذج
             const existingAlert = document.getElementById('duplicateStudentAlert');
             if(existingAlert) existingAlert.remove();
         };
@@ -374,25 +376,21 @@
         window.logout = () => signOut(auth);
         window.toggleDarkMode = () => document.body.classList.toggle('dark-mode');
         
-        // دالة للتحقق من تكرار الاسم عند كتابته
         window.checkDuplicateStudent = () => {
             const nameInput = document.getElementById('fName');
             const nameValue = nameInput.value.trim();
             const qaidValue = document.getElementById('qNum').value.trim();
             const pageValue = document.getElementById('pNum').value.trim();
             
-            // إزالة أي تنبيه سابق
             const existingAlert = document.getElementById('duplicateStudentAlert');
             if(existingAlert) existingAlert.remove();
             
             if(nameValue) {
-                // البحث عن طالب بنفس الاسم في قاعدة البيانات
                 const existingStudent = window.allStudentsData.find(student => 
                     student.name.trim().toLowerCase() === nameValue.toLowerCase()
                 );
                 
                 if(existingStudent) {
-                    // إنشاء عنصر التنبيه
                     const alertDiv = document.createElement('div');
                     alertDiv.id = 'duplicateStudentAlert';
                     alertDiv.className = 'duplicate-alert';
@@ -407,7 +405,6 @@
                         text-align: center;
                     `;
                     
-                    // التحقق من التكرار الكامل
                     const isFullDuplicate = existingStudent && 
                                            String(existingStudent.qaid).trim() === String(qaidValue).trim() &&
                                            String(existingStudent.page).trim() === String(pageValue).trim();
@@ -431,7 +428,6 @@
                         `;
                     }
                     
-                    // إضافة التنبيه بعد حقل الاسم
                     nameInput.parentNode.insertBefore(alertDiv, nameInput.nextSibling);
                 }
             }
@@ -467,7 +463,6 @@
         .letter-bar { display: none; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; justify-content: center; background: var(--card); padding: 8px; border-radius: 10px; }
         .letter-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: #f1f5f9; border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
 
-        /* تحديث تنسيق النوافذ المنبثقة لتكون في منتصف الشاشة */
         .modal { 
             position: fixed; 
             top: 0; 
@@ -502,7 +497,6 @@
             box-sizing: border-box; 
         }
         
-        /* تنسيق الإشعارات - غير شفافة */
         .toast { position: fixed; bottom: 20px; left: 20px; padding: 12px 20px; border-radius: 8px; color: white; z-index: 9999; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: 0.5s; opacity: 1; }
         .toast.success { background: #10b981; border-right: 5px solid #065f46; }
         .toast.error { background: #ef4444; border-right: 5px solid #991b1b; }
@@ -520,7 +514,6 @@
             justify-content: center; 
         }
         
-        /* تنسيق الطباعة المتقدم لمنع انقطاع التسلسل */
         @media print { 
             .no-print { display: none !important; } 
             .print-area { display: block !important; } 
@@ -623,6 +616,7 @@
         </div>
         <div class="action-bar-sub">
             <button class="btn" style="background:var(--accent)" onclick="document.getElementById('fileInput').click()">استيراد</button>
+            <button class="btn" style="background:#10b981" onclick="downloadExcelTemplate()"><i class="fas fa-file-excel"></i> نموذج Excel</button>
             <button class="btn" style="background:#f59e0b" onclick="exportExcel()">تصدير</button>
             <button class="btn" style="background:var(--blue)" onclick="showPrintOptions()">طباعة</button>
         </div>
