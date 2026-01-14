@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام الأرشيف الذكي - منع التكرار</title>
+    <title>نظام الأرشيف الذكي - النسخة المتطورة</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     
@@ -33,7 +33,7 @@
         window.activeLetter = null;
         let unsavedChanges = false;
 
-        // نظام الإشعارات
+        // نظام الإشعارات الملون وغير الشفاف
         window.showToast = (msg, type = 'success') => {
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
@@ -46,7 +46,7 @@
         onAuthStateChanged(auth, (user) => {
             document.getElementById('loginPage').style.display = user ? 'none' : 'flex';
             document.getElementById('appContent').style.display = user ? 'block' : 'none';
-            if(user) { loadData(); createLetterFilter(); }
+            if(user) { loadData(); }
         });
 
         function loadData() {
@@ -74,28 +74,6 @@
             });
         }
 
-        function createLetterFilter() {
-            const letters = "اأبتثجحخدذرزسشصضطظعغفقكلمنهوي";
-            const container = document.getElementById('letterBar');
-            container.innerHTML = `<span class="letter-btn active" id="btn-all" onclick="filterByLetter(null)">الكل</span>`;
-            letters.split('').forEach(l => {
-                container.innerHTML += `<span class="letter-btn" id="btn-${l}" onclick="filterByLetter('${l}')">${l}</span>`;
-            });
-        }
-
-        window.toggleLetterBar = () => {
-            const bar = document.getElementById('letterBar');
-            bar.style.display = (bar.style.display === 'flex') ? 'none' : 'flex';
-        };
-
-        window.filterByLetter = (l) => {
-            window.activeLetter = l;
-            document.querySelectorAll('.letter-btn').forEach(b => b.classList.remove('active'));
-            if(l) document.getElementById(`btn-${l}`).classList.add('active');
-            else document.getElementById('btn-all').classList.add('active');
-            window.applyFilters();
-        };
-
         window.applyFilters = () => {
             const term = document.getElementById('searchInput').value.toLowerCase();
             const sortBy = document.getElementById('sortSelect').value;
@@ -104,10 +82,9 @@
             
             let filtered = window.allStudentsData.filter(s => {
                 const matchSearch = (s.name || '').toLowerCase().includes(term) || String(s.qaid).includes(term);
-                const matchLetter = window.activeLetter ? s.name.trim().startsWith(window.activeLetter) : true;
                 const matchQaid = filterQaid ? String(s.qaid) === filterQaid : true;
                 const matchPage = filterPage ? String(s.page).includes(filterPage) : true;
-                return matchSearch && matchLetter && matchQaid && matchPage;
+                return matchSearch && matchQaid && matchPage;
             });
             
             if (sortBy === "alpha") filtered.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
@@ -122,21 +99,11 @@
             document.getElementById('filterQaid').value = '';
             document.getElementById('filterPage').value = '';
             document.getElementById('sortSelect').value = 'newest';
-            window.filterByLetter(null);
             window.applyFilters();
             showToast("تم مسح جميع الفلاتر");
         };
 
-        // 🔴 دالة للتحقق من التكرار: نفس القيد + نفس الصفحة
-        function isDuplicateQaidPage(qaid, page, existingStudents, excludeId = null) {
-            return existingStudents.some(student => {
-                if (excludeId && student.id === excludeId) return false;
-                return String(student.qaid).trim() === String(qaid).trim() &&
-                       String(student.page).trim() === String(page).trim();
-            });
-        }
-
-        // 🔴 دالة لتحميل نموذج Excel جاهز
+        // دالة لتحميل نموذج Excel جاهز
         window.downloadExcelTemplate = () => {
             const templateData = [
                 ["الاسم", "اللقب", "الأم", "القيد", "الصفحة", "ملاحظات"],
@@ -155,7 +122,15 @@
             showToast("تم تحميل النموذج بنجاح");
         };
 
-        // 🔴 تعديل دالة الاستيراد لمنع تكرار القيد والصفحة
+        // دالة للتحقق من التكرار الصارم: نفس القيد + نفس الصفحة
+        function isDuplicateQaidPage(qaid, page, existingStudents, excludeId = null) {
+            return existingStudents.some(student => 
+                (excludeId ? student.id !== excludeId : true) &&
+                String(student.qaid).trim() === String(qaid).trim() &&
+                String(student.page).trim() === String(page).trim()
+            );
+        }
+
         window.importExcel = (event) => {
             const file = event.target.files[0];
             if(!file) return;
@@ -170,9 +145,8 @@
                     const batch = writeBatch(db);
                     let added = 0;
                     let skipped = 0;
-                    let duplicates = [];
                     
-                    json.forEach((row, index) => {
+                    json.forEach((row) => {
                         const rName = String(row.name || row["الاسم"] || "").trim();
                         const rQaid = String(row.qaid || row["القيد"] || "").trim();
                         const rPage = String(row.page || row["الصفحة"] || "").trim();
@@ -182,9 +156,8 @@
                             return;
                         }
                         
-                        // 🔴 التحقق من تكرار القيد والصفحة (بغض النظر عن الاسم)
+                        // التحقق من التكرار الصارم: نفس القيد + نفس الصفحة
                         if (isDuplicateQaidPage(rQaid, rPage, existingStudents)) {
-                            duplicates.push(`القيد ${rQaid} - الصفحة ${rPage}`);
                             skipped++;
                             return;
                         }
@@ -207,15 +180,6 @@
                         showToast(`تم استيراد ${added} طالب (تم تخطي ${skipped})`);
                     } else {
                         showToast("لم يتم استيراد أي بيانات جديدة", "error");
-                    }
-                    
-                    // عرض أخطاء التكرار
-                    if (duplicates.length > 0) {
-                        setTimeout(() => {
-                            const dupList = duplicates.slice(0, 5).join(', ');
-                            const more = duplicates.length > 5 ? ` و${duplicates.length - 5} أكثر` : '';
-                            showToast(`توجد تكرارات: ${dupList}${more}`, "error");
-                        }, 1000);
                     }
                     
                 } catch(err) { showToast("خطأ في الملف", "error"); }
@@ -305,7 +269,6 @@
             setTimeout(() => { window.print(); }, 500);
         }
 
-        // 🔴 تعديل دالة الحفظ لمنع تكرار القيد والصفحة
         window.saveData = async () => {
             const id = document.getElementById('editId').value;
             const name = document.getElementById('fName').value.trim();
@@ -315,9 +278,9 @@
             
             if(!name || !mother || !qaid || !page) return showToast("أكمل البيانات", "error");
             
-            // 🔴 التحقق من تكرار القيد والصفحة
+            // التحقق من التكرار الصارم: نفس القيد + نفس الصفحة
             if (isDuplicateQaidPage(qaid, page, window.allStudentsData, id)) {
-                showToast("❌ هذا القيد والصفحة مسجلان مسبقاً لطالب آخر", "error");
+                showToast("هذا القيد والصفحة مسجلين مسبقاً لطالب آخر", "error");
                 return;
             }
             
@@ -338,7 +301,7 @@
                     await addDoc(studentsCol, data);
                 }
                 
-                showToast("✅ تم الحفظ بنجاح"); 
+                showToast("تم الحفظ بنجاح"); 
                 window.closeAddModal(); 
                 window.resetForm();
                 unsavedChanges = false;
@@ -382,15 +345,8 @@
             const randomName = names[Math.floor(Math.random() * names.length)];
             const randomSurname = surnames[Math.floor(Math.random() * surnames.length)];
             const randomMother = mothers[Math.floor(Math.random() * mothers.length)];
-            
-            // 🔴 توليد قيد وصفحة غير مكررين
-            let randomQaid, randomPage;
-            let attempts = 0;
-            do {
-                randomQaid = Math.floor(Math.random() * 90000) + 10000;
-                randomPage = Math.floor(Math.random() * 50) + 1;
-                attempts++;
-            } while (isDuplicateQaidPage(randomQaid, randomPage, window.allStudentsData) && attempts < 100);
+            const randomQaid = Math.floor(Math.random() * 90000) + 10000;
+            const randomPage = Math.floor(Math.random() * 50) + 1;
             
             document.getElementById('fName').value = randomName;
             document.getElementById('surname').value = randomSurname;
@@ -403,147 +359,12 @@
             unsavedChanges = true;
         };
 
-        window.showStatistics = () => {
-            const statsContent = document.getElementById('statsContent');
-            const totalStudents = window.allStudentsData.length;
-            const uniqueQaids = new Set(window.allStudentsData.map(s => s.qaid)).size;
-            
-            // 🔴 إحصائيات التكرار
-            const qaidPageMap = {};
-            let duplicateCount = 0;
-            
-            window.allStudentsData.forEach(s => {
-                const key = `${s.qaid}-${s.page}`;
-                if (qaidPageMap[key]) {
-                    qaidPageMap[key].count++;
-                    duplicateCount++;
-                } else {
-                    qaidPageMap[key] = {
-                        qaid: s.qaid,
-                        page: s.page,
-                        count: 1,
-                        students: [s.name]
-                    };
-                }
-            });
-            
-            const duplicates = Object.values(qaidPageMap).filter(item => item.count > 1);
-            
-            let html = `
-                <div style="margin-bottom: 15px;">
-                    <h4><i class="fas fa-chart-bar"></i> الإحصائيات العامة</h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0;">
-                        <div class="stat-card">
-                            <div class="stat-value">${totalStudents}</div>
-                            <div class="stat-label">إجمالي الطلاب</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value">${uniqueQaids}</div>
-                            <div class="stat-label">عدد القيود</div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            // 🔴 عرض التكرارات إذا وجدت
-            if (duplicates.length > 0) {
-                html += `
-                    <div style="margin-bottom: 15px; background: #fee2e2; padding: 12px; border-radius: 8px; border: 1px solid #fca5a5;">
-                        <h4 style="color: #dc2626; margin-top: 0;">
-                            <i class="fas fa-exclamation-triangle"></i> تحذير: توجد تكرارات
-                        </h4>
-                        <p style="margin: 5px 0; font-size: 0.9rem;">
-                            عدد التكرارات: <strong>${duplicateCount}</strong> طالب
-                        </p>
-                        <div style="max-height: 150px; overflow-y: auto; margin-top: 10px;">
-                `;
-                
-                duplicates.forEach(dup => {
-                    html += `
-                        <div style="padding: 5px 0; border-bottom: 1px solid #fca5a5;">
-                            <strong>القيد ${dup.qaid} - الصفحة ${dup.page}</strong>
-                            <br><small>عدد الطلاب: ${dup.count}</small>
-                        </div>
-                    `;
-                });
-                
-                html += `</div></div>`;
-            }
-            
-            // إحصائيات الصفحات
-            const pageStats = {};
-            window.allStudentsData.forEach(s => {
-                pageStats[s.page] = (pageStats[s.page] || 0) + 1;
-            });
-            
-            html += `
-                <div style="margin-bottom: 15px;">
-                    <h4><i class="fas fa-file-alt"></i> توزيع الصفحات</h4>
-                    <div style="max-height: 200px; overflow-y: auto;">
-            `;
-            
-            Object.entries(pageStats)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 10)
-                .forEach(([page, count]) => {
-                    html += `
-                        <div style="display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #e2e8f0;">
-                            <span>الصفحة ${page}</span>
-                            <span><strong>${count}</strong> طالب</span>
-                        </div>
-                    `;
-                });
-            
-            html += `
-                    </div>
-                </div>
-                
-                <div style="margin-top: 20px; text-align: center;">
-                    <button onclick="exportStatistics()" class="btn" style="background: #0ea5e9;">
-                        <i class="fas fa-download"></i> تصدير الإحصائيات
-                    </button>
-                </div>
-            `;
-            
-            statsContent.innerHTML = html;
-            document.getElementById('statsModal').style.display = 'flex';
-        };
-
-        window.exportStatistics = () => {
-            const stats = {
-                totalStudents: window.allStudentsData.length,
-                uniqueQaids: new Set(window.allStudentsData.map(s => s.qaid)).size,
-                todayAdded: window.allStudentsData.filter(s => {
-                    const today = new Date().setHours(0,0,0,0);
-                    return s.timestamp >= today;
-                }).length
-            };
-            
-            const ws = XLSX.utils.json_to_sheet([stats]);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "الإحصائيات");
-            XLSX.writeFile(wb, "إحصائيات_الأرشيف.xlsx");
-            showToast("تم تصدير الإحصائيات");
-        };
-
         window.render = (data) => {
             const list = document.getElementById('studentsList');
             list.innerHTML = ''; 
             data.forEach((s) => {
-                // 🔴 التحقق إذا كان هذا القيد والصفحة مكررين
-                const isDuplicate = window.allStudentsData.filter(st => 
-                    st.id !== s.id && 
-                    String(st.qaid) === String(s.qaid) && 
-                    String(st.page) === String(s.page)
-                ).length > 0;
-                
-                const duplicateBadge = isDuplicate ? 
-                    `<span class="duplicate-badge" title="هذا القيد والصفحة مكرران!">
-                        <i class="fas fa-exclamation-triangle"></i> مكرر
-                    </span>` : '';
-                
                 list.innerHTML += `
-                    <div class="student-item card ${isDuplicate ? 'duplicate-item' : ''}">
+                    <div class="student-item card">
                         <div class="card-body-wrapper">
                             <div class="user-icon" title="آخر رقمين من القيد: ${String(s.qaid).slice(-2)}">
                                 <i class="fas fa-user-graduate"></i>
@@ -552,7 +373,6 @@
                             <div class="student-details">
                                 <p class="student-name">${s.name} <small class="surname-text">${s.surname || ''}</small></p>
                                 <div class="student-meta">
-                                    ${duplicateBadge}
                                     <span title="اسم الأم">
                                         <i class="fas fa-female"></i> ${s.mother}
                                     </span>
@@ -593,56 +413,17 @@
             document.getElementById('entryModal').style.display = 'flex';
             unsavedChanges = false;
             
-            // التحقق من التكرار عند التعديل
-            window.checkDuplicateQaidPage();
+            // إضافة مستمعات الأحداث للحقول
+            setupInputListeners();
         };
 
-        // 🔴 دالة جديدة للتحقق من تكرار القيد والصفحة أثناء الكتابة
-        window.checkDuplicateQaidPage = () => {
-            const qaidValue = document.getElementById('qNum').value.trim();
-            const pageValue = document.getElementById('pNum').value.trim();
-            const editId = document.getElementById('editId').value;
-            
-            const existingAlert = document.getElementById('duplicateQaidPageAlert');
-            if(existingAlert) existingAlert.remove();
-            
-            if(qaidValue && pageValue) {
-                const isDuplicate = isDuplicateQaidPage(qaidValue, pageValue, window.allStudentsData, editId);
-                
-                if (isDuplicate) {
-                    const alertDiv = document.createElement('div');
-                    alertDiv.id = 'duplicateQaidPageAlert';
-                    alertDiv.style.cssText = `
-                        background: #fee2e2;
-                        border: 1px solid #ef4444;
-                        color: #991b1b;
-                        padding: 10px;
-                        border-radius: 8px;
-                        margin-top: 10px;
-                        font-size: 0.85rem;
-                        text-align: center;
-                    `;
-                    
-                    // البحث عن الطالب المكرر
-                    const duplicateStudent = window.allStudentsData.find(student => 
-                        student.id !== editId &&
-                        String(student.qaid).trim() === String(qaidValue).trim() &&
-                        String(student.page).trim() === String(pageValue).trim()
-                    );
-                    
-                    const duplicateInfo = duplicateStudent ? 
-                        ` (${duplicateStudent.name})` : '';
-                    
-                    alertDiv.innerHTML = `
-                        <i class="fas fa-exclamation-triangle" style="margin-left: 5px;"></i>
-                        <strong>تحذير!</strong> هذا القيد (${qaidValue}) والصفحة (${pageValue}) مسجلان مسبقاً${duplicateInfo}
-                        <br><small>لا يمكن حفظ البيانات حتى تغيير القيد أو الصفحة</small>
-                    `;
-                    
-                    document.getElementById('qNum').parentNode.parentNode.appendChild(alertDiv);
-                }
-            }
-        };
+        function setupInputListeners() {
+            document.querySelectorAll('#entryModal input, #entryModal textarea').forEach(input => {
+                input.addEventListener('input', () => {
+                    unsavedChanges = true;
+                });
+            });
+        }
 
         window.openAddModal = () => { 
             window.resetForm(); 
@@ -668,8 +449,6 @@
             document.getElementById('saveBtn').innerText = "حفظ"; 
             const existingAlert = document.getElementById('duplicateStudentAlert');
             if(existingAlert) existingAlert.remove();
-            const existingAlert2 = document.getElementById('duplicateQaidPageAlert');
-            if(existingAlert2) existingAlert2.remove();
             unsavedChanges = false;
         };
         
@@ -684,17 +463,55 @@
         window.logout = () => signOut(auth);
         window.toggleDarkMode = () => document.body.classList.toggle('dark-mode');
         
-        function setupInputListeners() {
-            document.querySelectorAll('#entryModal input, #entryModal textarea').forEach(input => {
-                input.addEventListener('input', () => {
-                    unsavedChanges = true;
-                    // التحقق من تكرار القيد والصفحة عند التغيير
-                    if (input.id === 'qNum' || input.id === 'pNum') {
-                        window.checkDuplicateQaidPage();
-                    }
-                });
-            });
-        }
+        // دالة للتحقق من التكرار عند كتابة الاسم الرباعي
+        window.checkDuplicateStudent = () => {
+            const nameInput = document.getElementById('fName');
+            const nameValue = nameInput.value.trim();
+            
+            // إزالة أي تنبيه سابق
+            const existingAlert = document.getElementById('duplicateStudentAlert');
+            if(existingAlert) existingAlert.remove();
+            
+            if(nameValue) {
+                // البحث عن طالب بنفس الاسم في قاعدة البيانات
+                const existingStudent = window.allStudentsData.find(student => 
+                    student.name.trim().toLowerCase() === nameValue.toLowerCase()
+                );
+                
+                if(existingStudent) {
+                    // إنشاء عنصر التنبيه
+                    const alertDiv = document.createElement('div');
+                    alertDiv.id = 'duplicateStudentAlert';
+                    alertDiv.className = 'duplicate-alert';
+                    alertDiv.style.cssText = `
+                        background: #fef3c7;
+                        border: 1px solid #f59e0b;
+                        color: #92400e;
+                        padding: 8px 12px;
+                        border-radius: 6px;
+                        margin-top: 8px;
+                        font-size: 0.85rem;
+                        text-align: center;
+                        animation: fadeIn 0.3s ease-in;
+                    `;
+                    
+                    alertDiv.innerHTML = `
+                        <i class="fas fa-exclamation-triangle" style="margin-left: 5px;"></i>
+                        هذا الطالب مسجل مسبقاً: 
+                        <br>
+                        <strong>رقم القيد: ${existingStudent.qaid}</strong> | 
+                        <strong>رقم الصفحة: ${existingStudent.page}</strong>
+                        <br>
+                        <small style="color: #666; font-size: 0.75rem;">
+                            يمكنك إضافة طالب جديد بنفس الاسم ولكن بقيد أو صفحة مختلفين
+                        </small>
+                    `;
+                    
+                    // إضافة التنبيه تحت حقل الاسم مباشرة
+                    nameInput.parentNode.insertBefore(alertDiv, nameInput.nextSibling);
+                }
+            }
+        };
     </script>
     
     <style>
@@ -714,15 +531,19 @@
             --bg: #0f172a; 
             --card: #1e293b; 
             --text: #f8fafc; 
+            --success: #34d399;
+            --warning: #fbbf24;
+            --danger: #f87171;
         }
         
         body { 
-            font-family: 'Segoe UI', sans-serif; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             background: var(--bg); 
             color: var(--text); 
             direction: rtl; 
             margin: 0; 
             padding: 5px; 
+            transition: background 0.3s, color 0.3s;
         }
         
         .container { max-width: 800px; margin: auto; }
@@ -742,33 +563,6 @@
             box-shadow: 0 6px 16px rgba(0,0,0,0.12);
         }
         
-        /* 🔴 تمييز العناصر المكررة */
-        .duplicate-item {
-            border-right: 4px solid #ef4444 !important;
-            background: #fef2f2;
-        }
-        
-        .duplicate-item:hover {
-            background: #fee2e2;
-        }
-        
-        .duplicate-badge {
-            background: #ef4444;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.7rem;
-            font-weight: bold;
-            margin-left: 5px;
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
-        }
-        
         .student-item { 
             display: flex; 
             align-items: center; 
@@ -781,11 +575,13 @@
             font-weight: 700; 
             font-size: 1rem; 
             line-height: 1.3; 
+            color: var(--text);
         }
         
         .surname-text { 
             color: var(--accent); 
             font-size: 0.85rem; 
+            font-weight: 500;
         }
         
         .student-meta { 
@@ -816,6 +612,7 @@
             color: var(--blue); 
             font-size: 1rem;
             position: relative;
+            box-shadow: 0 2px 5px rgba(14, 165, 233, 0.2);
         }
         
         .user-icon .qaid-end {
@@ -907,6 +704,10 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
         
+        .btn:active {
+            transform: translateY(0);
+        }
+        
         .stats-bar { 
             display: grid; 
             grid-template-columns: repeat(3, 1fr); 
@@ -920,6 +721,7 @@
             border-radius: 12px; 
             text-align: center; 
             border: 1px solid rgba(0,0,0,0.05);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
         }
         
         .stat-item i {
@@ -938,6 +740,7 @@
         .stat-label { 
             font-size: 0.75rem; 
             color: #64748b; 
+            font-weight: 500;
         }
         
         .action-bar { 
@@ -962,7 +765,8 @@
             padding: 8px 15px; 
             border-radius: 50px; 
             border: 2px solid var(--blue); 
-            margin-bottom: 10px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.1);
         }
         
         .search-wrapper input { 
@@ -983,6 +787,7 @@
             background: var(--card);
             padding: 12px;
             border-radius: 12px;
+            border: 1px solid rgba(0,0,0,0.05);
         }
         
         .advanced-filters select,
@@ -994,8 +799,9 @@
             border-radius: 8px;
             background: var(--bg);
             color: var(--text);
+            font-size: 0.9rem;
         }
-        
+
         .modal { 
             position: fixed; 
             top: 0; 
@@ -1006,7 +812,8 @@
             display: none; 
             align-items: center; 
             justify-content: center; 
-            z-index: 5000; 
+            z-index: 5000;
+            backdrop-filter: blur(3px);
         }
         
         .modal-content { 
@@ -1020,6 +827,29 @@
             left: 50%;
             transform: translate(-50%, -50%);
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            animation: modalFade 0.3s ease-out;
+        }
+        
+        @keyframes modalFade {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -60%);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
         input, select, textarea { 
@@ -1031,6 +861,14 @@
             background: var(--card); 
             color: var(--text); 
             box-sizing: border-box;
+            font-size: 0.95rem;
+            transition: border 0.2s;
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
         }
         
         .toast { 
@@ -1045,10 +883,29 @@
             box-shadow: 0 6px 16px rgba(0,0,0,0.15); 
             transition: 0.5s; 
             opacity: 1;
+            animation: toastSlide 0.3s ease-out;
         }
         
-        .toast.success { background: var(--success); border-right: 5px solid #065f46; }
-        .toast.error { background: var(--danger); border-right: 5px solid #991b1b; }
+        @keyframes toastSlide {
+            from {
+                transform: translateX(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .toast.success { 
+            background: var(--success); 
+            border-right: 5px solid #065f46; 
+        }
+        
+        .toast.error { 
+            background: var(--danger); 
+            border-right: 5px solid #991b1b; 
+        }
 
         .loader { 
             position: fixed; 
@@ -1063,13 +920,17 @@
             justify-content: center;
             flex-direction: column;
             gap: 15px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text);
+            backdrop-filter: blur(5px);
         }
         
         .loader.dark-mode {
             background: rgba(15, 23, 42, 0.9);
         }
         
-        /* تلميحات */
+        /* تلميحات (Tooltips) */
         [title] {
             position: relative;
             cursor: help;
@@ -1089,6 +950,19 @@
             white-space: nowrap;
             z-index: 1000;
             margin-bottom: 5px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        [title]:hover::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: var(--main);
+            z-index: 1000;
+            margin-bottom: -5px;
         }
         
         @media print { 
@@ -1117,13 +991,52 @@
             justify-content: center;
             cursor: pointer;
             z-index: 100;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transition: all 0.3s;
+        }
+        
+        .theme-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+        }
+        
+        /* تخصيص شريط التمرير */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        .dark-mode ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        
+        .dark-mode ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+        
+        .dark-mode ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
         }
     </style>
 </head>
 <body>
 
 <div id="loader" class="loader">
-    <div style="width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top: 4px solid var(--blue); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+    <div class="spinner" style="width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top: 4px solid var(--blue); border-radius: 50%; animation: spin 1s linear infinite;"></div>
     جاري المعالجة...
 </div>
 
@@ -1138,57 +1051,69 @@
 
 <div id="masterDeleteModal" class="modal">
     <div class="modal-content">
-        <h3 style="text-align:center; color:var(--danger);">حذف الأرشيف كاملاً؟</h3>
-        <p style="text-align:center; font-size:0.9rem;">اكتب كلمة <b>حذف</b> للتأكيد:</p>
-        <input type="text" id="masterDeleteInput" style="text-align:center;">
-        <div style="display:flex; gap:10px; margin-top:15px;">
-            <button class="btn" style="background:var(--danger); flex:1;" onclick="confirmMasterDelete()">تأكيد</button>
-            <button class="btn" style="background:#ccc; flex:1;" onclick="document.getElementById('masterDeleteModal').style.display='none'">إلغاء</button>
+        <h3 style="text-align:center; color:var(--danger); margin-bottom: 15px;">
+            <i class="fas fa-exclamation-triangle"></i> حذف الأرشيف كاملاً؟
+        </h3>
+        <p style="text-align:center; font-size:0.9rem; margin-bottom: 20px;">اكتب كلمة <b style="color:var(--danger);">حذف</b> للتأكيد:</p>
+        <input type="text" id="masterDeleteInput" style="text-align:center; font-size: 1rem;">
+        <div style="display:flex; gap:12px; margin-top:20px;">
+            <button class="btn" style="background:var(--danger); flex:1;" onclick="confirmMasterDelete()">
+                <i class="fas fa-check"></i> تأكيد
+            </button>
+            <button class="btn" style="background:#64748b; flex:1;" onclick="document.getElementById('masterDeleteModal').style.display='none'">
+                <i class="fas fa-times"></i> إلغاء
+            </button>
         </div>
     </div>
 </div>
 
 <div id="deleteModal" class="modal">
     <div class="modal-content">
-        <h4 style="text-align:center;">حذف الطالب؟</h4>
-        <div style="display:flex; gap:10px; margin-top:15px;">
-            <button class="btn" style="background:var(--danger); flex:1;" onclick="confirmDel()">نعم</button>
-            <button class="btn" style="background:#ccc; flex:1;" onclick="document.getElementById('deleteModal').style.display='none'">لا</button>
+        <h4 style="text-align:center; color:var(--danger); margin-bottom: 20px;">
+            <i class="fas fa-trash-alt"></i> حذف الطالب؟
+        </h4>
+        <div style="display:flex; gap:12px; margin-top:15px;">
+            <button class="btn" style="background:var(--danger); flex:1;" onclick="confirmDel()">
+                <i class="fas fa-check"></i> نعم
+            </button>
+            <button class="btn" style="background:#64748b; flex:1;" onclick="document.getElementById('deleteModal').style.display='none'">
+                <i class="fas fa-times"></i> لا
+            </button>
         </div>
     </div>
 </div>
 
 <div id="entryModal" class="modal">
     <div class="modal-content">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h3 style="margin:0; color:var(--blue); font-size:1.1rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="margin:0; color:var(--blue); font-size:1.2rem;">
                 <i class="fas fa-user-graduate"></i> بيانات الطالب
             </h3>
-            <div style="display:flex; gap:5px;">
-                <button onclick="generateRandomData()" style="background:#f1f5f9; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; color:var(--text);" title="تعبئة تلقائية">
+            <div style="display:flex; gap:8px;">
+                <button onclick="generateRandomData()" style="background:#f1f5f9; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; color:var(--text);" title="تعبئة تلقائية">
                     <i class="fas fa-magic"></i>
                 </button>
-                <button onclick="duplicateLastStudent()" style="background:#f0f9ff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; color:#0ea5e9;" title="نسخ آخر طالب">
+                <button onclick="duplicateLastStudent()" style="background:#f0f9ff; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; color:#0ea5e9;" title="نسخ آخر طالب">
                     <i class="fas fa-copy"></i>
                 </button>
             </div>
         </div>
         
         <input type="hidden" id="editId">
-        <input type="text" id="fName" placeholder="الاسم الرباعي" oninput="checkDuplicateQaidPage()">
+        <input type="text" id="fName" placeholder="الاسم الرباعي" oninput="checkDuplicateStudent()">
         <input type="text" id="surname" placeholder="اللقب">
         <input type="text" id="mName" placeholder="اسم الأم">
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin:10px 0;">
-            <input type="text" id="qNum" placeholder="القيد" oninput="checkDuplicateQaidPage()">
-            <input type="number" id="pNum" placeholder="الصفحة" oninput="checkDuplicateQaidPage()">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin:12px 0;">
+            <input type="text" id="qNum" placeholder="القيد">
+            <input type="number" id="pNum" placeholder="الصفحة">
         </div>
-        <textarea id="note" placeholder="ملاحظات..." rows="2" style="margin-bottom: 10px;"></textarea>
+        <textarea id="note" placeholder="ملاحظات..." rows="3" style="margin-bottom: 15px;"></textarea>
         
-        <div style="display:flex; gap:10px; margin-top:15px;">
+        <div style="display:flex; gap:12px; margin-top:20px;">
             <button id="saveBtn" class="btn" style="background:var(--main); flex:2;" onclick="saveData()">
                 <i class="fas fa-save"></i> حفظ
             </button>
-            <button class="btn" style="background:#eee; color:#334155; flex:1;" onclick="closeAddModal()">
+            <button class="btn" style="background:#64748b; flex:1;" onclick="closeAddModal()">
                 <i class="fas fa-times"></i> إغلاق
             </button>
         </div>
@@ -1197,32 +1122,30 @@
 
 <div id="printModal" class="modal">
     <div class="modal-content">
-        <h3>طباعة</h3>
-        <button class="btn" style="background:var(--accent); width:100%; margin-bottom:10px" onclick="printAllAlpha()">السجل العام</button>
-        <select id="qaidSelect"></select>
-        <button class="btn" style="background:var(--blue); width:100%; margin-top:10px" onclick="printSelectedQaid()">طباعة القيد</button>
-        <button class="btn" style="background:#eee; color:#334155; width:100%; margin-top:10px;" onclick="document.getElementById('printModal').style.display='none'">إلغاء</button>
-    </div>
-</div>
-
-<div id="statsModal" class="modal">
-    <div class="modal-content" style="max-width: 500px; max-height: 80vh; overflow-y: auto;">
-        <h3>
-            <i class="fas fa-chart-pie"></i> الإحصائيات
+        <h3 style="margin-bottom: 20px;">
+            <i class="fas fa-print"></i> طباعة
         </h3>
-        <div id="statsContent"></div>
-        <button class="btn" style="background:#64748b; width:100%; margin-top:15px;" onclick="document.getElementById('statsModal').style.display='none'">
-            <i class="fas fa-times"></i> إغلاق
+        <button class="btn" style="background:var(--accent); width:100%; margin-bottom:12px" onclick="printAllAlpha()">
+            <i class="fas fa-print"></i> السجل العام
+        </button>
+        <select id="qaidSelect" style="margin-bottom: 12px;"></select>
+        <button class="btn" style="background:var(--blue); width:100%; margin-bottom:12px" onclick="printSelectedQaid()">
+            <i class="fas fa-print"></i> طباعة القيد
+        </button>
+        <button class="btn" style="background:#64748b; width:100%;" onclick="document.getElementById('printModal').style.display='none'">
+            <i class="fas fa-times"></i> إلغاء
         </button>
     </div>
 </div>
 
 <div id="loginPage" style="height: 100vh; flex-direction: column; align-items: center; justify-content: center; display: none;">
-    <div class="card" style="width: 300px; text-align: center; padding: 25px; border-radius: 12px;">
-        <h2 style="margin-bottom: 20px; color: var(--blue);">دخول النظام</h2>
-        <input type="email" id="loginEmail" placeholder="البريد" style="margin-bottom: 15px;">
+    <div class="card" style="width: 320px; text-align: center; padding: 30px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+        <h2 style="margin-bottom: 25px; color: var(--blue);">
+            <i class="fas fa-lock"></i> دخول النظام
+        </h2>
+        <input type="email" id="loginEmail" placeholder="البريد الإلكتروني" style="margin-bottom: 15px;">
         <input type="password" id="loginPass" placeholder="كلمة المرور" style="margin-bottom: 20px;">
-        <button class="btn" style="background:var(--main); width:100%;" onclick="login()">
+        <button class="btn" style="background:var(--main); width:100%; padding: 14px;" onclick="login()">
             <i class="fas fa-sign-in-alt"></i> دخول
         </button>
     </div>
@@ -1230,36 +1153,36 @@
 
 <div id="appContent" class="container" style="display: none;">
     <div class="print-area">
-        <div style="text-align:center; border-bottom: 2px solid #000; margin-bottom: 10px;">
-            <h2 id="printTitle" style="margin: 5px 0;"></h2>
-            <span id="printDate" style="font-size: 12px;"></span>
+        <div style="text-align:center; border-bottom: 2px solid #000; margin-bottom: 10px; padding-bottom: 10px;">
+            <h2 id="printTitle" style="margin: 5px 0; font-size: 1.5rem;"></h2>
+            <span id="printDate" style="font-size: 12px; color: #666;"></span>
         </div>
         <div id="printTablesContainer"></div>
     </div>
 
     <div class="no-print">
-        <div style="display:flex; justify-content:space-between; align-items:center; padding: 5px; margin-bottom: 10px;">
-            <h4 style="margin:0; color:var(--blue);">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding: 10px 5px; margin-bottom: 10px;">
+            <h4 style="margin:0; color:var(--blue); font-size: 1.3rem;">
                 <i class="fas fa-archive"></i> نظام الأرشيف الذكي
             </h4>
-            <button onclick="logout()" style="background:none; border:none; color:var(--danger); font-size:0.9rem; cursor:pointer;">
+            <button onclick="logout()" style="background:none; border:none; color:var(--danger); font-size:0.9rem; cursor:pointer; padding: 8px 12px; border-radius: 8px; transition: background 0.2s;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='none'">
                 <i class="fas fa-sign-out-alt"></i> خروج
             </button>
         </div>
 
         <div class="stats-bar">
             <div class="stat-item">
-                <i class="fas fa-users" style="color:var(--blue); font-size:1.2rem;"></i>
+                <i class="fas fa-users" style="color:var(--blue); font-size:1.3rem;"></i>
                 <span class="stat-val" id="statTotal">0</span>
                 <span class="stat-label">طلاب</span>
             </div>
             <div class="stat-item">
-                <i class="fas fa-calendar-day" style="color:var(--success); font-size:1.2rem;"></i>
+                <i class="fas fa-calendar-day" style="color:var(--success); font-size:1.3rem;"></i>
                 <span class="stat-val" style="color:var(--success)" id="statToday">0</span>
                 <span class="stat-label">اليوم</span>
             </div>
             <div class="stat-item">
-                <i class="fas fa-folder" style="color:var(--accent); font-size:1.2rem;"></i>
+                <i class="fas fa-folder" style="color:var(--accent); font-size:1.3rem;"></i>
                 <span class="stat-val" style="color:var(--accent)" id="statQaids">0</span>
                 <span class="stat-label">قيود</span>
             </div>
@@ -1289,10 +1212,7 @@
             </button>
         </div>
         
-        <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-            <button class="btn" onclick="showStatistics()" style="background:#8b5cf6; flex: 1;">
-                <i class="fas fa-chart-bar"></i> إحصائيات
-            </button>
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
             <button class="btn" onclick="clearFilters()" style="background:#64748b; flex: 1;">
                 <i class="fas fa-filter"></i> مسح الفلاتر
             </button>
@@ -1314,18 +1234,10 @@
         </div>
 
         <div class="search-wrapper">
-            <i class="fas fa-search" style="color:var(--blue); font-size:0.9rem;"></i>
-            <input type="text" id="searchInput" placeholder="ابحث..." onkeyup="applyFilters()">
-            <select id="sortSelect" onchange="applyFilters()" style="width: auto; border:none; color:var(--blue); font-weight:bold; background:transparent; font-size:0.8rem;">
-                <option value="newest">الأحدث</option>
-                <option value="alpha">أبجدي</option>
-                <option value="qaid">حسب القيد</option>
-                <option value="page">حسب الصفحة</option>
-            </select>
-            <i class="fas fa-font" style="color:#ccc; font-size:0.8rem; cursor:pointer;" onclick="toggleLetterBar()" title="فلترة بالحرف الأول"></i>
+            <i class="fas fa-search" style="color:var(--blue); font-size:1rem;"></i>
+            <input type="text" id="searchInput" placeholder="ابحث عن اسم أو قيد..." onkeyup="applyFilters()">
         </div>
 
-        <div id="letterBar" class="letter-bar"></div>
         <div id="studentsList"></div>
     </div>
 </div>
