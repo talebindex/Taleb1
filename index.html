@@ -97,6 +97,15 @@
             window.render(filtered);
         };
 
+        // دالة للتحقق من التكرار الصارم (الاسم + القيد + الصفحة)
+        function isDuplicateStudent(name, qaid, page, existingStudents) {
+            return existingStudents.some(student => 
+                student.name.trim().toLowerCase() === name.trim().toLowerCase() &&
+                String(student.qaid).trim() === String(qaid).trim() &&
+                String(student.page).trim() === String(page).trim()
+            );
+        }
+
         window.importExcel = (event) => {
             const file = event.target.files[0];
             if(!file) return;
@@ -106,26 +115,62 @@
                 try {
                     const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
                     const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                    
+                    // الحصول على البيانات الحالية من قاعدة البيانات
+                    const existingStudents = window.allStudentsData;
+                    
                     const batch = writeBatch(db);
                     let added = 0;
-                    json.forEach(row => {
+                    let skipped = 0;
+                    let duplicates = [];
+                    
+                    json.forEach((row, index) => {
                         const rName = String(row.name || row["الاسم"] || "").trim();
-                        if (rName === "") return;
+                        const rQaid = String(row.qaid || row["القيد"] || "").trim();
+                        const rPage = String(row.page || row["الصفحة"] || "").trim();
+                        
+                        if (rName === "" || rQaid === "" || rPage === "") {
+                            skipped++;
+                            return;
+                        }
+                        
+                        // التحقق من التكرار الصارم
+                        if (isDuplicateStudent(rName, rQaid, rPage, existingStudents)) {
+                            duplicates.push(`${rName} (قيد: ${rQaid}, صفحة: ${rPage})`);
+                            skipped++;
+                            return;
+                        }
+                        
                         const newDoc = doc(collection(db, "students"));
                         batch.set(newDoc, {
                             name: rName, 
                             surname: String(row.surname || row["اللقب"] || "").trim(),
                             mother: String(row.mother || row["الأم"] || "").trim(),
-                            qaid: String(row.qaid || row["القيد"] || "").trim(),
-                            page: String(row.page || row["الصفحة"] || "").trim(),
+                            qaid: rQaid,
+                            page: rPage,
                             note: String(row.note || row["ملاحظات"] || "").trim(),
                             timestamp: Date.now()
                         });
                         added++;
                     });
-                    await batch.commit();
-                    showToast(`تم استيراد ${added} طالب`);
-                } catch(err) { showToast("خطأ في الملف", "error"); }
+                    
+                    if (added > 0) {
+                        await batch.commit();
+                        showToast(`تم استيراد ${added} طالب (تم تخطي ${skipped})`);
+                    } else {
+                        showToast("لم يتم استيراد أي بيانات جديدة", "error");
+                    }
+                    
+                    // عرض معلومات عن المكررات إذا وجدت
+                    if (duplicates.length > 0) {
+                        setTimeout(() => {
+                            showToast(`تم تخطي ${duplicates.length} سجل مكرر`, "error");
+                        }, 1000);
+                    }
+                    
+                } catch(err) { 
+                    showToast("خطأ في الملف", "error"); 
+                }
                 document.getElementById('loader').style.display = 'none';
             };
             reader.readAsArrayBuffer(file);
@@ -219,13 +264,46 @@
             const mother = document.getElementById('mName').value.trim();
             const qaid = document.getElementById('qNum').value.trim();
             const page = document.getElementById('pNum').value.trim();
+            
             if(!name || !mother || !qaid || !page) return showToast("أكمل البيانات", "error");
+            
+            // التحقق من التكرار الصارم عند الحفظ
+            if (!id) { // فقط للطلاب الجدد، ليس عند التحديث
+                const existingStudent = window.allStudentsData.find(student => 
+                    student.name.trim().toLowerCase() === name.toLowerCase() &&
+                    String(student.qaid).trim() === String(qaid).trim() &&
+                    String(student.page).trim() === String(page).trim()
+                );
+                
+                if (existingStudent) {
+                    showToast("هذا الطالب مسجل مسبقاً بنفس القيد والصفحة", "error");
+                    return;
+                }
+            }
+            
             try {
-                const data = { name, surname: document.getElementById('surname').value, mother, qaid, page, note: document.getElementById('note').value, timestamp: Date.now() };
-                if(id) await updateDoc(doc(db, "students", id), data);
-                else await addDoc(studentsCol, data);
-                showToast("تم الحفظ بنجاح"); window.closeAddModal(); window.resetForm();
-            } catch(e) { showToast("خطأ شبكة", "error"); }
+                const data = { 
+                    name, 
+                    surname: document.getElementById('surname').value, 
+                    mother, 
+                    qaid, 
+                    page, 
+                    note: document.getElementById('note').value, 
+                    timestamp: Date.now() 
+                };
+                
+                if(id) {
+                    await updateDoc(doc(db, "students", id), data);
+                } else {
+                    await addDoc(studentsCol, data);
+                }
+                
+                showToast("تم الحفظ بنجاح"); 
+                window.closeAddModal(); 
+                window.resetForm();
+            } catch(e) { 
+                showToast("خطأ شبكة", "error"); 
+            }
         };
 
         window.del = (id) => { deleteTargetId = id; document.getElementById('deleteModal').style.display = 'flex'; };
@@ -300,6 +378,8 @@
         window.checkDuplicateStudent = () => {
             const nameInput = document.getElementById('fName');
             const nameValue = nameInput.value.trim();
+            const qaidValue = document.getElementById('qNum').value.trim();
+            const pageValue = document.getElementById('pNum').value.trim();
             
             // إزالة أي تنبيه سابق
             const existingAlert = document.getElementById('duplicateStudentAlert');
@@ -327,12 +407,29 @@
                         text-align: center;
                     `;
                     
-                    alertDiv.innerHTML = `
-                        <i class="fas fa-exclamation-triangle" style="margin-left: 5px;"></i>
-                        هذا الطالب مسجل مسبقاً: 
-                        <strong>رقم القيد: ${existingStudent.qaid}</strong> | 
-                        <strong>رقم الصفحة: ${existingStudent.page}</strong>
-                    `;
+                    // التحقق من التكرار الكامل
+                    const isFullDuplicate = existingStudent && 
+                                           String(existingStudent.qaid).trim() === String(qaidValue).trim() &&
+                                           String(existingStudent.page).trim() === String(pageValue).trim();
+                    
+                    if (isFullDuplicate && qaidValue && pageValue) {
+                        alertDiv.innerHTML = `
+                            <i class="fas fa-exclamation-triangle" style="margin-left: 5px;"></i>
+                            هذا الطالب مسجل مسبقاً بنفس القيد والصفحة!
+                            <br><strong>رقم القيد: ${existingStudent.qaid}</strong> | 
+                            <strong>رقم الصفحة: ${existingStudent.page}</strong>
+                        `;
+                        alertDiv.style.background = '#fee2e2';
+                        alertDiv.style.borderColor = '#ef4444';
+                        alertDiv.style.color = '#991b1b';
+                    } else if (existingStudent) {
+                        alertDiv.innerHTML = `
+                            <i class="fas fa-exclamation-triangle" style="margin-left: 5px;"></i>
+                            هذا الطالب مسجل مسبقاً: 
+                            <strong>رقم القيد: ${existingStudent.qaid}</strong> | 
+                            <strong>رقم الصفحة: ${existingStudent.page}</strong>
+                        `;
+                    }
                     
                     // إضافة التنبيه بعد حقل الاسم
                     nameInput.parentNode.insertBefore(alertDiv, nameInput.nextSibling);
@@ -471,8 +568,8 @@
         <input type="text" id="surname" placeholder="اللقب">
         <input type="text" id="mName" placeholder="اسم الأم">
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-            <input type="text" id="qNum" placeholder="القيد">
-            <input type="number" id="pNum" placeholder="الصفحة">
+            <input type="text" id="qNum" placeholder="القيد" oninput="checkDuplicateStudent()">
+            <input type="number" id="pNum" placeholder="الصفحة" oninput="checkDuplicateStudent()">
         </div>
         <textarea id="note" placeholder="ملاحظات..." rows="2"></textarea>
         <button id="saveBtn" class="btn" style="background:var(--main); width:100%; margin-top:10px;" onclick="saveData()">حفظ</button>
