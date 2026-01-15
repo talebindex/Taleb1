@@ -81,7 +81,11 @@
             const filterPage = document.getElementById('filterPage').value;
             
             let filtered = window.allStudentsData.filter(s => {
-                const matchSearch = (s.name || '').toLowerCase().includes(term) || String(s.qaid).includes(term);
+                // البحث في الاسم واللقب والقيد
+                const matchSearch = 
+                    (s.name || '').toLowerCase().includes(term) || 
+                    (s.surname || '').toLowerCase().includes(term) ||
+                    String(s.qaid).includes(term);
                 const matchQaid = filterQaid ? String(s.qaid) === filterQaid : true;
                 const matchPage = filterPage ? String(s.page).includes(filterPage) : true;
                 return matchSearch && matchQaid && matchPage;
@@ -90,6 +94,7 @@
             if (sortBy === "alpha") filtered.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
             else if (sortBy === "qaid") filtered.sort((a, b) => String(a.qaid).localeCompare(String(b.qaid)));
             else if (sortBy === "page") filtered.sort((a, b) => String(a.page).localeCompare(String(b.page)));
+            else if (sortBy === "surname") filtered.sort((a, b) => (a.surname || '').localeCompare(b.surname || '', 'ar'));
             
             window.render(filtered);
         };
@@ -106,7 +111,7 @@
         // دالة لتحميل نموذج Excel جاهز
         window.downloadExcelTemplate = () => {
             const templateData = [
-                ["الاسم", "اللقب", "القيد", "الصفحة", "ملاحظات"], // تم حذف الأم
+                ["الاسم", "اللقب", "القيد", "الصفحة", "ملاحظات"],
                 ["أحمد محمد علي", "الكبيسي", "12345", "25", "-"],
                 ["سارة خالد حسن", "العبيدي", "12346", "26", "طالبة متفوقة"],
                 ["علي محمود سعيد", "الجبوري", "12347", "27", "-"],
@@ -248,9 +253,9 @@
                 
                 // تم حذف اسم الأم من جدول الطباعة
                 const tableHTML = (subset, startIdx) => {
-                    let h = '<table><thead><tr><th>ت</th><th>الاسم</th><th>القيد</th><th>الصفحة</th></tr></thead><tbody>';
+                    let h = '<table><thead><tr><th>ت</th><th>الاسم</th><th>اللقب</th><th>القيد</th><th>الصفحة</th></tr></thead><tbody>';
                     subset.forEach((s, idx) => {
-                        h += `<tr><td>${startIdx + idx + 1}</td><td>${s.name}</td><td>${s.qaid}</td><td>${s.page}</td></tr>`;
+                        h += `<tr><td>${startIdx + idx + 1}</td><td>${s.name}</td><td>${s.surname || ''}</td><td>${s.qaid}</td><td>${s.page}</td></tr>`;
                     });
                     return h + '</tbody></table>';
                 };
@@ -314,7 +319,7 @@
         window.copyStudentData = (id) => {
             const student = window.allStudentsData.find(s => s.id === id);
             // تم حذف اسم الأم من البيانات المنقولة
-            const text = `الاسم: ${student.name}\nالقيد: ${student.qaid}\nالصفحة: ${student.page}`;
+            const text = `الاسم: ${student.name}\nاللقب: ${student.surname || ''}\nالقيد: ${student.qaid}\nالصفحة: ${student.page}`;
             navigator.clipboard.writeText(text).then(() => {
                 showToast("تم نسخ بيانات الطالب");
             });
@@ -367,7 +372,7 @@
                                 <small class="qaid-end">${String(s.qaid).slice(-2)}</small>
                             </div>
                             <div class="student-details">
-                                <p class="student-name">${s.name} <small class="surname-text">${s.surname || ''}</small></p>
+                                <p class="student-name">${s.name} <span class="surname-badge">${s.surname || ''}</span></p>
                                 <div class="student-meta">
                                     <span class="highlight-badge qaid-badge" title="رقم القيد">
                                         <i class="fas fa-hashtag"></i> ${s.qaid}
@@ -517,6 +522,7 @@
             --success: #10b981;
             --warning: #f59e0b;
             --danger: #ef4444;
+            --surname: #7c3aed; /* لون جديد للقب */
         }
         
         body.dark-mode { 
@@ -526,6 +532,7 @@
             --success: #34d399;
             --warning: #fbbf24;
             --danger: #f87171;
+            --surname: #a78bfa; /* لون القب في الوضع الداكن */
         }
         
         body { 
@@ -564,8 +571,8 @@
             }
             
             .action-bar-sub {
-                grid-template-columns: repeat(4, 1fr);
-                gap: 10px;
+                grid-template-columns: repeat(5, 1fr);
+                gap: 8px;
                 margin-bottom: 15px;
             }
             
@@ -623,8 +630,8 @@
             }
             
             .action-bar-sub {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 8px;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 6px;
                 margin-bottom: 12px;
             }
             
@@ -653,6 +660,14 @@
             
             .item-actions {
                 justify-content: flex-end;
+            }
+            
+            .action-bar-sub .btn span {
+                display: none;
+            }
+            
+            .action-bar-sub .btn i {
+                margin: 0;
             }
         }
         
@@ -737,12 +752,29 @@
             font-size: 1rem; 
             line-height: 1.3; 
             color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
         }
         
-        .surname-text { 
-            color: var(--accent); 
+        /* تمييز اللقب بشكل أجمل */
+        .surname-badge { 
+            background: var(--surname); 
+            color: white; 
+            padding: 3px 10px;
+            border-radius: 20px; 
             font-size: 0.85rem; 
-            font-weight: 500;
+            font-weight: 600;
+            display: inline-block;
+            box-shadow: 0 2px 4px rgba(124, 58, 237, 0.2);
+            transition: all 0.2s;
+            margin-right: 5px;
+        }
+        
+        .surname-badge:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(124, 58, 237, 0.3);
         }
         
         .student-meta { 
@@ -888,8 +920,8 @@
         
         .secondary-actions {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
         }
         
         .utility-actions {
@@ -904,7 +936,7 @@
             }
             
             .secondary-actions {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: repeat(3, 1fr);
             }
         }
         
@@ -968,6 +1000,16 @@
             outline: none; 
             background: transparent; 
             color: inherit; 
+        }
+        
+        .search-wrapper::before {
+            content: "🔍";
+            font-size: 1.2rem;
+            color: var(--blue);
+        }
+        
+        .search-wrapper input::placeholder {
+            color: #94a3b8;
         }
         
         .modal { 
@@ -1134,17 +1176,42 @@
             margin-bottom: -5px;
         }
         
+        /* تحسينات الطباعة - تكبير الخط إلى 20 */
         @media print { 
             .no-print { display: none !important; } 
             .print-area { display: block !important; } 
-            .print-page { page-break-after: always; padding: 10px; }
-            .print-grid { display: flex; gap: 10px; }
+            .print-page { page-break-after: always; padding: 20px; }
+            .print-grid { display: flex; gap: 20px; }
             .print-col { flex: 1; }
-            table { width: 100%; border-collapse: collapse; } 
-            th, td { border: 1px solid black; padding: 4px; text-align: center; font-size: 11px; } 
+            table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                font-size: 20px !important; /* تكبير الخط إلى 20 */
+            } 
+            th, td { 
+                border: 2px solid black; 
+                padding: 12px !important; /* زيادة الحشوة */
+                text-align: center; 
+                font-size: 20px !important; /* تكبير الخط إلى 20 */
+                font-weight: bold;
+            }
+            th {
+                background-color: #f1f5f9;
+                font-size: 22px !important;
+            }
+            #printTitle {
+                font-size: 28px !important;
+                margin-bottom: 20px;
+            }
+            #printDate {
+                font-size: 18px !important;
+            }
         }
         
-        .print-area { display: none; }
+        .print-area { 
+            display: none; 
+            font-family: 'Arial', sans-serif;
+        }
         
         .theme-toggle {
             position: fixed;
@@ -1276,6 +1343,47 @@
             font-size: 1.1rem;
             color: var(--text);
         }
+        
+        /* تحسين ترتيب الأزرار */
+        .action-buttons-row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin: 10px 0;
+        }
+        
+        .action-buttons-row .btn {
+            font-size: 0.85rem;
+            padding: 10px 5px;
+        }
+        
+        @media (max-width: 767px) {
+            .action-buttons-row {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            
+            .action-buttons-row .btn span {
+                display: none;
+            }
+        }
+        
+        /* فلاتر البحث */
+        .search-filters {
+            background: var(--card);
+            padding: 15px;
+            border-radius: 12px;
+            margin: 15px 0;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        @media (max-width: 767px) {
+            .search-filters {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1397,9 +1505,9 @@
 
 <div id="appContent" class="container" style="display: none;">
     <div class="print-area">
-        <div style="text-align:center; border-bottom: 2px solid #000; margin-bottom: 10px; padding-bottom: 10px;">
-            <h2 id="printTitle" style="margin: 5px 0; font-size: 1.5rem;"></h2>
-            <span id="printDate" style="font-size: 12px; color: #666;"></span>
+        <div style="text-align:center; border-bottom: 2px solid #000; margin-bottom: 20px; padding-bottom: 15px;">
+            <h2 id="printTitle" style="margin: 10px 0; font-size: 28px; font-weight: bold;"></h2>
+            <span id="printDate" style="font-size: 18px; color: #666; font-weight: bold;"></span>
         </div>
         <div id="printTablesContainer"></div>
     </div>
@@ -1442,24 +1550,21 @@
                 </button>
             </div>
             
-            <div class="secondary-actions">
-                <button class="btn" style="background:var(--accent)" onclick="document.getElementById('fileInput').click()">
-                    <i class="fas fa-file-import"></i> استيراد
+            <div class="action-buttons-row">
+                <button class="btn" style="background:var(--accent)" onclick="document.getElementById('fileInput').click()" title="استيراد من Excel">
+                    <i class="fas fa-file-import"></i> <span>استيراد</span>
                 </button>
-                <button class="btn" style="background:var(--success)" onclick="downloadExcelTemplate()">
-                    <i class="fas fa-file-excel"></i> نموذج Excel
+                <button class="btn" style="background:var(--success)" onclick="downloadExcelTemplate()" title="نموذج Excel">
+                    <i class="fas fa-file-excel"></i> <span>نموذج Excel</span>
                 </button>
-                <button class="btn" style="background:var(--warning)" onclick="exportExcel()">
-                    <i class="fas fa-file-export"></i> تصدير
+                <button class="btn" style="background:var(--warning)" onclick="exportExcel()" title="تصدير إلى Excel">
+                    <i class="fas fa-file-export"></i> <span>تصدير</span>
                 </button>
-                <button class="btn" style="background:var(--blue)" onclick="showPrintOptions()">
-                    <i class="fas fa-print"></i> طباعة
+                <button class="btn" style="background:var(--blue)" onclick="showPrintOptions()" title="طباعة">
+                    <i class="fas fa-print"></i> <span>طباعة</span>
                 </button>
-            </div>
-            
-            <div class="utility-actions">
-                <button class="btn" onclick="clearFilters()" style="background:#64748b;">
-                    <i class="fas fa-filter"></i> مسح الفلاتر
+                <button class="btn" onclick="clearFilters()" style="background:#64748b;" title="مسح الفلاتر">
+                    <i class="fas fa-filter"></i> <span>مسح الفلاتر</span>
                 </button>
             </div>
         </div>
@@ -1473,15 +1578,15 @@
             <input type="number" id="filterPage" placeholder="رقم الصفحة" oninput="applyFilters()">
             <select id="sortSelect" onchange="applyFilters()">
                 <option value="newest">الأحدث أولاً</option>
-                <option value="alpha">أبجدي</option>
+                <option value="alpha">الاسم أبجدي</option>
+                <option value="surname">اللقب أبجدي</option>
                 <option value="qaid">حسب القيد</option>
                 <option value="page">حسب الصفحة</option>
             </select>
         </div>
 
         <div class="search-wrapper">
-            <i class="fas fa-search" style="color:var(--blue); font-size:1rem;"></i>
-            <input type="text" id="searchInput" placeholder="ابحث عن اسم أو قيد..." onkeyup="applyFilters()">
+            <input type="text" id="searchInput" placeholder="ابحث عن اسم أو لقب أو قيد..." onkeyup="applyFilters()">
         </div>
 
         <div id="studentsList"></div>
@@ -1493,4 +1598,4 @@
 </div>
 
 </body>
-                </html>
+    </html>
