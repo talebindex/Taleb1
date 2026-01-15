@@ -359,28 +359,12 @@
             unsavedChanges = true;
         };
 
-        // دالة لتوليد لون فريد بناءً على الفهرس
-        function getStudentBackgroundColor(index) {
-            const colors = [
-                'linear-gradient(135deg, #f0f9ff, #e0f2fe)',  // أزرق فاتح
-                'linear-gradient(135deg, #fefce8, #fef9c3)',  // أصفر فاتح
-                'linear-gradient(135deg, #f0fdf4, #dcfce7)',  // أخضر فاتح
-                'linear-gradient(135deg, #fef2f2, #fee2e2)',  // أحمر فاتح
-                'linear-gradient(135deg, #faf5ff, #f3e8ff)',  // بنفسجي فاتح
-                'linear-gradient(135deg, #fffbeb, #fef3c7)',  // برتقالي فاتح
-                'linear-gradient(135deg, #eff6ff, #dbeafe)',  // أزرق داكن فاتح
-                'linear-gradient(135deg, #fdf4ff, #fae8ff)'   // وردي فاتح
-            ];
-            return colors[index % colors.length];
-        }
-
         window.render = (data) => {
             const list = document.getElementById('studentsList');
             list.innerHTML = ''; 
-            data.forEach((s, index) => {
-                const bgColor = getStudentBackgroundColor(index);
+            data.forEach((s) => {
                 list.innerHTML += `
-                    <div class="student-item card" style="background: ${bgColor};">
+                    <div class="student-item card">
                         <div class="card-body-wrapper">
                             <div class="user-icon" title="آخر رقمين من القيد: ${String(s.qaid).slice(-2)}">
                                 <i class="fas fa-user-graduate"></i>
@@ -558,16 +542,154 @@
             color: var(--text); 
             direction: rtl; 
             margin: 0; 
-            padding: 5px; 
+            padding: 0; 
             transition: background 0.3s, color 0.3s;
+            min-height: 100vh;
         }
         
-        .container { max-width: 800px; margin: auto; }
+        /* التعديلات الرئيسية للشاشات الكبيرة والصغيرة */
+        .container { 
+            max-width: 1200px; /* زيادة العرض للشاشات الكبيرة */
+            margin: auto;
+            padding: 15px;
+        }
+        
+        /* تصميم متجاوب للشاشات الكبيرة */
+        @media (min-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .stats-bar {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 15px;
+            }
+            
+            .action-bar {
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+                margin-bottom: 15px;
+            }
+            
+            .action-bar-sub {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 10px;
+                margin-bottom: 15px;
+            }
+            
+            .advanced-filters {
+                display: flex;
+                gap: 12px;
+                margin: 15px 0;
+                padding: 15px;
+            }
+            
+            .advanced-filters select,
+            .advanced-filters input {
+                flex: 1;
+                min-width: 150px;
+            }
+            
+            .student-item {
+                padding: 15px 20px;
+            }
+            
+            .card-body-wrapper {
+                gap: 20px;
+            }
+            
+            .student-name {
+                font-size: 1.1rem;
+            }
+            
+            .student-meta {
+                font-size: 0.9rem;
+                gap: 15px;
+            }
+            
+            .modal-content {
+                max-width: 450px;
+                padding: 30px;
+            }
+        }
+        
+        /* تصميم للشاشات الصغيرة (هواتف) */
+        @media (max-width: 767px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .stats-bar {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 8px;
+            }
+            
+            .action-bar {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+                margin-bottom: 10px;
+            }
+            
+            .action-bar-sub {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+                margin-bottom: 12px;
+            }
+            
+            .advanced-filters {
+                flex-direction: column;
+                gap: 10px;
+                margin: 10px 0;
+                padding: 12px;
+            }
+            
+            .advanced-filters select,
+            .advanced-filters input {
+                width: 100%;
+            }
+            
+            .student-item {
+                padding: 12px 15px;
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .card-body-wrapper {
+                margin-bottom: 10px;
+            }
+            
+            .item-actions {
+                justify-content: flex-end;
+            }
+        }
+        
+        /* تصميم للشاشات الكبيرة جداً (أجهزة كمبيوتر مكتبية) */
+        @media (min-width: 1200px) {
+            .container {
+                max-width: 1400px;
+                padding: 25px;
+            }
+            
+            .students-list-container {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(550px, 1fr));
+                gap: 15px;
+            }
+            
+            .student-item {
+                margin-bottom: 0;
+            }
+            
+            .modal-content {
+                max-width: 500px;
+            }
+        }
         
         .card { 
-            padding: 10px 15px; 
+            background: var(--card); 
+            padding: 12px 15px; 
             border-radius: 12px; 
-            margin-bottom: 8px; 
+            margin-bottom: 10px; 
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             transition: transform 0.2s, box-shadow 0.2s;
             border: 1px solid rgba(0,0,0,0.05);
@@ -618,7 +740,7 @@
         .user-icon { 
             width: 42px; 
             height: 42px; 
-            background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7)); 
+            background: linear-gradient(135deg, #e0f2fe, #bae6fd); 
             border-radius: 50%; 
             display: flex; 
             flex-direction: column;
@@ -627,8 +749,7 @@
             color: var(--blue); 
             font-size: 1rem;
             position: relative;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            border: 1px solid rgba(255,255,255,0.3);
+            box-shadow: 0 2px 5px rgba(14, 165, 233, 0.2);
         }
         
         .user-icon .qaid-end {
@@ -642,6 +763,7 @@
             display: flex; 
             align-items: center; 
             gap: 15px; 
+            flex: 1;
         }
         
         .highlight-badge { 
@@ -652,17 +774,18 @@
             display: flex;
             align-items: center;
             gap: 5px;
-            background: rgba(255,255,255,0.8);
-            border: 1px solid rgba(255,255,255,0.3);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         
         .qaid-badge { 
+            background: #e0f2fe; 
             color: #0369a1; 
+            border: 1px solid #bae6fd;
         }
         
         .page-badge { 
+            background: #fef9c3; 
             color: #854d0e; 
+            border: 1px solid #fef08a;
         }
         
         .item-actions { 
@@ -671,33 +794,32 @@
         }
         
         .edit-btn-small, .del-btn-small, .copy-btn-small { 
-            background: rgba(255,255,255,0.8); 
-            border: 1px solid rgba(255,255,255,0.3); 
+            background: none; 
+            border: 1px solid #e2e8f0; 
             border-radius: 8px; 
             padding: 6px 12px; 
             cursor: pointer; 
             color: #64748b; 
             font-size: 0.9rem;
             transition: all 0.2s;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         
         .edit-btn-small:hover { 
-            background: rgba(219, 234, 254, 0.9); 
+            background: #dbeafe; 
             color: #1d4ed8; 
-            border-color: rgba(147, 197, 253, 0.5);
+            border-color: #93c5fd;
         }
         
         .del-btn-small:hover { 
-            background: rgba(254, 226, 226, 0.9); 
+            background: #fee2e2; 
             color: #dc2626; 
-            border-color: rgba(252, 165, 165, 0.5);
+            border-color: #fca5a5;
         }
         
         .copy-btn-small:hover { 
-            background: rgba(240, 249, 255, 0.9); 
+            background: #f0f9ff; 
             color: #0ea5e9; 
-            border-color: rgba(125, 211, 252, 0.5);
+            border-color: #7dd3fc;
         }
         
         .btn { 
@@ -713,6 +835,7 @@
             gap: 8px; 
             font-size: 0.95rem;
             transition: all 0.2s;
+            min-height: 48px;
         }
         
         .btn:hover {
@@ -726,14 +849,13 @@
         
         .stats-bar { 
             display: grid; 
-            grid-template-columns: repeat(3, 1fr); 
-            gap: 8px; 
-            margin-bottom: 12px; 
+            gap: 10px; 
+            margin-bottom: 15px; 
         }
         
         .stat-item { 
             background: var(--card); 
-            padding: 12px; 
+            padding: 15px; 
             border-radius: 12px; 
             text-align: center; 
             border: 1px solid rgba(0,0,0,0.05);
@@ -743,34 +865,21 @@
         .stat-item i {
             display: block;
             margin-bottom: 5px;
+            font-size: 1.4rem;
         }
         
         .stat-val { 
             display: block; 
-            font-size: 1.4rem; 
+            font-size: 1.6rem; 
             font-weight: 800; 
             color: var(--blue); 
-            margin: 5px 0;
+            margin: 8px 0;
         }
         
         .stat-label { 
-            font-size: 0.75rem; 
+            font-size: 0.8rem; 
             color: #64748b; 
             font-weight: 500;
-        }
-        
-        .action-bar { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 8px; 
-            margin-bottom: 8px; 
-        }
-        
-        .action-bar-sub { 
-            display: grid; 
-            grid-template-columns: repeat(4, 1fr); 
-            gap: 8px; 
-            margin-bottom: 12px; 
         }
         
         .search-wrapper { 
@@ -778,46 +887,23 @@
             align-items: center; 
             gap: 10px; 
             background: var(--card); 
-            padding: 8px 15px; 
+            padding: 10px 18px; 
             border-radius: 50px; 
             border: 2px solid var(--blue); 
-            margin-bottom: 12px;
+            margin-bottom: 15px;
             box-shadow: 0 2px 8px rgba(14, 165, 233, 0.1);
         }
         
         .search-wrapper input { 
             border: none; 
             padding: 8px; 
-            font-size: 0.95rem; 
+            font-size: 1rem; 
             width: 100%; 
             outline: none; 
             background: transparent; 
             color: inherit; 
         }
         
-        .advanced-filters {
-            margin: 12px 0;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            background: var(--card);
-            padding: 12px;
-            border-radius: 12px;
-            border: 1px solid rgba(0,0,0,0.05);
-        }
-        
-        .advanced-filters select,
-        .advanced-filters input {
-            flex: 1;
-            min-width: 140px;
-            padding: 10px;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            background: var(--bg);
-            color: var(--text);
-            font-size: 0.9rem;
-        }
-
         .modal { 
             position: fixed; 
             top: 0; 
@@ -837,7 +923,7 @@
             padding: 25px; 
             border-radius: 16px; 
             width: 90%; 
-            max-width: 380px; 
+            max-width: 400px; 
             position: absolute;
             top: 50%;
             left: 50%;
@@ -900,6 +986,7 @@
             transition: 0.5s; 
             opacity: 1;
             animation: toastSlide 0.3s ease-out;
+            max-width: 350px;
         }
         
         @keyframes toastSlide {
@@ -1047,6 +1134,52 @@
         .dark-mode ::-webkit-scrollbar-thumb:hover {
             background: #64748b;
         }
+        
+        /* تصميم العنوان الرئيسي */
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .header-title {
+            margin: 0;
+            color: var(--blue);
+            font-size: 1.5rem;
+        }
+        
+        @media (min-width: 768px) {
+            .header-title {
+                font-size: 1.8rem;
+            }
+        }
+        
+        /* تحسين عرض قائمة الطلاب للشاشات الكبيرة */
+        #studentsList {
+            display: grid;
+            gap: 12px;
+        }
+        
+        @media (min-width: 768px) {
+            #studentsList {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (min-width: 1200px) {
+            #studentsList {
+                grid-template-columns: 1fr;
+            }
+            
+            .student-item {
+                display: grid;
+                grid-template-columns: 1fr auto;
+                gap: 15px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1150,12 +1283,12 @@
         </button>
         <button class="btn" style="background:#64748b; width:100%;" onclick="document.getElementById('printModal').style.display='none'">
             <i class="fas fa-times"></i> إلغاء
-        </button>
+            </button>
     </div>
 </div>
 
 <div id="loginPage" style="height: 100vh; flex-direction: column; align-items: center; justify-content: center; display: none;">
-    <div class="card" style="width: 320px; text-align: center; padding: 30px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+    <div class="card" style="width: 90%; max-width: 400px; text-align: center; padding: 30px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
         <h2 style="margin-bottom: 25px; color: var(--blue);">
             <i class="fas fa-lock"></i> دخول النظام
         </h2>
@@ -1177,8 +1310,8 @@
     </div>
 
     <div class="no-print">
-        <div style="display:flex; justify-content:space-between; align-items:center; padding: 10px 5px; margin-bottom: 10px;">
-            <h4 style="margin:0; color:var(--blue); font-size: 1.3rem;">
+        <div class="header-container">
+            <h4 class="header-title">
                 <i class="fas fa-archive"></i> نظام الأرشيف الذكي
             </h4>
             <button onclick="logout()" style="background:none; border:none; color:var(--danger); font-size:0.9rem; cursor:pointer; padding: 8px 12px; border-radius: 8px; transition: background 0.2s;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='none'">
@@ -1188,17 +1321,17 @@
 
         <div class="stats-bar">
             <div class="stat-item">
-                <i class="fas fa-users" style="color:var(--blue); font-size:1.3rem;"></i>
+                <i class="fas fa-users" style="color:var(--blue);"></i>
                 <span class="stat-val" id="statTotal">0</span>
                 <span class="stat-label">طلاب</span>
             </div>
             <div class="stat-item">
-                <i class="fas fa-calendar-day" style="color:var(--success); font-size:1.3rem;"></i>
+                <i class="fas fa-calendar-day" style="color:var(--success);"></i>
                 <span class="stat-val" style="color:var(--success)" id="statToday">0</span>
                 <span class="stat-label">اليوم</span>
             </div>
             <div class="stat-item">
-                <i class="fas fa-folder" style="color:var(--accent); font-size:1.3rem;"></i>
+                <i class="fas fa-folder" style="color:var(--accent);"></i>
                 <span class="stat-val" style="color:var(--accent)" id="statQaids">0</span>
                 <span class="stat-label">قيود</span>
             </div>
@@ -1241,7 +1374,7 @@
                 <option value="">جميع القيود</option>
             </select>
             <input type="number" id="filterPage" placeholder="رقم الصفحة" oninput="applyFilters()">
-            <select id="sortSelect" onchange="applyFilters()" style="flex: 1; min-width: 140px;">
+            <select id="sortSelect" onchange="applyFilters()">
                 <option value="newest">الأحدث أولاً</option>
                 <option value="alpha">أبجدي</option>
                 <option value="qaid">حسب القيد</option>
@@ -1263,4 +1396,4 @@
 </div>
 
 </body>
-</html>
+    </html>
