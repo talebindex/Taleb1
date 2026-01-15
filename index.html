@@ -446,15 +446,10 @@
             setupInputListeners();
         };
         
+        // التعديل هنا: إزالة رسالة التحذير عند إغلاق النافذة
         window.closeAddModal = () => {
-            if (unsavedChanges) {
-                if (confirm("هل تريد إغلاق النافذة؟ هناك تغييرات غير محفوظة.")) {
-                    document.getElementById('entryModal').style.display = 'none';
-                    unsavedChanges = false;
-                }
-            } else {
-                document.getElementById('entryModal').style.display = 'none';
-            }
+            document.getElementById('entryModal').style.display = 'none';
+            unsavedChanges = false;
         };
         
         window.resetForm = () => { 
@@ -1643,7 +1638,7 @@
         </button>
         <button class="btn" style="background:#64748b; width:100%;" onclick="document.getElementById('printModal').style.display='none'">
             <i class="fas fa-times"></i> إلغاء
-            </button>
+        </button>
     </div>
 </div>
 
@@ -1764,4 +1759,4 @@
 </div>
 
 </body>
-</html>
+    </html>
