@@ -243,42 +243,44 @@
             const container = document.getElementById('printTablesContainer');
             container.innerHTML = '';
             
-            const rowsPerPage = 60; // عدد الأسطر في كل صفحة (30 في كل عمود)
-            for (let i = 0; i < data.length; i += rowsPerPage) {
-                const pageData = data.slice(i, i + rowsPerPage);
+            // عدد الصفوف في كل عمود (يجب أن يكون 30 لكل عمود)
+            const rowsPerColumn = 30;
+            const totalRowsPerPage = rowsPerColumn * 2; // 60 صف في كل صفحة
+            
+            for (let pageIndex = 0; pageIndex < Math.ceil(data.length / totalRowsPerPage); pageIndex++) {
+                const startIdx = pageIndex * totalRowsPerPage;
+                const pageData = data.slice(startIdx, startIdx + totalRowsPerPage);
                 
                 const pageDiv = document.createElement('div');
                 pageDiv.className = 'print-page';
                 
                 // تقسيم البيانات إلى عمودين (30 سطر في كل عمود)
-                const leftColumnData = pageData.slice(0, 30); // العمود الأيسر: 1-30
-                const rightColumnData = pageData.slice(30, 60); // العمود الأيمن: 31-60
+                const leftColumnData = pageData.slice(0, rowsPerColumn); // العمود الأيسر
+                const rightColumnData = pageData.slice(rowsPerColumn, totalRowsPerPage); // العمود الأيمن
                 
                 // دالة لإنشاء الجدول مع تسلسل متناسق
-                const tableHTML = (subset, startIdx, isRightColumn = false) => {
+                const tableHTML = (subset, columnStartNumber) => {
                     let h = '<table><thead><tr><th>ت</th><th>الاسم</th><th>اللقب</th><th>القيد</th><th>الصفحة</th></tr></thead><tbody>';
                     subset.forEach((s, idx) => {
-                        // حساب الرقم التسلسلي بناءً على إذا كان العمود الأيمن أم الأيسر
-                        let seqNumber;
-                        if (isRightColumn) {
-                            // في العمود الأيمن: يبدأ من 31 إذا كان الصفحة الأولى
-                            seqNumber = startIdx + idx + 31;
-                        } else {
-                            // في العمود الأيسر: يبدأ من 1
-                            seqNumber = startIdx + idx + 1;
-                        }
+                        // حساب الرقم التسلسلي بناءً على بداية العمود
+                        const seqNumber = columnStartNumber + idx;
                         h += `<tr><td>${seqNumber}</td><td>${s.name}</td><td>${s.surname || ''}</td><td>${s.qaid}</td><td>${s.page}</td></tr>`;
                     });
                     return h + '</tbody></table>';
                 };
 
+                // حساب بداية الأرقام لهذه الصفحة
+                const pageStartNumber = pageIndex * totalRowsPerPage + 1;
+                const leftColumnStartNumber = pageStartNumber;
+                const rightColumnStartNumber = pageStartNumber + rowsPerColumn;
+                
                 pageDiv.innerHTML = `
                     <div class="print-grid">
                         <div class="print-col print-col-left">
-                            ${tableHTML(leftColumnData, i, false)}
+                            ${tableHTML(leftColumnData, leftColumnStartNumber)}
                         </div>
                         <div class="print-col print-col-right">
-                            ${tableHTML(rightColumnData, i, true)}
+                            ${tableHTML(rightColumnData, rightColumnStartNumber)}
                         </div>
                     </div>
                 `;
@@ -1192,7 +1194,7 @@
             margin-bottom: -5px;
         }
         
-        /* تحسينات الطباعة - تقليل الخط إلى 14 */
+        /* تحسينات الطباعة - تقليل الخط إلى 14 وتحسين التسلسل */
         @media print { 
             .no-print { display: none !important; } 
             .print-area { 
@@ -1203,34 +1205,36 @@
                 page-break-after: always; 
                 padding: 15px;
                 height: 100%;
+                position: relative;
             }
             .print-grid { 
                 display: flex; 
-                gap: 20px;
+                gap: 25px;
                 height: 100%;
+                justify-content: space-between;
             }
             .print-col { 
-                flex: 1;
+                width: 48%;
                 height: 100%;
             }
             .print-col-left {
-                border-right: 2px solid #ddd;
-                padding-right: 10px;
+                border-right: 1px dashed #ccc;
+                padding-right: 12px;
             }
             .print-col-right {
-                padding-left: 10px;
+                padding-left: 12px;
             }
             table { 
                 width: 100%; 
                 border-collapse: collapse; 
-                font-size: 14px !important; /* تقليل الخط إلى 14 */
+                font-size: 14px !important;
                 line-height: 1.4;
             } 
             th, td { 
                 border: 1px solid #333; 
-                padding: 6px 8px !important; /* تقليل الحشوة */
+                padding: 6px 8px !important;
                 text-align: center; 
-                font-size: 14px !important; /* تقليل الخط إلى 14 */
+                font-size: 14px !important;
                 font-weight: normal;
             }
             th {
@@ -1241,21 +1245,24 @@
             }
             #printTitle {
                 font-size: 22px !important;
-                margin-bottom: 15px;
+                margin-bottom: 10px;
                 text-align: center;
+                font-weight: bold;
             }
             #printDate {
                 font-size: 16px !important;
                 text-align: center;
                 margin-bottom: 20px;
                 display: block;
+                font-weight: bold;
             }
             
             /* تنسيق خاص للأرقام التسلسلية */
             td:first-child {
                 font-weight: bold;
                 background-color: #f8fafc;
-                width: 40px;
+                width: 35px;
+                min-width: 35px;
             }
             
             /* تحسين عرض الأسماء */
@@ -1273,13 +1280,34 @@
             
             /* جعل الصفحة تأخذ المساحة الكاملة */
             @page {
-                margin: 0.5cm;
+                margin: 1cm;
                 size: A4 portrait;
             }
             
             body {
                 margin: 0;
                 padding: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            
+            /* إضافة ترقيم الصفحات */
+            .print-page::after {
+                content: "الصفحة " counter(page);
+                position: absolute;
+                bottom: 10px;
+                left: 50%;
+                transform: translateX(-50%);
+                font-size: 12px;
+                color: #666;
+            }
+            
+            /* بدء ترقيم الصفحات */
+            body {
+                counter-reset: page;
+            }
+            .print-page {
+                counter-increment: page;
             }
         }
         
@@ -1673,4 +1701,4 @@
 </div>
 
 </body>
-</html>
+                </html>
