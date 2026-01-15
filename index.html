@@ -243,47 +243,68 @@
             const container = document.getElementById('printTablesContainer');
             container.innerHTML = '';
             
-            // عدد الصفوف في كل عمود (يجب أن يكون 30 لكل عمود)
-            const rowsPerColumn = 30;
-            const totalRowsPerPage = rowsPerColumn * 2; // 60 صف في كل صفحة
+            // عدد الأسطر في كل عمود (يجب أن يكون متساوي في الصفحة الواحدة)
+            const rowsPerColumn = 30; // 30 في كل عمود = 60 في الصفحة
             
-            for (let pageIndex = 0; pageIndex < Math.ceil(data.length / totalRowsPerPage); pageIndex++) {
-                const startIdx = pageIndex * totalRowsPerPage;
-                const pageData = data.slice(startIdx, startIdx + totalRowsPerPage);
+            for (let pageNum = 0; pageNum < Math.ceil(data.length / (rowsPerColumn * 2)); pageNum++) {
+                const pageStartIndex = pageNum * rowsPerColumn * 2; // بداية الصفحة
+                const pageEndIndex = pageStartIndex + (rowsPerColumn * 2); // نهاية الصفحة
+                const pageData = data.slice(pageStartIndex, pageEndIndex);
+                
+                // تقسيم الصفحة إلى عمودين متساويين
+                const leftColumnData = pageData.slice(0, rowsPerColumn);
+                const rightColumnData = pageData.slice(rowsPerColumn, rowsPerColumn * 2);
                 
                 const pageDiv = document.createElement('div');
                 pageDiv.className = 'print-page';
                 
-                // تقسيم البيانات إلى عمودين (30 سطر في كل عمود)
-                const leftColumnData = pageData.slice(0, rowsPerColumn); // العمود الأيسر
-                const rightColumnData = pageData.slice(rowsPerColumn, totalRowsPerPage); // العمود الأيمن
-                
-                // دالة لإنشاء الجدول مع تسلسل متناسق
-                const tableHTML = (subset, columnStartNumber) => {
-                    let h = '<table><thead><tr><th>ت</th><th>الاسم</th><th>اللقب</th><th>القيد</th><th>الصفحة</th></tr></thead><tbody>';
-                    subset.forEach((s, idx) => {
-                        // حساب الرقم التسلسلي بناءً على بداية العمود
-                        const seqNumber = columnStartNumber + idx;
-                        h += `<tr><td>${seqNumber}</td><td>${s.name}</td><td>${s.surname || ''}</td><td>${s.qaid}</td><td>${s.page}</td></tr>`;
+                // دالة لإنشاء جدول واحد
+                const createTable = (columnData, startNumber) => {
+                    let html = '<table><thead><tr><th>ت</th><th>الاسم</th><th>اللقب</th><th>القيد</th><th>الصفحة</th></tr></thead><tbody>';
+                    
+                    columnData.forEach((student, idx) => {
+                        const seqNumber = startNumber + idx;
+                        html += `<tr>
+                            <td>${seqNumber}</td>
+                            <td>${student.name || ''}</td>
+                            <td>${student.surname || ''}</td>
+                            <td>${student.qaid || ''}</td>
+                            <td>${student.page || ''}</td>
+                        </tr>`;
                     });
-                    return h + '</tbody></table>';
+                    
+                    // إضافة أسطر فارغة إذا كان عدد البيانات أقل من 30
+                    const emptyRows = rowsPerColumn - columnData.length;
+                    for (let i = 0; i < emptyRows; i++) {
+                        html += `<tr>
+                            <td>${startNumber + columnData.length + i}</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                        </tr>`;
+                    }
+                    
+                    html += '</tbody></table>';
+                    return html;
                 };
-
-                // حساب بداية الأرقام لهذه الصفحة
-                const pageStartNumber = pageIndex * totalRowsPerPage + 1;
-                const leftColumnStartNumber = pageStartNumber;
-                const rightColumnStartNumber = pageStartNumber + rowsPerColumn;
+                
+                // حساب بداية الأرقام للصفحة الحالية
+                const pageStartNumber = pageNum * rowsPerColumn * 2 + 1;
+                const leftStartNumber = pageStartNumber;
+                const rightStartNumber = pageStartNumber + rowsPerColumn;
                 
                 pageDiv.innerHTML = `
                     <div class="print-grid">
                         <div class="print-col print-col-left">
-                            ${tableHTML(leftColumnData, leftColumnStartNumber)}
+                            ${createTable(leftColumnData, leftStartNumber)}
                         </div>
                         <div class="print-col print-col-right">
-                            ${tableHTML(rightColumnData, rightColumnStartNumber)}
+                            ${createTable(rightColumnData, rightStartNumber)}
                         </div>
                     </div>
                 `;
+                
                 container.appendChild(pageDiv);
             }
             
@@ -1569,7 +1590,7 @@
                 <i class="fas fa-save"></i> حفظ
             </button>
             <button class="btn" style="background:#64748b; flex:1;" onclick="closeAddModal()">
-                <i class="fas fa-times"></i> إغلاق
+                <i class="fas fa-times"></i> إلغاء
             </button>
         </div>
     </div>
@@ -1701,4 +1722,4 @@
 </div>
 
 </body>
-                </html>
+</html>
