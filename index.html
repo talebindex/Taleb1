@@ -106,13 +106,13 @@
         // دالة لتحميل نموذج Excel جاهز
         window.downloadExcelTemplate = () => {
             const templateData = [
-                ["الاسم", "اللقب", "الأم", "القيد", "الصفحة", "ملاحظات"],
-                ["أحمد محمد علي", "الكبيسي", "فاطمة", "12345", "25", "-"],
-                ["سارة خالد حسن", "العبيدي", "لمياء", "12346", "26", "طالبة متفوقة"],
-                ["علي محمود سعيد", "الجبوري", "نادية", "12347", "27", "-"],
-                ["لمياء فارس عبدالله", "التميمي", "رنا", "12348", "28", "-"],
-                ["محمد خالد إبراهيم", "الراوي", "سعاد", "12349", "29", "-"],
-                ["فاطمة عماد حسين", "الخالدي", "إخلاص", "12350", "30", "-"]
+                ["الاسم", "اللقب", "القيد", "الصفحة", "ملاحظات"], // تم حذف الأم
+                ["أحمد محمد علي", "الكبيسي", "12345", "25", "-"],
+                ["سارة خالد حسن", "العبيدي", "12346", "26", "طالبة متفوقة"],
+                ["علي محمود سعيد", "الجبوري", "12347", "27", "-"],
+                ["لمياء فارس عبدالله", "التميمي", "12348", "28", "-"],
+                ["محمد خالد إبراهيم", "الراوي", "12349", "29", "-"],
+                ["فاطمة عماد حسين", "الخالدي", "12350", "30", "-"]
             ];
             
             const ws = XLSX.utils.aoa_to_sheet(templateData);
@@ -166,7 +166,6 @@
                         batch.set(newDoc, {
                             name: rName, 
                             surname: String(row.surname || row["اللقب"] || "").trim(),
-                            mother: String(row.mother || row["الأم"] || "").trim(),
                             qaid: rQaid,
                             page: rPage,
                             note: String(row.note || row["ملاحظات"] || "").trim(),
@@ -247,10 +246,11 @@
                 const pageDiv = document.createElement('div');
                 pageDiv.className = 'print-page';
                 
+                // تم حذف اسم الأم من جدول الطباعة
                 const tableHTML = (subset, startIdx) => {
-                    let h = '<table><thead><tr><th>ت</th><th>الاسم</th><th>الأم</th><th>قيد</th><th>ص</th></tr></thead><tbody>';
+                    let h = '<table><thead><tr><th>ت</th><th>الاسم</th><th>القيد</th><th>الصفحة</th></tr></thead><tbody>';
                     subset.forEach((s, idx) => {
-                        h += `<tr><td>${startIdx + idx + 1}</td><td>${s.name}</td><td>${s.mother}</td><td>${s.qaid}</td><td>${s.page}</td></tr>`;
+                        h += `<tr><td>${startIdx + idx + 1}</td><td>${s.name}</td><td>${s.qaid}</td><td>${s.page}</td></tr>`;
                     });
                     return h + '</tbody></table>';
                 };
@@ -272,11 +272,10 @@
         window.saveData = async () => {
             const id = document.getElementById('editId').value;
             const name = document.getElementById('fName').value.trim();
-            const mother = document.getElementById('mName').value.trim();
             const qaid = document.getElementById('qNum').value.trim();
             const page = document.getElementById('pNum').value.trim();
             
-            if(!name || !mother || !qaid || !page) return showToast("أكمل البيانات", "error");
+            if(!name || !qaid || !page) return showToast("أكمل البيانات", "error");
             
             // التحقق من التكرار الصارم: نفس القيد + نفس الصفحة
             if (isDuplicateQaidPage(qaid, page, window.allStudentsData, id)) {
@@ -288,7 +287,6 @@
                 const data = { 
                     name, 
                     surname: document.getElementById('surname').value, 
-                    mother, 
                     qaid, 
                     page, 
                     note: document.getElementById('note').value, 
@@ -315,7 +313,8 @@
         
         window.copyStudentData = (id) => {
             const student = window.allStudentsData.find(s => s.id === id);
-            const text = `الاسم: ${student.name}\nالأم: ${student.mother}\nالقيد: ${student.qaid}\nالصفحة: ${student.page}`;
+            // تم حذف اسم الأم من البيانات المنقولة
+            const text = `الاسم: ${student.name}\nالقيد: ${student.qaid}\nالصفحة: ${student.page}`;
             navigator.clipboard.writeText(text).then(() => {
                 showToast("تم نسخ بيانات الطالب");
             });
@@ -326,7 +325,6 @@
                 const lastStudent = window.allStudentsData[0];
                 document.getElementById('fName').value = lastStudent.name;
                 document.getElementById('surname').value = lastStudent.surname;
-                document.getElementById('mName').value = lastStudent.mother;
                 document.getElementById('qNum').value = lastStudent.qaid;
                 document.getElementById('pNum').value = lastStudent.page;
                 document.getElementById('note').value = lastStudent.note;
@@ -340,17 +338,14 @@
         window.generateRandomData = () => {
             const names = ["أحمد محمد علي", "سارة خالد حسن", "علي محمود سعيد", "لمياء فارس عبدالله", "محمد خالد إبراهيم"];
             const surnames = ["الكبيسي", "العبيدي", "الجبوري", "التميمي", "الراوي"];
-            const mothers = ["فاطمة", "لمياء", "نادية", "رنا", "سعاد"];
             
             const randomName = names[Math.floor(Math.random() * names.length)];
             const randomSurname = surnames[Math.floor(Math.random() * surnames.length)];
-            const randomMother = mothers[Math.floor(Math.random() * mothers.length)];
             const randomQaid = Math.floor(Math.random() * 90000) + 10000;
             const randomPage = Math.floor(Math.random() * 50) + 1;
             
             document.getElementById('fName').value = randomName;
             document.getElementById('surname').value = randomSurname;
-            document.getElementById('mName').value = randomMother;
             document.getElementById('qNum').value = randomQaid;
             document.getElementById('pNum').value = randomPage;
             document.getElementById('note').value = "بيانات تجريبية";
@@ -362,9 +357,10 @@
         window.render = (data) => {
             const list = document.getElementById('studentsList');
             list.innerHTML = ''; 
-            data.forEach((s) => {
+            data.forEach((s, index) => {
                 list.innerHTML += `
                     <div class="student-item card">
+                        <div class="student-number">${index + 1}</div>
                         <div class="card-body-wrapper">
                             <div class="user-icon" title="آخر رقمين من القيد: ${String(s.qaid).slice(-2)}">
                                 <i class="fas fa-user-graduate"></i>
@@ -373,9 +369,6 @@
                             <div class="student-details">
                                 <p class="student-name">${s.name} <small class="surname-text">${s.surname || ''}</small></p>
                                 <div class="student-meta">
-                                    <span title="اسم الأم">
-                                        <i class="fas fa-female"></i> ${s.mother}
-                                    </span>
                                     <span class="highlight-badge qaid-badge" title="رقم القيد">
                                         <i class="fas fa-hashtag"></i> ${s.qaid}
                                     </span>
@@ -405,7 +398,6 @@
             document.getElementById('editId').value = s.id;
             document.getElementById('fName').value = s.name;
             document.getElementById('surname').value = s.surname;
-            document.getElementById('mName').value = s.mother;
             document.getElementById('qNum').value = s.qaid;
             document.getElementById('pNum').value = s.page;
             document.getElementById('note').value = s.note;
@@ -549,7 +541,7 @@
         
         /* التعديلات الرئيسية للشاشات الكبيرة والصغيرة */
         .container { 
-            max-width: 1200px; /* زيادة العرض للشاشات الكبيرة */
+            max-width: 1200px;
             margin: auto;
             padding: 15px;
         }
@@ -591,7 +583,7 @@
             }
             
             .student-item {
-                padding: 15px 20px;
+                padding: 15px 20px 15px 10px;
             }
             
             .card-body-wrapper {
@@ -649,13 +641,14 @@
             }
             
             .student-item {
-                padding: 12px 15px;
-                flex-direction: column;
-                align-items: stretch;
+                padding: 12px 15px 12px 5px;
+                flex-direction: row;
+                align-items: center;
+                position: relative;
             }
             
             .card-body-wrapper {
-                margin-bottom: 10px;
+                margin-bottom: 0;
             }
             
             .item-actions {
@@ -687,12 +680,13 @@
         
         .card { 
             background: var(--card); 
-            padding: 12px 15px; 
+            padding: 12px 15px 12px 10px; 
             border-radius: 12px; 
             margin-bottom: 10px; 
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             transition: transform 0.2s, box-shadow 0.2s;
             border: 1px solid rgba(0,0,0,0.05);
+            position: relative;
         }
         
         .card:hover {
@@ -704,7 +698,37 @@
             display: flex; 
             align-items: center; 
             justify-content: space-between; 
-            border-right: 4px solid var(--blue); 
+            border-right: 4px solid var(--blue);
+            position: relative;
+        }
+        
+        /* تسلسل الطلاب */
+        .student-number {
+            position: absolute;
+            right: -20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--blue);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+            z-index: 1;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        @media (max-width: 767px) {
+            .student-number {
+                right: -15px;
+                width: 25px;
+                height: 25px;
+                font-size: 0.8rem;
+            }
         }
         
         .student-name { 
@@ -764,6 +788,7 @@
             align-items: center; 
             gap: 15px; 
             flex: 1;
+            margin-right: 10px;
         }
         
         .highlight-badge { 
@@ -847,6 +872,42 @@
             transform: translateY(0);
         }
         
+        /* تحسين تصميم الأزرار */
+        .action-buttons-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 15px 0;
+        }
+        
+        .main-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .secondary-actions {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        
+        .utility-actions {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+        
+        @media (max-width: 767px) {
+            .main-actions {
+                grid-template-columns: 1fr;
+            }
+            
+            .secondary-actions {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
         .stats-bar { 
             display: grid; 
             gap: 10px; 
@@ -860,24 +921,29 @@
             text-align: center; 
             border: 1px solid rgba(0,0,0,0.05);
             box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+        
+        .stat-item:hover {
+            transform: translateY(-5px);
         }
         
         .stat-item i {
             display: block;
             margin-bottom: 5px;
-            font-size: 1.4rem;
+            font-size: 1.8rem;
         }
         
         .stat-val { 
             display: block; 
-            font-size: 1.6rem; 
+            font-size: 1.8rem; 
             font-weight: 800; 
             color: var(--blue); 
             margin: 8px 0;
         }
         
         .stat-label { 
-            font-size: 0.8rem; 
+            font-size: 0.9rem; 
             color: #64748b; 
             font-weight: 500;
         }
@@ -887,7 +953,7 @@
             align-items: center; 
             gap: 10px; 
             background: var(--card); 
-            padding: 10px 18px; 
+            padding: 12px 20px; 
             border-radius: 50px; 
             border: 2px solid var(--blue); 
             margin-bottom: 15px;
@@ -1180,6 +1246,36 @@
                 gap: 15px;
             }
         }
+        
+        /* تلميحات إضافية */
+        .stats-info {
+            text-align: center;
+            margin: 10px 0;
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+        
+        /* تحسين تصميم الفلاتر */
+        .filters-container {
+            background: var(--card);
+            padding: 15px;
+            border-radius: 12px;
+            margin: 15px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .filters-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .filters-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: var(--text);
+        }
     </style>
 </head>
 <body>
@@ -1251,7 +1347,6 @@
         <input type="hidden" id="editId">
         <input type="text" id="fName" placeholder="الاسم الرباعي" oninput="checkDuplicateStudent()">
         <input type="text" id="surname" placeholder="اللقب">
-        <input type="text" id="mName" placeholder="اسم الأم">
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin:12px 0;">
             <input type="text" id="qNum" placeholder="القيد">
             <input type="number" id="pNum" placeholder="الصفحة">
@@ -1283,7 +1378,7 @@
         </button>
         <button class="btn" style="background:#64748b; width:100%;" onclick="document.getElementById('printModal').style.display='none'">
             <i class="fas fa-times"></i> إلغاء
-            </button>
+        </button>
     </div>
 </div>
 
@@ -1337,34 +1432,36 @@
             </div>
         </div>
 
-        <div class="action-bar">
-            <button class="btn" style="background:var(--main)" onclick="openAddModal()">
-                <i class="fas fa-plus"></i> إضافة طالب
-            </button>
-            <button class="btn" style="background:var(--danger)" onclick="openMasterDelete()">
-                <i class="fas fa-trash-alt"></i> مسح السجل
-            </button>
-        </div>
-        
-        <div class="action-bar-sub">
-            <button class="btn" style="background:var(--accent)" onclick="document.getElementById('fileInput').click()">
-                <i class="fas fa-file-import"></i> استيراد
-            </button>
-            <button class="btn" style="background:var(--success)" onclick="downloadExcelTemplate()">
-                <i class="fas fa-file-excel"></i> نموذج Excel
-            </button>
-            <button class="btn" style="background:var(--warning)" onclick="exportExcel()">
-                <i class="fas fa-file-export"></i> تصدير
-            </button>
-            <button class="btn" style="background:var(--blue)" onclick="showPrintOptions()">
-                <i class="fas fa-print"></i> طباعة
-            </button>
-        </div>
-        
-        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-            <button class="btn" onclick="clearFilters()" style="background:#64748b; flex: 1;">
-                <i class="fas fa-filter"></i> مسح الفلاتر
-            </button>
+        <div class="action-buttons-container">
+            <div class="main-actions">
+                <button class="btn" style="background:var(--main)" onclick="openAddModal()">
+                    <i class="fas fa-plus"></i> إضافة طالب
+                </button>
+                <button class="btn" style="background:var(--danger)" onclick="openMasterDelete()">
+                    <i class="fas fa-trash-alt"></i> مسح السجل
+                </button>
+            </div>
+            
+            <div class="secondary-actions">
+                <button class="btn" style="background:var(--accent)" onclick="document.getElementById('fileInput').click()">
+                    <i class="fas fa-file-import"></i> استيراد
+                </button>
+                <button class="btn" style="background:var(--success)" onclick="downloadExcelTemplate()">
+                    <i class="fas fa-file-excel"></i> نموذج Excel
+                </button>
+                <button class="btn" style="background:var(--warning)" onclick="exportExcel()">
+                    <i class="fas fa-file-export"></i> تصدير
+                </button>
+                <button class="btn" style="background:var(--blue)" onclick="showPrintOptions()">
+                    <i class="fas fa-print"></i> طباعة
+                </button>
+            </div>
+            
+            <div class="utility-actions">
+                <button class="btn" onclick="clearFilters()" style="background:#64748b;">
+                    <i class="fas fa-filter"></i> مسح الفلاتر
+                </button>
+            </div>
         </div>
         
         <input type="file" id="fileInput" hidden onchange="importExcel(event)" accept=".xlsx, .xls">
@@ -1396,4 +1493,4 @@
 </div>
 
 </body>
-    </html>
+                </html>
