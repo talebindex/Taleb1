@@ -30,8 +30,6 @@
 
         let deleteTargetId = null;
         window.allStudentsData = [];
-        window.activeLetter = null;
-        let unsavedChanges = false;
 
         window.showToast = (msg, type = 'success') => {
             const container = document.getElementById('toastContainer');
@@ -77,55 +75,26 @@
             const term = document.getElementById('searchInput').value.toLowerCase();
             const sortBy = document.getElementById('sortSelect').value;
             const filterQaid = document.getElementById('filterQaid').value;
-            const filterPage = document.getElementById('filterPage').value;
             
             let filtered = window.allStudentsData.filter(s => {
-                const matchSearch = 
-                    (s.name || '').toLowerCase().includes(term) || 
-                    (s.surname || '').toLowerCase().includes(term) ||
-                    String(s.qaid).includes(term);
+                const matchSearch = (s.name || '').toLowerCase().includes(term) || (s.surname || '').toLowerCase().includes(term) || String(s.qaid).includes(term);
                 const matchQaid = filterQaid ? String(s.qaid) === filterQaid : true;
-                const matchPage = filterPage ? String(s.page).includes(filterPage) : true;
-                return matchSearch && matchQaid && matchPage;
+                return matchSearch && matchQaid;
             });
             
             if (sortBy === "alpha") filtered.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
             else if (sortBy === "qaid") filtered.sort((a, b) => String(a.qaid).localeCompare(String(b.qaid)));
-            else if (sortBy === "page") filtered.sort((a, b) => String(a.page).localeCompare(String(b.page)));
-            else if (sortBy === "surname") filtered.sort((a, b) => (a.surname || '').localeCompare(b.surname || '', 'ar'));
             
             window.render(filtered);
         };
 
-        window.clearFilters = () => {
-            document.getElementById('searchInput').value = '';
-            document.getElementById('filterQaid').value = '';
-            document.getElementById('filterPage').value = '';
-            document.getElementById('sortSelect').value = 'newest';
-            window.applyFilters();
-            showToast("تم مسح جميع الفلاتر");
-        };
-
         window.downloadExcelTemplate = () => {
-            const templateData = [
-                ["الاسم", "اللقب", "القيد", "الصفحة", "ملاحظات"],
-                ["أحمد محمد علي", "الكبيسي", "12345", "25", "-"],
-                ["سارة خالد حسن", "العبيدي", "12346", "26", "طالبة متفوقة"]
-            ];
+            const templateData = [["الاسم", "اللقب", "القيد", "الصفحة", "ملاحظات"], ["مثال اسم", "لقب", "123", "1", ""]];
             const ws = XLSX.utils.aoa_to_sheet(templateData);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
-            XLSX.writeFile(wb, "نموذج_اسماء_الطلاب.xlsx");
-            showToast("تم تحميل النموذج بنجاح");
+            XLSX.writeFile(wb, "نموذج_الأرشيف.xlsx");
         };
-
-        function isDuplicateQaidPage(qaid, page, existingStudents, excludeId = null) {
-            return existingStudents.some(student => 
-                (excludeId ? student.id !== excludeId : true) &&
-                String(student.qaid).trim() === String(qaid).trim() &&
-                String(student.page).trim() === String(page).trim()
-            );
-        }
 
         window.importExcel = (event) => {
             const file = event.target.files[0];
@@ -136,28 +105,20 @@
                 try {
                     const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
                     const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                    const existingStudents = window.allStudentsData;
                     const batch = writeBatch(db);
-                    let added = 0;
-                    let skipped = 0;
                     json.forEach((row) => {
-                        const rName = String(row.name || row["الاسم"] || "").trim();
-                        const rQaid = String(row.qaid || row["القيد"] || "").trim();
-                        const rPage = String(row.page || row["الصفحة"] || "").trim();
-                        if (rName === "" || rQaid === "" || rPage === "") { skipped++; return; }
-                        if (isDuplicateQaidPage(rQaid, rPage, existingStudents)) { skipped++; return; }
                         const newDoc = doc(collection(db, "students"));
                         batch.set(newDoc, {
-                            name: rName, 
-                            surname: String(row.surname || row["اللقب"] || "").trim(),
-                            qaid: rQaid,
-                            page: rPage,
-                            note: String(row.note || row["ملاحظات"] || "").trim(),
+                            name: String(row.name || row["الاسم"] || ""),
+                            surname: String(row.surname || row["اللقب"] || ""),
+                            qaid: String(row.qaid || row["القيد"] || ""),
+                            page: String(row.page || row["الصفحة"] || ""),
+                            note: String(row.note || row["ملاحظات"] || ""),
                             timestamp: Date.now()
                         });
-                        added++;
                     });
-                    if (added > 0) { await batch.commit(); showToast(`تم استيراد ${added} طالب`); }
+                    await batch.commit();
+                    showToast("تم الاستيراد بنجاح");
                 } catch(err) { showToast("خطأ في الملف", "error"); }
                 document.getElementById('loader').style.display = 'none';
             };
@@ -168,25 +129,19 @@
             const ws = XLSX.utils.json_to_sheet(window.allStudentsData.map(({id, timestamp, ...rest}) => rest));
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
-            XLSX.writeFile(wb, "الارشيف.xlsx");
+            XLSX.writeFile(wb, "تصدير_الأرشيف.xlsx");
         };
 
-        window.openMasterDelete = () => {
-            document.getElementById('masterDeleteInput').value = '';
-            document.getElementById('masterDeleteModal').style.display = 'flex';
-        };
+        window.openMasterDelete = () => { document.getElementById('masterDeleteModal').style.display = 'flex'; };
 
         window.confirmMasterDelete = async () => {
             if(document.getElementById('masterDeleteInput').value !== 'حذف') return showToast("اكتب كلمة حذف", "error");
             document.getElementById('loader').style.display = 'flex';
-            try {
-                const snapshot = await getDocs(studentsCol);
-                const batch = writeBatch(db);
-                snapshot.docs.forEach((doc) => batch.delete(doc.ref));
-                await batch.commit();
-                showToast("تم مسح السجل بنجاح", "error");
-                document.getElementById('masterDeleteModal').style.display = 'none';
-            } catch(e) { showToast("خطأ في المسح", "error"); }
+            const snapshot = await getDocs(studentsCol);
+            const batch = writeBatch(db);
+            snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+            await batch.commit();
+            document.getElementById('masterDeleteModal').style.display = 'none';
             document.getElementById('loader').style.display = 'none';
         };
 
@@ -210,58 +165,51 @@
             executePrint([...window.allStudentsData].sort((a,b)=>a.name.localeCompare(b.name,'ar')), "السجل العام");
         };
 
-        // --- الدالة المعدلة لضمان تسلسل الأرقام في الصفحة الواحدة ---
+        // --- الدالة الأساسية المعدلة للتسلسل (1-25 يمين، 26-50 يسار) ---
         function executePrint(data, title) {
             document.getElementById('printTitle').innerText = title;
             const container = document.getElementById('printTablesContainer');
             container.innerHTML = '';
             
-            const rowsPerColumn = 30; 
-            const rowsPerPage = rowsPerColumn * 2; // 60 سطر لكل صفحة
+            const rowsPerColumn = 25; // 25 سطر في كل جهة
+            const totalRowsPerPage = 50; // المجموع 50 اسم في الورقة الواحدة
             
-            for (let pageNum = 0; pageNum < Math.ceil(data.length / rowsPerPage); pageNum++) {
-                const pageStartIndex = pageNum * rowsPerPage;
-                const pageData = data.slice(pageStartIndex, pageStartIndex + rowsPerPage);
+            for (let pageNum = 0; pageNum < Math.ceil(data.length / totalRowsPerPage); pageNum++) {
+                const pageStartIndex = pageNum * totalRowsPerPage;
+                const pageData = data.slice(pageStartIndex, pageStartIndex + totalRowsPerPage);
                 
                 const pageDiv = document.createElement('div');
                 pageDiv.className = 'print-page';
                 
-                // تقسيم البيانات بالتناوب (أفقي) لضمان تسلسل الأرقام
-                // الرقم 1 يذهب لليمين، 2 لليسار، 3 لليمين وهكذا
-                let rightColData = [];
-                let leftColData = [];
-                
-                for(let i=0; i < rowsPerColumn; i++) {
-                    // توزيع سطر بسطر ليكون التسلسل: يمين (1)، يسار (2)، يمين (3)...
-                    rightColData.push(pageData[i*2] || null);
-                    leftColData.push(pageData[i*2 + 1] || null);
-                }
+                // تقسيم البيانات: النصف الأول (1-25) لليمين، النصف الثاني (26-50) لليسار
+                const rightData = pageData.slice(0, rowsPerColumn);
+                const leftData = pageData.slice(rowsPerColumn, totalRowsPerPage);
 
-                const createTable = (columnData, isRight) => {
+                const createTable = (colData, startSeq) => {
                     let html = '<table><thead><tr><th>ت</th><th>الاسم</th><th>اللقب</th><th>القيد</th><th>الصفحة</th></tr></thead><tbody>';
-                    columnData.forEach((student, idx) => {
-                        // حساب الرقم التسلسلي الحقيقي بناءً على مكان السطر
-                        const seqNumber = pageStartIndex + (idx * 2) + (isRight ? 1 : 2);
+                    for (let i = 0; i < rowsPerColumn; i++) {
+                        const student = colData[i];
+                        const currentSeq = startSeq + i;
                         if (student) {
                             html += `<tr>
-                                <td>${seqNumber}</td>
+                                <td>${currentSeq}</td>
                                 <td>${student.name || ''}</td>
                                 <td>${student.surname || ''}</td>
                                 <td>${student.qaid || ''}</td>
                                 <td>${student.page || ''}</td>
                             </tr>`;
                         } else {
-                            html += `<tr><td>${seqNumber}</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
+                            html += `<tr><td>${currentSeq}</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
                         }
-                    });
+                    }
                     html += '</tbody></table>';
                     return html;
                 };
 
                 pageDiv.innerHTML = `
                     <div class="print-grid">
-                        <div class="print-col print-col-right">${createTable(rightColData, true)}</div>
-                        <div class="print-col print-col-left">${createTable(leftColData, false)}</div>
+                        <div class="print-col print-col-right">${createTable(rightData, pageStartIndex + 1)}</div>
+                        <div class="print-col print-col-left">${createTable(leftData, pageStartIndex + rowsPerColumn + 1)}</div>
                     </div>
                 `;
                 container.appendChild(pageDiv);
@@ -278,26 +226,17 @@
             const qaid = document.getElementById('qNum').value.trim();
             const page = document.getElementById('pNum').value.trim();
             if(!name || !qaid || !page) return showToast("أكمل البيانات", "error");
-            if (isDuplicateQaidPage(qaid, page, window.allStudentsData, id)) {
-                showToast("هذا القيد والصفحة مسجلين مسبقاً", "error"); return;
-            }
-            try {
-                const data = { name, surname: document.getElementById('surname').value, qaid, page, note: document.getElementById('note').value, timestamp: Date.now() };
-                if(id) await updateDoc(doc(db, "students", id), data);
-                else await addDoc(studentsCol, data);
-                showToast("تم الحفظ بنجاح"); window.closeAddModal(); window.resetForm();
-            } catch(e) { showToast("خطأ شبكة", "error"); }
+            
+            const data = { name, surname: document.getElementById('surname').value, qaid, page, note: document.getElementById('note').value, timestamp: Date.now() };
+            if(id) await updateDoc(doc(db, "students", id), data);
+            else await addDoc(studentsCol, data);
+            
+            showToast("تم الحفظ"); window.closeAddModal(); window.resetForm();
         };
 
         window.del = (id) => { deleteTargetId = id; document.getElementById('deleteModal').style.display = 'flex'; };
-        window.confirmDel = async () => { if(deleteTargetId) { await deleteDoc(doc(db, "students", deleteTargetId)); showToast("تم الحذف", "error"); document.getElementById('deleteModal').style.display = 'none'; } };
+        window.confirmDel = async () => { if(deleteTargetId) { await deleteDoc(doc(db, "students", deleteTargetId)); document.getElementById('deleteModal').style.display = 'none'; } };
         
-        window.copyStudentData = (id) => {
-            const student = window.allStudentsData.find(s => s.id === id);
-            const text = `الاسم: ${student.name}\nاللقب: ${student.surname || ''}\nالقيد: ${student.qaid}\nالصفحة: ${student.page}`;
-            navigator.clipboard.writeText(text).then(() => showToast("تم نسخ بيانات الطالب"));
-        };
-
         window.render = (data) => {
             const list = document.getElementById('studentsList');
             list.innerHTML = ''; 
@@ -305,23 +244,15 @@
                 list.innerHTML += `
                     <div class="student-item card">
                         <div class="student-number">${index + 1}</div>
-                        <div class="card-body-wrapper">
-                            <div class="user-icon">
-                                <i class="fas fa-user-graduate"></i>
-                                <small class="qaid-end">${String(s.qaid).slice(-2)}</small>
-                            </div>
-                            <div class="student-details">
-                                <p class="student-name">${s.name} <span class="surname-badge">${s.surname || ''}</span></p>
-                                <div class="student-meta">
-                                    <span class="highlight-badge qaid-badge"><i class="fas fa-hashtag"></i> ${s.qaid}</span>
-                                    <span class="highlight-badge page-badge"><i class="fas fa-file-alt"></i> ${s.page}</span>
-                                </div>
+                        <div class="student-details">
+                            <p class="student-name">${s.name} <span class="surname-badge">${s.surname || ''}</span></p>
+                            <div class="student-meta">
+                                <span>القيد: ${s.qaid}</span> | <span>الصفحة: ${s.page}</span>
                             </div>
                         </div>
                         <div class="item-actions">
-                            <button onclick="copyStudentData('${s.id}')" class="copy-btn-small"><i class="fas fa-copy"></i></button>
-                            <button onclick="edit('${s.id}')" class="edit-btn-small"><i class="fas fa-edit"></i></button>
-                            <button onclick="del('${s.id}')" class="del-btn-small"><i class="fas fa-trash"></i></button>
+                            <button onclick="edit('${s.id}')"><i class="fas fa-edit"></i></button>
+                            <button onclick="del('${s.id}')"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>`;
             });
@@ -341,74 +272,68 @@
 
         window.openAddModal = () => { window.resetForm(); document.getElementById('entryModal').style.display = 'flex'; };
         window.closeAddModal = () => document.getElementById('entryModal').style.display = 'none';
-        window.resetForm = () => { 
-            document.getElementById('editId').value = ''; 
-            document.querySelectorAll('#entryModal input, #entryModal textarea').forEach(i => i.value = ''); 
-            document.getElementById('saveBtn').innerText = "حفظ"; 
-        };
+        window.resetForm = () => { document.querySelectorAll('input, textarea').forEach(i => i.value = ''); document.getElementById('saveBtn').innerText = "حفظ"; };
         window.login = async () => { 
             try { await signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value, document.getElementById('loginPass').value); } 
-            catch(e) { showToast("بيانات خاطئة", "error"); } 
+            catch(e) { showToast("خطأ في الدخول", "error"); } 
         };
         window.logout = () => signOut(auth);
         window.toggleDarkMode = () => document.body.classList.toggle('dark-mode');
     </script>
     
     <style>
-        :root { --main: #1e293b; --blue: #0ea5e9; --bg: #f8fafc; --card: #ffffff; --text: #334155; --accent: #6366f1; --success: #10b981; --warning: #f59e0b; --danger: #ef4444; --surname: #7c3aed; }
-        body.dark-mode { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --surname: #a78bfa; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); direction: rtl; margin: 0; transition: 0.3s; }
-        .container { max-width: 1200px; margin: auto; padding: 20px; }
-        .card { background: var(--card); padding: 15px; border-radius: 12px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); position: relative; border-right: 4px solid var(--blue); }
+        :root { --main: #1e293b; --blue: #0ea5e9; --bg: #f8fafc; --card: #ffffff; --text: #334155; --accent: #6366f1; --success: #10b981; --danger: #ef4444; }
+        body.dark-mode { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); direction: rtl; margin: 0; }
+        .container { max-width: 1000px; margin: auto; padding: 15px; }
+        .card { background: var(--card); padding: 12px; border-radius: 10px; margin-bottom: 10px; border-right: 4px solid var(--blue); position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .student-item { display: flex; align-items: center; justify-content: space-between; }
-        .student-number { position: absolute; right: -15px; background: var(--blue); color: white; width: 25px; height: 25px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold; }
-        .student-name { font-weight: bold; margin: 0; }
-        .surname-badge { background: var(--surname); color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; margin-right: 5px; }
-        .student-meta { display: flex; gap: 10px; font-size: 0.8rem; margin-top: 5px; }
-        .highlight-badge { padding: 2px 8px; border-radius: 5px; background: #e0f2fe; color: #0369a1; }
-        .item-actions button { background: none; border: 1px solid #ddd; padding: 5px 10px; border-radius: 5px; cursor: pointer; color: #666; }
-        .btn { border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; color: white; font-weight: bold; display: flex; align-items: center; gap: 5px; }
-        .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
-        .stat-item { background: var(--card); padding: 15px; border-radius: 10px; text-align: center; }
-        .stat-val { display: block; font-size: 1.5rem; font-weight: bold; color: var(--blue); }
-        .search-wrapper { background: var(--card); padding: 10px; border-radius: 25px; border: 2px solid var(--blue); margin-bottom: 20px; display: flex; }
-        .search-wrapper input { border: none; width: 100%; outline: none; background: none; color: inherit; padding: 5px 10px; }
+        .student-number { background: var(--blue); color: #fff; width: 25px; height: 25px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; margin-left: 10px; }
+        .surname-badge { background: #7c3aed; color: white; padding: 2px 8px; border-radius: 5px; font-size: 12px; }
+        .btn { border: none; border-radius: 8px; cursor: pointer; padding: 10px 15px; font-weight: bold; color: white; display: flex; align-items: center; gap: 5px; }
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
-        .modal-content { background: var(--card); padding: 20px; border-radius: 15px; width: 90%; max-width: 400px; }
-        .advanced-filters { display: flex; gap: 10px; margin-bottom: 15px; }
-        .toast { position: fixed; bottom: 20px; left: 20px; padding: 10px 20px; border-radius: 5px; color: white; z-index: 2000; }
+        .modal-content { background: var(--card); padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; }
+        input, textarea, select { width: 100%; padding: 10px; margin-top: 8px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .toast { position: fixed; bottom: 20px; left: 20px; padding: 12px; border-radius: 8px; color: white; z-index: 2000; }
         .toast.success { background: var(--success); }
         .toast.error { background: var(--danger); }
-        .loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 3000; display: none; align-items: center; justify-content: center; }
-        
         @media print {
             .no-print { display: none !important; }
-            .print-area { display: block !important; direction: rtl; }
-            .print-page { page-break-after: always; padding: 10px; }
-            .print-grid { display: flex; gap: 20px; justify-content: center; }
-            .print-col { width: 48%; }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; }
-            th, td { border: 1px solid #000; padding: 4px; text-align: center; }
-            th { background: #eee !important; }
-            #printTitle { text-align: center; font-size: 18px; margin-bottom: 5px; }
-            #printDate { text-align: center; display: block; font-size: 12px; margin-bottom: 10px; }
+            .print-area { display: block !important; }
+            .print-page { page-break-after: always; padding: 1cm; direction: rtl; }
+            .print-grid { display: flex; gap: 20px; }
+            .print-col { width: 50%; }
+            table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; }
+            th, td { border: 1px solid #000; padding: 5px; text-align: center; overflow: hidden; white-space: nowrap; }
+            th { background: #f0f0f0 !important; }
+            #printTitle { text-align: center; margin-bottom: 5px; }
+            #printDate { text-align: center; display: block; font-size: 10px; margin-bottom: 10px; }
         }
         .print-area { display: none; }
-        .theme-toggle { position: fixed; bottom: 20px; left: 20px; background: var(--main); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .theme-toggle { position: fixed; bottom: 20px; right: 20px; background: var(--main); color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 100; }
     </style>
 </head>
 <body>
 
-<div id="loader" class="loader">جاري المعالجة...</div>
+<div id="loader" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:5000; display:none; align-items:center; justify-content:center;">جاري المعالجة...</div>
 <div id="toastContainer"></div>
 
 <div id="masterDeleteModal" class="modal">
     <div class="modal-content">
         <h3 style="color:var(--danger)">حذف الأرشيف كاملاً؟</h3>
         <p>اكتب كلمة <b>حذف</b> للتأكيد:</p>
-        <input type="text" id="masterDeleteInput" style="width:100%; padding:10px; margin-bottom:10px">
-        <button class="btn" style="background:var(--danger); width:100%" onclick="confirmMasterDelete()">تأكيد الحذف</button>
-        <button onclick="document.getElementById('masterDeleteModal').style.display='none'" style="width:100%; margin-top:5px; border:none; background:none; cursor:pointer">إلغاء</button>
+        <input type="text" id="masterDeleteInput">
+        <button class="btn" style="background:var(--danger); width:100%; margin-top:10px" onclick="confirmMasterDelete()">تأكيد الحذف</button>
+        <button class="btn" style="background:#ccc; width:100%; margin-top:5px; color:#333" onclick="document.getElementById('masterDeleteModal').style.display='none'">إلغاء</button>
+    </div>
+</div>
+
+<div id="deleteModal" class="modal">
+    <div class="modal-content">
+        <h3>تأكيد الحذف</h3>
+        <p>هل أنت متأكد من حذف هذا الطالب؟</p>
+        <button class="btn" style="background:var(--danger); width:100%" onclick="confirmDel()">حذف</button>
+        <button class="btn" style="background:#ccc; width:100%; margin-top:5px; color:#333" onclick="document.getElementById('deleteModal').style.display='none'">إلغاء</button>
     </div>
 </div>
 
@@ -416,32 +341,32 @@
     <div class="modal-content">
         <h3>بيانات الطالب</h3>
         <input type="hidden" id="editId">
-        <input type="text" id="fName" placeholder="الاسم الرباعي" style="width:100%; padding:10px; margin-bottom:10px">
-        <input type="text" id="surname" placeholder="اللقب" style="width:100%; padding:10px; margin-bottom:10px">
-        <input type="text" id="qNum" placeholder="القيد" style="width:100%; padding:10px; margin-bottom:10px">
-        <input type="number" id="pNum" placeholder="الصفحة" style="width:100%; padding:10px; margin-bottom:10px">
-        <textarea id="note" placeholder="ملاحظات..." style="width:100%; padding:10px; margin-bottom:10px"></textarea>
-        <button id="saveBtn" class="btn" style="background:var(--main); width:100%" onclick="saveData()">حفظ</button>
-        <button onclick="closeAddModal()" style="width:100%; margin-top:5px; border:none; background:none; cursor:pointer">إلغاء</button>
+        <input type="text" id="fName" placeholder="الاسم الرباعي">
+        <input type="text" id="surname" placeholder="اللقب">
+        <input type="text" id="qNum" placeholder="القيد">
+        <input type="number" id="pNum" placeholder="الصفحة">
+        <textarea id="note" placeholder="ملاحظات..." rows="3"></textarea>
+        <button id="saveBtn" class="btn" style="background:var(--main); width:100%; margin-top:10px" onclick="saveData()">حفظ</button>
+        <button class="btn" style="background:#ccc; width:100%; margin-top:5px; color:#333" onclick="closeAddModal()">إلغاء</button>
     </div>
 </div>
 
 <div id="printModal" class="modal">
     <div class="modal-content">
         <h3>خيارات الطباعة</h3>
-        <button class="btn" style="background:var(--accent); width:100%; margin-bottom:10px" onclick="printAllAlpha()">السجل العام</button>
-        <select id="qaidSelect" style="width:100%; padding:10px; margin-bottom:10px"></select>
-        <button class="btn" style="background:var(--blue); width:100%" onclick="printSelectedQaid()">طباعة القيد</button>
-        <button onclick="document.getElementById('printModal').style.display='none'" style="width:100%; margin-top:5px; border:none; background:none; cursor:pointer">إلغاء</button>
+        <button class="btn" style="background:var(--accent); width:100%; margin-bottom:10px" onclick="printAllAlpha()">السجل العام (أبجدي)</button>
+        <select id="qaidSelect"></select>
+        <button class="btn" style="background:var(--blue); width:100%; margin-top:10px" onclick="printSelectedQaid()">طباعة هذا القيد</button>
+        <button class="btn" style="background:#ccc; width:100%; margin-top:10px; color:#333" onclick="document.getElementById('printModal').style.display='none'">إلغاء</button>
     </div>
 </div>
 
 <div id="loginPage" style="height: 100vh; flex-direction: column; align-items: center; justify-content: center; display: none;">
-    <div class="card" style="width: 300px; text-align: center;">
-        <h2 style="color: var(--blue);">دخول النظام</h2>
-        <input type="email" id="loginEmail" placeholder="البريد" style="width:100%; padding:10px; margin-bottom:10px">
-        <input type="password" id="loginPass" placeholder="كلمة المرور" style="width:100%; padding:10px; margin-bottom:10px">
-        <button class="btn" style="background:var(--main); width:100%" onclick="login()">دخول</button>
+    <div class="card" style="width: 300px; text-align: center; padding: 20px">
+        <h2 style="color: var(--blue)">دخول النظام</h2>
+        <input type="email" id="loginEmail" placeholder="البريد">
+        <input type="password" id="loginPass" placeholder="كلمة المرور">
+        <button class="btn" style="background:var(--main); width:100%; margin-top:15px" onclick="login()">دخول</button>
     </div>
 </div>
 
@@ -453,49 +378,48 @@
     </div>
 
     <div class="no-print">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px">
-            <h2>نظام الأرشيف</h2>
-            <button onclick="logout()" style="color:var(--danger); border:none; background:none; cursor:pointer">خروج</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
+            <h3>الأرشيف الذكي</h3>
+            <button onclick="logout()" style="color:var(--danger); background:none; border:none; cursor:pointer">خروج</button>
         </div>
 
         <div class="stats-bar">
-            <div class="stat-item"><span class="stat-val" id="statTotal">0</span><span class="stat-label">طلاب</span></div>
-            <div class="stat-item"><span class="stat-val" id="statToday" style="color:var(--success)">0</span><span class="stat-label">اليوم</span></div>
-            <div class="stat-item"><span class="stat-val" id="statQaids" style="color:var(--accent)">0</span><span class="stat-label">قيود</span></div>
+            <div class="stat-item"><span id="statTotal" style="font-weight:bold; color:var(--blue)">0</span><br><small>طالب</small></div>
+            <div class="stat-item"><span id="statToday" style="font-weight:bold; color:var(--success)">0</span><br><small>اليوم</small></div>
+            <div class="stat-item"><span id="statQaids" style="font-weight:bold; color:var(--accent)">0</span><br><small>قيود</small></div>
         </div>
 
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px">
             <button class="btn" style="background:var(--main)" onclick="openAddModal()">إضافة طالب</button>
             <button class="btn" style="background:var(--danger)" onclick="openMasterDelete()">مسح السجل</button>
         </div>
 
-        <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap">
-            <button class="btn" style="background:var(--accent)" onclick="document.getElementById('fileInput').click()">استيراد</button>
-            <button class="btn" style="background:var(--success)" onclick="downloadExcelTemplate()">نموذج</button>
-            <button class="btn" style="background:var(--warning)" onclick="exportExcel()">تصدير</button>
-            <button class="btn" style="background:var(--blue)" onclick="showPrintOptions()">طباعة</button>
+        <div style="display:flex; gap:8px; margin-bottom:15px; flex-wrap:wrap">
+            <button class="btn" style="background:var(--accent); font-size:12px" onclick="document.getElementById('fileInput').click()">استيراد Excel</button>
+            <button class="btn" style="background:var(--success); font-size:12px" onclick="downloadExcelTemplate()">نموذج</button>
+            <button class="btn" style="background:var(--warning); font-size:12px" onclick="exportExcel()">تصدير Excel</button>
+            <button class="btn" style="background:var(--blue); font-size:12px" onclick="showPrintOptions()">طباعة</button>
         </div>
         
         <input type="file" id="fileInput" hidden onchange="importExcel(event)" accept=".xlsx, .xls">
 
-        <div class="advanced-filters">
+        <div style="display:flex; gap:10px; margin-bottom:10px">
             <select id="filterQaid" onchange="applyFilters()"><option value="">جميع القيود</option></select>
             <select id="sortSelect" onchange="applyFilters()">
                 <option value="newest">الأحدث</option>
                 <option value="alpha">أبجدي</option>
+                <option value="qaid">حسب القيد</option>
             </select>
         </div>
 
-        <div class="search-wrapper">
-            <input type="text" id="searchInput" placeholder="بحث..." onkeyup="applyFilters()">
-        </div>
+        <input type="text" id="searchInput" placeholder="بحث باسم الطالب أو القيد..." onkeyup="applyFilters()">
 
-        <div id="studentsList"></div>
+        <div id="studentsList" style="margin-top:15px"></div>
     </div>
 </div>
 
 <div class="theme-toggle no-print" onclick="toggleDarkMode()">
-    <i class="fas fa-moon"></i>
+    <i class="fas fa-adjust"></i>
 </div>
 
 </body>
