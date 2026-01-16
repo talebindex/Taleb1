@@ -33,7 +33,7 @@
         window.activeLetter = null;
         let unsavedChanges = false;
 
-        // --- التعديل: متغيرات التحكم في العرض التدريجي ---
+        // متغيرات العرض التدريجي
         let displayLimit = 50; 
         let filteredDataGlobal = [];
 
@@ -113,13 +113,11 @@
                 filtered.sort((a, b) => (a.surname || '').localeCompare(b.surname || '', 'ar'));
             }
 
-            // --- التعديل: إعادة تعيين العرض التدريجي عند كل فلترة ---
             displayLimit = 50; 
             filteredDataGlobal = filtered;
             window.render(filtered.slice(0, displayLimit));
         };
 
-        // --- التعديل: دالة تحميل المزيد ---
         window.loadMore = () => {
             displayLimit += 50;
             window.render(filteredDataGlobal.slice(0, displayLimit));
@@ -155,7 +153,6 @@
             );
         }
 
-        // --- التعديل: استيراد البيانات بنظام الـ Chunks ---
         window.importExcel = (event) => {
             const file = event.target.files[0];
             if(!file) return;
@@ -312,16 +309,16 @@
                 const rightColumnData = pageData.slice(0, rowsPerColumn);
                 const leftColumnData = pageData.slice(rowsPerColumn, totalRowsPerPage);
 
+                // --- تعديل: إزالة عمود اللقب وتكبير حجم الخط إلى 14 ---
                 const createTableHTML = (columnData, startSequence) => {
                     let tableHTML = `
                         <table>
                             <thead>
                                 <tr>
-                                    <th style="width:30px">ت</th>
+                                    <th style="width:35px">ت</th>
                                     <th>الاسم الرباعي</th>
-                                    <th style="width:80px">اللقب</th>
-                                    <th style="width:60px">القيد</th>
-                                    <th style="width:50px">ص</th>
+                                    <th style="width:70px">القيد</th>
+                                    <th style="width:55px">ص</th>
                                 </tr>
                             </thead>
                             <tbody>`;
@@ -332,14 +329,13 @@
                         if (student) {
                             tableHTML += `
                                 <tr>
-                                    <td>${sequence}</td>
-                                    <td style="text-align:right; padding-right:5px;">${student.name || ''}</td>
-                                    <td>${student.surname || ''}</td>
-                                    <td>${student.qaid || ''}</td>
-                                    <td>${student.page || ''}</td>
+                                    <td style="font-size:14pt">${sequence}</td>
+                                    <td style="text-align:right; padding-right:8px; font-size:14pt; font-weight:bold;">${student.name || ''}</td>
+                                    <td style="font-size:14pt">${student.qaid || ''}</td>
+                                    <td style="font-size:14pt">${student.page || ''}</td>
                                 </tr>`;
                         } else {
-                            tableHTML += `<tr><td>${sequence}</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
+                            tableHTML += `<tr><td>${sequence}</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
                         }
                     }
                     tableHTML += `</tbody></table>`;
@@ -464,15 +460,12 @@
             unsavedChanges = true;
         };
 
-        // --- التعديل: دالة العرض مع زر التحميل المزيد ---
         window.render = (data) => {
             const list = document.getElementById('studentsList');
             
-            // إذا كان العرض يبدأ من البداية، نمسح القائمة
             if (displayLimit === 50) {
                 list.innerHTML = '';
             } else {
-                // نمسح زر "تحميل المزيد" القديم فقط
                 const oldBtn = document.getElementById('loadMoreBtn');
                 if (oldBtn) oldBtn.remove();
             }
@@ -519,7 +512,6 @@
 
             list.insertAdjacentHTML('beforeend', html);
 
-            // إظهار زر تحميل المزيد إذا كان هناك بيانات متبقية
             if (filteredDataGlobal.length > displayLimit) {
                 const remaining = filteredDataGlobal.length - displayLimit;
                 const loadMoreBtn = `
@@ -647,7 +639,6 @@
             document.addEventListener('click', closeDropdown);
         };
 
-        // فحص الثيم المفضل عند التحميل
         if(localStorage.getItem('theme') === 'dark') {
             document.body.classList.add('dark-mode');
         }
@@ -1091,16 +1082,18 @@
 
         @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 
-        /* تسيق الطباعة */
+        /* تسيق الطباعة المحدث */
         @media print {
             .no-print { display: none !important; }
             .print-area { display: block !important; padding: 0; margin: 0; }
             .print-page { page-break-after: always; padding: 10mm; height: 277mm; position: relative; }
             .print-grid { display: flex; gap: 10mm; justify-content: space-between; height: 100%; }
             .print-col { width: 48%; }
-            table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-            th, td { border: 1px solid #000; padding: 4px 2px; font-size: 10.5px; height: 6.5mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
-            th { background-color: #f0f0f0 !important; -webkit-print-color-adjust: exact; }
+            table { width: 100%; border-collapse: collapse; table-layout: fixed; border: 1.5px solid #000; }
+            th, td { border: 1px solid #000; padding: 4px 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+            th { background-color: #f0f0f0 !important; -webkit-print-color-adjust: exact; font-size: 12pt; }
+            /* تكبير الخط للاسماء والارقام حسب الطلب */
+            td { font-size: 14pt !important; } 
             .print-title-area { text-align: center; border-bottom: 2px solid #000; margin-bottom: 5px; padding-bottom: 5px; }
         }
 
@@ -1329,7 +1322,6 @@
         </div>
 
         <div class="search-wrapper">
-            <i class="fas fa-search"></i>
             <input type="text" id="searchInput" placeholder="ابحث عن اسم، لقب، أو رقم قيد..." onkeyup="applyFilters()">
         </div>
 
