@@ -3,1215 +3,1797 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>فهرس القيود الذكي | النظام المتكامل</title>
+    <title>قيودكوم - نظام إدارة القيود الطلابية</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, writeBatch, getDocs, getCountFromServer } 
+        from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } 
+        from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC-RyeNVI6aNmWSJIYhQCG_4J_RQDAovds",
+            authDomain: "student-archive-f8689.firebaseapp.com",
+            projectId: "student-archive-f8689",
+            storageBucket: "student-archive-f8689.appspot.com",
+            messagingSenderId: "815104091476",
+            appId: "1:815104091476:web:8e725238d8ebabaf26d4c1"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const studentsCol = collection(db, "students");
+
+        let deleteTargetId = null;
+        window.allStudentsData = [];
+        window.filteredStudentsData = [];
+        window.activeLetter = null;
+        let unsavedChanges = false;
+        
+        // متغيرات التقسيم إلى صفحات
+        window.currentPage = 1;
+        window.pageSize = 100;
+        window.totalPages = 1;
+
+        // نظام الإشعارات الملون وغير الشفاف
+        window.showToast = (msg, type = 'success') => {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-trash-alt'}"></i> ${msg}`;
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            document.getElementById('loginPage').style.display = user ? 'none' : 'flex';
+            document.getElementById('appContent').style.display = user ? 'block' : 'none';
+            if(user) { 
+                loadData(); 
+                updateTotalCount();
+            }
+        });
+
+        // دالة للحصول على العدد الإجمالي للطلاب
+        async function updateTotalCount() {
+            try {
+                const snapshot = await getCountFromServer(studentsCol);
+                const totalCount = snapshot.data().count;
+                document.getElementById('statTotal').innerText = totalCount;
+            } catch (error) {
+                console.error("Error getting total count:", error);
+            }
+        }
+
+        function loadData() {
+            onSnapshot(query(studentsCol, orderBy("timestamp", "desc")), (snapshot) => {
+                window.allStudentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                updateQuickStats();
+                updateQaidFilter();
+                updateMotherFilter();
+                window.applyFilters(); 
+            });
+        }
+
+        function updateQuickStats() {
+            const startOfDay = new Date().setHours(0,0,0,0);
+            const todayCount = window.allStudentsData.filter(s => s.timestamp >= startOfDay).length;
+            document.getElementById('statToday').innerText = todayCount;
+            document.getElementById('statQaids').innerText = new Set(window.allStudentsData.map(s => s.qaid)).size;
+        }
+
+        function updateQaidFilter() {
+            const qaidSelect = document.getElementById('filterQaid');
+            const uniqueQaids = [...new Set(window.allStudentsData.map(s => s.qaid))].sort();
+            qaidSelect.innerHTML = '<option value="">جميع القيود</option>';
+            uniqueQaids.forEach(q => {
+                qaidSelect.innerHTML += `<option value="${q}">قيد ${q}</option>`;
+            });
+        }
+
+        function updateMotherFilter() {
+            const motherSelect = document.getElementById('filterMother');
+            const uniqueMothers = [...new Set(window.allStudentsData.map(s => s.motherName).filter(name => name && name.trim() !== ''))].sort();
+            motherSelect.innerHTML = '<option value="">جميع أسماء الأمهات</option>';
+            uniqueMothers.forEach(m => {
+                motherSelect.innerHTML += `<option value="${m}">${m}</option>`;
+            });
+        }
+
+        window.applyFilters = () => {
+            const term = document.getElementById('searchInput').value.toLowerCase();
+            const sortBy = document.getElementById('sortSelect').value;
+            const filterQaid = document.getElementById('filterQaid').value;
+            const filterPage = document.getElementById('filterPage').value;
+            const filterMother = document.getElementById('filterMother').value;
+            
+            let filtered = window.allStudentsData.filter(s => {
+                // البحث في الاسم واللقب والقيد واسم الأم
+                const matchSearch = 
+                    (s.name || '').toLowerCase().includes(term) || 
+                    (s.surname || '').toLowerCase().includes(term) ||
+                    (s.motherName || '').toLowerCase().includes(term) ||
+                    String(s.qaid).includes(term);
+                const matchQaid = filterQaid ? String(s.qaid) === filterQaid : true;
+                const matchPage = filterPage ? String(s.page).includes(filterPage) : true;
+                const matchMother = filterMother ? (s.motherName || '').toLowerCase().includes(filterMother.toLowerCase()) : true;
+                return matchSearch && matchQaid && matchPage && matchMother;
+            });
+            
+            if (sortBy === "alpha") filtered.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+            else if (sortBy === "qaid") filtered.sort((a, b) => String(a.qaid).localeCompare(String(b.qaid)));
+            else if (sortBy === "page") filtered.sort((a, b) => String(a.page).localeCompare(String(b.page)));
+            else if (sortBy === "surname") filtered.sort((a, b) => (a.surname || '').localeCompare(b.surname || '', 'ar'));
+            else if (sortBy === "mother") filtered.sort((a, b) => (a.motherName || '').localeCompare(b.motherName || '', 'ar'));
+            
+            window.filteredStudentsData = filtered;
+            window.totalPages = Math.ceil(filtered.length / window.pageSize);
+            window.currentPage = 1;
+            
+            window.renderPage();
+            updatePaginationControls();
+        };
+
+        window.renderPage = () => {
+            const startIndex = (window.currentPage - 1) * window.pageSize;
+            const endIndex = startIndex + window.pageSize;
+            const pageData = window.filteredStudentsData.slice(startIndex, endIndex);
+            
+            window.render(pageData);
+            updatePaginationInfo();
+        };
+
+        function updatePaginationInfo() {
+            const totalStudents = window.filteredStudentsData.length;
+            const startIndex = (window.currentPage - 1) * window.pageSize + 1;
+            const endIndex = Math.min(window.currentPage * window.pageSize, totalStudents);
+            
+            document.getElementById('pageInfo').innerText = 
+                `عرض ${startIndex}-${endIndex} من ${totalStudents} طالب`;
+        }
+
+        function updatePaginationControls() {
+            const prevBtn = document.getElementById('prevPage');
+            const nextBtn = document.getElementById('nextPage');
+            
+            prevBtn.disabled = window.currentPage <= 1;
+            nextBtn.disabled = window.currentPage >= window.totalPages;
+            
+            document.getElementById('pageNumber').innerText = window.currentPage;
+            document.getElementById('totalPages').innerText = window.totalPages;
+        }
+
+        window.goToPage = (page) => {
+            if (page < 1 || page > window.totalPages) return;
+            window.currentPage = page;
+            window.renderPage();
+            updatePaginationControls();
+            document.getElementById('studentsList').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+
+        window.prevPage = () => window.goToPage(window.currentPage - 1);
+        window.nextPage = () => window.goToPage(window.currentPage + 1);
+
+        window.clearFilters = () => {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('filterQaid').value = '';
+            document.getElementById('filterPage').value = '';
+            document.getElementById('filterMother').value = '';
+            document.getElementById('sortSelect').value = 'newest';
+            window.applyFilters();
+            showToast("تم مسح جميع الفلاتر");
+        };
+
+        window.downloadExcelTemplate = () => {
+            const templateData = [
+                ["الاسم", "اللقب", "اسم الأم", "القيد", "الصفحة", "ملاحظات"],
+                ["أحمد محمد علي", "الكبيسي", "سعاد", "12345", "25", "-"],
+                ["سارة خالد حسن", "العبيدي", "منى", "12346", "26", "طالبة متفوقة"],
+                ["علي محمود سعيد", "الجبوري", "ليلى", "12347", "27", "-"],
+                ["لمياء فارس عبدالله", "التميمي", "رحمة", "12348", "28", "-"],
+                ["محمد خالد إبراهيم", "الراوي", "فاطمة", "12349", "29", "-"],
+                ["فاطمة عماد حسين", "الخالدي", "زينب", "12350", "30", "-"]
+            ];
+            
+            const ws = XLSX.utils.aoa_to_sheet(templateData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
+            XLSX.writeFile(wb, "نموذج_اسماء_الطلاب.xlsx");
+            showToast("تم تحميل النموذج بنجاح");
+        };
+
+        function isDuplicateQaidPage(qaid, page, existingStudents, excludeId = null) {
+            return existingStudents.some(student => 
+                (excludeId ? student.id !== excludeId : true) &&
+                String(student.qaid).trim() === String(qaid).trim() &&
+                String(student.page).trim() === String(page).trim()
+            );
+        }
+
+        window.importExcel = (event) => {
+            const file = event.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            document.getElementById('loader').style.display = 'flex';
+            reader.onload = async (e) => {
+                try {
+                    const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                    const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                    
+                    const existingStudents = window.allStudentsData;
+                    const batch = writeBatch(db);
+                    let added = 0;
+                    let skipped = 0;
+                    
+                    json.forEach((row) => {
+                        const rName = String(row.name || row["الاسم"] || "").trim();
+                        const rQaid = String(row.qaid || row["القيد"] || "").trim();
+                        const rPage = String(row.page || row["الصفحة"] || "").trim();
+                        
+                        if (rName === "" || rQaid === "" || rPage === "") {
+                            skipped++;
+                            return;
+                        }
+                        
+                        if (isDuplicateQaidPage(rQaid, rPage, existingStudents)) {
+                            skipped++;
+                            return;
+                        }
+                        
+                        const newDoc = doc(collection(db, "students"));
+                        batch.set(newDoc, {
+                            name: rName, 
+                            surname: String(row.surname || row["اللقب"] || "").trim(),
+                            motherName: String(row.motherName || row["اسم الأم"] || "").trim(),
+                            qaid: rQaid,
+                            page: rPage,
+                            note: String(row.note || row["ملاحظات"] || "").trim(),
+                            timestamp: Date.now()
+                        });
+                        added++;
+                    });
+                    
+                    if (added > 0) {
+                        await batch.commit();
+                        showToast(`تم استيراد ${added} طالب (تم تخطي ${skipped})`);
+                        updateTotalCount();
+                    } else {
+                        showToast("لم يتم استيراد أي بيانات جديدة", "error");
+                    }
+                    
+                } catch(err) { showToast("خطأ في الملف", "error"); }
+                document.getElementById('loader').style.display = 'none';
+            };
+            reader.readAsArrayBuffer(file);
+        };
+
+        window.exportExcel = () => {
+            const ws = XLSX.utils.json_to_sheet(window.allStudentsData.map(({id, timestamp, ...rest}) => rest));
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
+            XLSX.writeFile(wb, "قيودكوم.xlsx");
+        };
+
+        window.openMasterDelete = () => {
+            document.getElementById('masterDeleteInput').value = '';
+            document.getElementById('masterDeleteModal').style.display = 'flex';
+        };
+
+        window.confirmMasterDelete = async () => {
+            if(document.getElementById('masterDeleteInput').value !== 'حذف') return showToast("اكتب كلمة حذف", "error");
+            document.getElementById('loader').style.display = 'flex';
+            try {
+                const snapshot = await getDocs(studentsCol);
+                const batch = writeBatch(db);
+                snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+                await batch.commit();
+                showToast("تم مسح السجل بنجاح", "error");
+                document.getElementById('masterDeleteModal').style.display = 'none';
+                updateTotalCount();
+            } catch(e) { showToast("خطأ في المسح", "error"); }
+            document.getElementById('loader').style.display = 'none';
+        };
+
+        window.showPrintOptions = () => {
+            const qSelect = document.getElementById('qaidSelect');
+            qSelect.innerHTML = '<option value="">-- اختر القيد --</option>';
+            [...new Set(window.allStudentsData.map(s => s.qaid))].sort().forEach(q => {
+                qSelect.innerHTML += `<option value="${q}">قيد رقم ${q}</option>`;
+            });
+            document.getElementById('printModal').style.display = 'flex';
+        };
+
+        window.printSelectedQaid = () => {
+            const q = document.getElementById('qaidSelect').value;
+            if(!q) return;
+            const data = window.allStudentsData.filter(s => String(s.qaid) === String(q)).sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+            executePrint(data, `سجل القيد رقم (${q})`);
+        };
+
+        window.printAllAlpha = () => {
+            executePrint([...window.allStudentsData].sort((a,b)=>a.name.localeCompare(b.name,'ar')), "السجل العام");
+        };
+
+        function executePrint(data, title) {
+            document.getElementById('printTitle').innerText = title;
+            const container = document.getElementById('printTablesContainer');
+            container.innerHTML = '';
+            
+            const rowsPerColumn = 30;
+            const totalRowsPerPage = 60;
+            
+            for (let pageNum = 0; pageNum < Math.ceil(data.length / totalRowsPerPage); pageNum++) {
+                const pageStartIndex = pageNum * totalRowsPerPage;
+                const pageData = data.slice(pageStartIndex, pageStartIndex + totalRowsPerPage);
+                
+                const pageDiv = document.createElement('div');
+                pageDiv.className = 'print-page';
+                
+                const rightData = pageData.slice(0, rowsPerColumn);
+                const leftData = pageData.slice(rowsPerColumn, totalRowsPerPage);
+
+                const createTable = (colData, startSeq) => {
+                    let html = '<table><thead><tr><th>ت</th><th>الاسم</th><th>اللقب</th><th>اسم الأم</th><th>القيد</th><th>الصفحة</th></tr></thead><tbody>';
+                    for (let i = 0; i < rowsPerColumn; i++) {
+                        const student = colData[i];
+                        const currentSeq = startSeq + i;
+                        if (student) {
+                            html += `<tr>
+                                <td>${currentSeq}</td>
+                                <td style="text-align:right; padding-right:5px; font-weight: bold;">${student.name || ''}</td>
+                                <td>${student.surname || ''}</td>
+                                <td>${student.motherName || ''}</td>
+                                <td>${student.qaid || ''}</td>
+                                <td>${student.page || ''}</td>
+                            </tr>`;
+                        } else {
+                            html += `<tr><td>${currentSeq}</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
+                        }
+                    }
+                    html += '</tbody></table>';
+                    return html;
+                };
+
+                pageDiv.innerHTML = `
+                    <div class="print-grid">
+                        <div class="print-col print-col-right">${createTable(rightData, pageStartIndex + 1)}</div>
+                        <div class="print-col print-col-left">${createTable(leftData, pageStartIndex + rowsPerColumn + 1)}</div>
+                    </div>
+                `;
+                container.appendChild(pageDiv);
+            }
+            
+            document.getElementById('printDate').innerText = "تاريخ الاستخراج: " + new Date().toLocaleDateString('ar-EG');
+            document.getElementById('printModal').style.display = 'none';
+            setTimeout(() => { window.print(); }, 500);
+        }
+
+        window.extractNameFromWhatsApp = () => {
+            const input = document.getElementById('whatsappInput').value.trim();
+            if (!input) {
+                showToast("الرجاء لصق النص من الواتساب", "error");
+                return;
+            }
+            
+            // تقسيم النص إلى كلمات
+            const words = input.split(' ').filter(word => word.trim() !== '');
+            
+            if (words.length < 2) {
+                showToast("النص غير كافي", "error");
+                return;
+            }
+            
+            let name = '';
+            let surname = '';
+            let motherName = '';
+            
+            // اللقب هو آخر كلمة
+            surname = words[words.length - 1];
+            
+            // اسم الأم هي الكلمة قبل الأخيرة (إذا كانت النص طويلاً)
+            if (words.length >= 2) {
+                motherName = words[words.length - 2];
+            }
+            
+            // الاسم هو كل الكلمات ماعدا الأخيرين (اللقب واسم الأم)
+            name = words.slice(0, words.length - 2).join(' ');
+            
+            document.getElementById('fName').value = name;
+            document.getElementById('surname').value = surname;
+            document.getElementById('motherName').value = motherName;
+            
+            // إغلاق نموذج الواتساب
+            document.getElementById('whatsappModal').style.display = 'none';
+            showToast("تم استخراج البيانات بنجاح");
+        };
+
+        window.saveData = async () => {
+            const id = document.getElementById('editId').value;
+            const name = document.getElementById('fName').value.trim();
+            const qaid = document.getElementById('qNum').value.trim();
+            const page = document.getElementById('pNum').value.trim();
+            
+            if(!name || !qaid || !page) return showToast("أكمل البيانات", "error");
+            
+            if (isDuplicateQaidPage(qaid, page, window.allStudentsData, id)) {
+                showToast("هذا القيد والصفحة مسجلين مسبقاً لطالب آخر", "error");
+                return;
+            }
+            
+            try {
+                const data = { 
+                    name, 
+                    surname: document.getElementById('surname').value, 
+                    motherName: document.getElementById('motherName').value,
+                    qaid, 
+                    page, 
+                    note: document.getElementById('note').value, 
+                    timestamp: Date.now() 
+                };
+                
+                if(id) {
+                    await updateDoc(doc(db, "students", id), data);
+                } else {
+                    await addDoc(studentsCol, data);
+                }
+                
+                showToast("تم الحفظ بنجاح"); 
+                window.closeAddModal(); 
+                window.resetForm();
+                unsavedChanges = false;
+                updateTotalCount();
+            } catch(e) { 
+                showToast("خطأ شبكة", "error"); 
+            }
+        };
+
+        window.del = (id) => { deleteTargetId = id; document.getElementById('deleteModal').style.display = 'flex'; };
+        window.confirmDel = async () => { if(deleteTargetId) { await deleteDoc(doc(db, "students", deleteTargetId)); showToast("تم الحذف", "error"); document.getElementById('deleteModal').style.display = 'none'; updateTotalCount(); } };
+        
+        window.copyStudentData = (id) => {
+            const student = window.allStudentsData.find(s => s.id === id);
+            const text = `الاسم: ${student.name}\nاللقب: ${student.surname || ''}\nاسم الأم: ${student.motherName || ''}\nالقيد: ${student.qaid}\nالصفحة: ${student.page}`;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast("تم نسخ بيانات الطالب");
+            });
+        };
+
+        window.duplicateLastStudent = () => {
+            if (window.allStudentsData.length > 0) {
+                const lastStudent = window.allStudentsData[0];
+                document.getElementById('fName').value = lastStudent.name;
+                document.getElementById('surname').value = lastStudent.surname;
+                document.getElementById('motherName').value = lastStudent.motherName;
+                document.getElementById('qNum').value = lastStudent.qaid;
+                document.getElementById('pNum').value = lastStudent.page;
+                document.getElementById('note').value = lastStudent.note;
+                showToast("تم نسخ بيانات آخر طالب");
+                unsavedChanges = true;
+            } else {
+                showToast("لا توجد بيانات للنسخ", "error");
+            }
+        };
+
+        window.generateRandomData = () => {
+            const names = ["أحمد محمد علي", "سارة خالد حسن", "علي محمود سعيد", "لمياء فارس عبدالله", "محمد خالد إبراهيم"];
+            const surnames = ["الكبيسي", "العبيدي", "الجبوري", "التميمي", "الراوي"];
+            const mothers = ["سعاد", "منى", "ليلى", "رحمة", "فاطمة", "زينب"];
+            
+            const randomName = names[Math.floor(Math.random() * names.length)];
+            const randomSurname = surnames[Math.floor(Math.random() * surnames.length)];
+            const randomMother = mothers[Math.floor(Math.random() * mothers.length)];
+            const randomQaid = Math.floor(Math.random() * 90000) + 10000;
+            const randomPage = Math.floor(Math.random() * 50) + 1;
+            
+            document.getElementById('fName').value = randomName;
+            document.getElementById('surname').value = randomSurname;
+            document.getElementById('motherName').value = randomMother;
+            document.getElementById('qNum').value = randomQaid;
+            document.getElementById('pNum').value = randomPage;
+            document.getElementById('note').value = "بيانات تجريبية";
+            
+            showToast("تم تعبئة بيانات تجريبية");
+            unsavedChanges = true;
+        };
+
+        window.render = (data) => {
+            const list = document.getElementById('studentsList');
+            list.innerHTML = ''; 
+            data.forEach((s, index) => {
+                const globalIndex = (window.currentPage - 1) * window.pageSize + index + 1;
+                
+                // إنشاء البادج الخاص باسم الأم إذا كان موجوداً
+                const motherBadge = s.motherName ? 
+                    `<span class="highlight-badge mother-badge" title="اسم الأم">
+                        <i class="fas fa-female"></i> ${s.motherName}
+                    </span>` : '';
+                
+                list.innerHTML += `
+                    <div class="student-item card">
+                        <div class="student-number">${globalIndex}</div>
+                        <div class="card-body-wrapper">
+                            <div class="user-icon" title="آخر رقمين من القيد: ${String(s.qaid).slice(-2)}">
+                                <i class="fas fa-user-graduate"></i>
+                                <small class="qaid-end">${String(s.qaid).slice(-2)}</small>
+                            </div>
+                            <div class="student-details">
+                                <p class="student-name">${s.name} <span class="surname-badge">${s.surname || ''}</span></p>
+                                <div class="student-meta">
+                                    ${motherBadge}
+                                    <span class="highlight-badge qaid-badge" title="رقم القيد">
+                                        <i class="fas fa-hashtag"></i> ${s.qaid}
+                                    </span>
+                                    <span class="highlight-badge page-badge" title="رقم الصفحة">
+                                        <i class="fas fa-file-alt"></i> ${s.page}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="item-actions">
+                            <button onclick="copyStudentData('${s.id}')" class="copy-btn-small" title="نسخ البيانات">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                            <button onclick="edit('${s.id}')" class="edit-btn-small" title="تعديل">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="del('${s.id}')" class="del-btn-small" title="حذف">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>`;
+            });
+            
+            if (data.length < 5) {
+                for (let i = data.length; i < 5; i++) {
+                    list.innerHTML += `<div class="student-item card empty-card" style="opacity: 0.3; min-height: 70px;"></div>`;
+                }
+            }
+        };
+
+        window.edit = (id) => {
+            const s = window.allStudentsData.find(x => x.id === id);
+            document.getElementById('editId').value = s.id;
+            document.getElementById('fName').value = s.name;
+            document.getElementById('surname').value = s.surname;
+            document.getElementById('motherName').value = s.motherName;
+            document.getElementById('qNum').value = s.qaid;
+            document.getElementById('pNum').value = s.page;
+            document.getElementById('note').value = s.note;
+            document.getElementById('saveBtn').innerText = "تحديث";
+            document.getElementById('entryModal').style.display = 'flex';
+            unsavedChanges = false;
+            setupInputListeners();
+        };
+
+        function setupInputListeners() {
+            document.querySelectorAll('#entryModal input, #entryModal textarea').forEach(input => {
+                input.addEventListener('input', () => {
+                    unsavedChanges = true;
+                });
+            });
+        }
+
+        window.openAddModal = () => { 
+            window.resetForm(); 
+            document.getElementById('entryModal').style.display = 'flex'; 
+            unsavedChanges = false;
+            setupInputListeners();
+        };
+        
+        window.closeAddModal = () => {
+            document.getElementById('entryModal').style.display = 'none';
+            unsavedChanges = false;
+        };
+        
+        window.resetForm = () => { 
+            document.getElementById('editId').value = ''; 
+            document.querySelectorAll('input, textarea').forEach(i => i.value = ''); 
+            document.getElementById('saveBtn').innerText = "حفظ"; 
+            const existingAlert = document.getElementById('duplicateStudentAlert');
+            if(existingAlert) existingAlert.remove();
+            unsavedChanges = false;
+        };
+        
+        window.login = async () => { 
+            try { 
+                await signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value, document.getElementById('loginPass').value); 
+            } catch(e) { 
+                showToast("بيانات خاطئة", "error"); 
+            } 
+        };
+        
+        window.logout = () => signOut(auth);
+        window.toggleDarkMode = () => document.body.classList.toggle('dark-mode');
+        
+        window.checkDuplicateStudent = () => {
+            const nameInput = document.getElementById('fName');
+            const nameValue = nameInput.value.trim();
+            
+            const existingAlert = document.getElementById('duplicateStudentAlert');
+            if(existingAlert) existingAlert.remove();
+            
+            if(nameValue) {
+                const existingStudent = window.allStudentsData.find(student => 
+                    student.name.trim().toLowerCase() === nameValue.toLowerCase()
+                );
+                
+                if(existingStudent) {
+                    const alertDiv = document.createElement('div');
+                    alertDiv.id = 'duplicateStudentAlert';
+                    alertDiv.className = 'duplicate-alert';
+                    alertDiv.style.cssText = `
+                        background: #fef3c7;
+                        border: 1px solid #f59e0b;
+                        color: #92400e;
+                        padding: 8px 12px;
+                        border-radius: 6px;
+                        margin-top: 8px;
+                        font-size: 0.85rem;
+                        text-align: center;
+                        animation: fadeIn 0.3s ease-in;
+                    `;
+                    
+                    alertDiv.innerHTML = `
+                        <i class="fas fa-exclamation-triangle" style="margin-left: 5px;"></i>
+                        هذا الطالب مسجل مسبقاً: 
+                        <br>
+                        <strong>رقم القيد: ${existingStudent.qaid}</strong> | 
+                        <strong>رقم الصفحة: ${existingStudent.page}</strong>
+                        <br>
+                        <small style="color: #666; font-size: 0.75rem;">
+                            يمكنك إضافة طالب جديد بنفس الاسم ولكن بقيد أو صفحة مختلفين
+                        </small>
+                    `;
+                    
+                    nameInput.parentNode.insertBefore(alertDiv, nameInput.nextSibling);
+                }
+            }
+        };
+
+        window.toggleSettings = () => {
+            const dropdown = document.getElementById('settingsDropdown');
+            dropdown.classList.toggle('show');
+            
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.settings-container')) {
+                    dropdown.classList.remove('show');
+                }
+            }, { once: true });
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('settingsBtn').addEventListener('click', window.toggleSettings);
+        });
+
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.settings-dropdown button')) {
+                document.getElementById('settingsDropdown').classList.remove('show');
+            }
+        });
+    </script>
+    
     <style>
-        :root {
-            --primary: #4361ee;
-            --primary-dark: #3a56d4;
-            --secondary: #7209b7;
-            --accent: #f72585;
-            --success: #4cc9f0;
-            --warning: #f8961e;
-            --danger: #e63946;
-            --dark: #1d3557;
-            --light: #f8f9fa;
-            --gray: #6c757d;
-            --gray-light: #e9ecef;
-            --border-radius-lg: 16px;
-            --border-radius-md: 12px;
-            --border-radius-sm: 8px;
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-            --shadow-hover: 0 15px 40px rgba(0, 0, 0, 0.12);
-            --gradient-primary: linear-gradient(135deg, #4361ee, #3a0ca3);
-            --gradient-accent: linear-gradient(135deg, #f72585, #b5179e);
+        :root { 
+            --main: #2c3e50; 
+            --blue: #3498db; 
+            --bg: #ecf0f1; 
+            --card: #ffffff; 
+            --text: #2c3e50; 
+            --accent: #9b59b6; 
+            --success: #27ae60;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --surname: #e67e22;
+            --mother: #9b59b6;
         }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Tajawal', sans-serif;
+        
+        body.dark-mode { 
+            --bg: #1a252f; 
+            --card: #2c3e50; 
+            --text: #ecf0f1; 
+            --success: #2ecc71;
+            --warning: #f1c40f;
+            --danger: #e74c3c;
+            --surname: #d35400;
+            --mother: #8e44ad;
         }
-
-        body {
-            background: linear-gradient(135deg, #f5f7ff 0%, #f0f2ff 100%);
-            color: var(--dark);
+        
+        body { 
+            font-family: 'Tajawal', 'Segoe UI', sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: var(--text); 
+            direction: rtl; 
+            margin: 0; 
+            padding: 0; 
             min-height: 100vh;
+        }
+
+        .app-wrapper {
+            min-height: 100vh;
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        body.dark-mode .app-wrapper {
+            background: rgba(26, 37, 47, 0.95);
+        }
+
+        .container { 
+            max-width: 1400px;
+            margin: 0 auto;
             padding: 20px;
         }
 
-        .container {
-            max-width: 1600px;
-            margin: 0 auto;
-        }
-
-        /* الهيدر المتقدم */
-        .glass-header {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: var(--border-radius-lg);
-            padding: 25px 35px;
-            box-shadow: var(--shadow);
-            margin-bottom: 30px;
+        /* تحسين الشعار والعنوان */
+        .header-container {
+            background: white;
+            border-radius: 20px;
+            padding: 20px 30px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-bottom: 4px solid var(--blue);
+        }
+
+        body.dark-mode .header-container {
+            background: var(--card);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header-logo {
+            height: 70px;
+            width: auto;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+            background: white;
+            padding: 8px;
+        }
+
+        .header-logo:hover {
+            transform: translateY(-5px);
+        }
+
+        .header-title {
+            margin: 0;
+            color: var(--blue);
+            font-size: 2rem;
+            font-weight: 800;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            background: linear-gradient(45deg, var(--blue), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* تحسين الإحصائيات */
+        .stats-bar { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px; 
+            margin-bottom: 25px; 
+        }
+        
+        .stat-item { 
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            padding: 25px 20px; 
+            border-radius: 15px; 
+            text-align: center; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+            border: 1px solid #e9ecef;
             position: relative;
             overflow: hidden;
         }
 
-        .glass-header::before {
+        body.dark-mode .stat-item {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            border-color: #404b5a;
+        }
+
+        .stat-item:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+        }
+
+        .stat-item::before {
             content: '';
             position: absolute;
             top: 0;
             right: 0;
-            width: 300px;
-            height: 100%;
-            background: var(--gradient-primary);
-            opacity: 0.05;
-            z-index: 0;
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .logo {
-            width: 70px;
-            height: 70px;
-            background: var(--gradient-primary);
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 8px 20px rgba(67, 97, 238, 0.3);
-            transition: var(--transition);
-        }
-
-        .logo:hover {
-            transform: rotate(10deg) scale(1.05);
-        }
-
-        .logo i {
-            font-size: 32px;
-            color: white;
-        }
-
-        .title-section h1 {
-            font-size: 32px;
-            font-weight: 700;
-            background: var(--gradient-primary);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            margin-bottom: 5px;
-        }
-
-        .title-section p {
-            color: var(--gray);
-            font-size: 15px;
-            font-weight: 400;
-        }
-
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .search-box {
-            position: relative;
-            width: 300px;
-        }
-
-        .search-box input {
             width: 100%;
-            padding: 14px 20px 14px 50px;
-            border-radius: 50px;
-            border: 2px solid var(--gray-light);
+            height: 5px;
+            background: linear-gradient(90deg, var(--blue), var(--accent));
+        }
+
+        .stat-item:nth-child(2)::before {
+            background: linear-gradient(90deg, var(--success), #2ecc71);
+        }
+
+        .stat-item:nth-child(3)::before {
+            background: linear-gradient(90deg, var(--accent), #9b59b6);
+        }
+
+        .stat-item i {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+            color: var(--blue);
+        }
+
+        .stat-val { 
+            display: block; 
+            font-size: 2.8rem; 
+            font-weight: 900; 
+            color: var(--blue); 
+            margin: 15px 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .stat-label { 
+            font-size: 1.1rem; 
+            color: #6c757d; 
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        /* تحسين أزرار الإجراءات */
+        .main-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .btn { 
+            border: none; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            padding: 18px 25px; 
+            font-weight: 700; 
+            color: white; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 12px; 
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            min-height: 60px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--blue), #2980b9);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d, #495057);
+            box-shadow: 0 5px 15px rgba(108, 117, 125, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .btn:active {
+            transform: translateY(-2px);
+        }
+
+        /* تحسين منطقة البحث والفلاتر */
+        .search-wrapper { 
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+            background: white; 
+            padding: 18px 30px; 
+            border-radius: 15px; 
+            border: 2px solid var(--blue); 
+            margin-bottom: 20px;
+            box-shadow: 0 5px 20px rgba(52, 152, 219, 0.15);
+            transition: all 0.3s ease;
+        }
+
+        body.dark-mode .search-wrapper {
+            background: var(--card);
+            border-color: #3498db;
+        }
+
+        .search-wrapper:hover {
+            box-shadow: 0 10px 30px rgba(52, 152, 219, 0.25);
+            transform: translateY(-3px);
+        }
+
+        .search-wrapper input { 
+            border: none; 
+            padding: 12px; 
+            font-size: 1.2rem; 
+            width: 100%; 
+            outline: none; 
+            background: transparent; 
+            color: inherit; 
+            font-weight: 500;
+        }
+
+        .search-wrapper::before {
+            content: "🔍";
+            font-size: 1.5rem;
+            color: var(--blue);
+            opacity: 0.8;
+        }
+
+        /* تحسين الفلاتر المتقدمة */
+        .advanced-filters {
             background: white;
-            font-size: 15px;
-            transition: var(--transition);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 25px 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+            border: 1px solid #e9ecef;
         }
 
-        .search-box input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
+        body.dark-mode .advanced-filters {
+            background: var(--card);
+            border-color: #404b5a;
         }
 
-        .search-box i {
+        .advanced-filters select,
+        .advanced-filters input {
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            font-size: 1rem;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+
+        body.dark-mode .advanced-filters select,
+        body.dark-mode .advanced-filters input {
+            background: #34495e;
+            border-color: #404b5a;
+            color: #ecf0f1;
+        }
+
+        .advanced-filters select:focus,
+        .advanced-filters input:focus {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+            transform: translateY(-2px);
+        }
+
+        /* تحسين بطاقات الطلاب */
+        .students-list-container {
+            margin: 25px 0;
+        }
+
+        .card { 
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            padding: 20px 25px 20px 15px; 
+            border-radius: 15px; 
+            margin-bottom: 15px; 
+            box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+            border: 1px solid #e9ecef;
+            position: relative;
+            overflow: hidden;
+        }
+
+        body.dark-mode .card {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            border-color: #404b5a;
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+        }
+
+        .student-item { 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            border-right: 6px solid var(--blue);
+            position: relative;
+            min-height: 90px;
+        }
+
+        /* تسلسل الطلاب */
+        .student-number {
             position: absolute;
-            right: 20px;
+            right: -25px;
             top: 50%;
             transform: translateY(-50%);
-            color: var(--gray);
-        }
-
-        .user-profile {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 18px;
-            background: white;
-            border-radius: 50px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-            cursor: pointer;
-            transition: var(--transition);
-        }
-
-        .user-profile:hover {
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-        }
-
-        .user-avatar {
-            width: 42px;
-            height: 42px;
-            background: var(--gradient-accent);
+            background: linear-gradient(135deg, var(--blue), #2980b9);
+            color: white;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            font-weight: 600;
+            font-weight: 800;
+            font-size: 1.1rem;
+            z-index: 1;
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+            border: 3px solid white;
         }
 
-        /* بطاقات الإحصائيات */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 25px;
-            margin-bottom: 35px;
+        body.dark-mode .student-number {
+            border-color: var(--card);
         }
 
-        .stat-card {
-            background: white;
-            border-radius: var(--border-radius-lg);
-            padding: 30px;
-            box-shadow: var(--shadow);
-            transition: var(--transition);
-            position: relative;
-            overflow: hidden;
-            border-top: 5px solid var(--primary);
-        }
-
-        .stat-card:hover {
-            transform: translateY(-8px);
-            box-shadow: var(--shadow-hover);
-        }
-
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 100px;
-            height: 100px;
-            background: linear-gradient(135deg, rgba(67, 97, 238, 0.1), transparent);
-            border-radius: 0 0 0 100px;
-        }
-
-        .stat-card.exit {
-            border-top-color: var(--danger);
-        }
-
-        .stat-card.request {
-            border-top-color: var(--success);
-        }
-
-        .stat-card.filter {
-            border-top-color: var(--warning);
-        }
-
-        .stat-card.add {
-            border-top-color: var(--secondary);
-        }
-
-        .stat-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 25px;
-        }
-
-        .stat-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 16px;
+        /* تحسين الأسماء والألقاب */
+        .student-name { 
+            margin: 0 0 10px 0; 
+            font-weight: 800; 
+            font-size: 1.3rem; 
+            line-height: 1.4; 
+            color: var(--text);
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-size: 26px;
-            color: white;
-            background: var(--gradient-primary);
-            box-shadow: 0 8px 20px rgba(67, 97, 238, 0.3);
-        }
-
-        .exit .stat-icon {
-            background: linear-gradient(135deg, #e63946, #d00000);
-        }
-
-        .request .stat-icon {
-            background: linear-gradient(135deg, #4cc9f0, #4895ef);
-        }
-
-        .filter .stat-icon {
-            background: linear-gradient(135deg, #f8961e, #f3722c);
-        }
-
-        .add .stat-icon {
-            background: linear-gradient(135deg, #7209b7, #560bad);
-        }
-
-        .stat-trend {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 14px;
-            font-weight: 600;
-            padding: 6px 12px;
-            border-radius: 20px;
-            background: rgba(76, 201, 240, 0.1);
-            color: var(--success);
-        }
-
-        .stat-trend.down {
-            background: rgba(230, 57, 70, 0.1);
-            color: var(--danger);
-        }
-
-        .stat-value {
-            font-size: 42px;
-            font-weight: 700;
-            margin-bottom: 10px;
-            background: linear-gradient(135deg, var(--dark), var(--primary));
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-        }
-
-        .stat-label {
-            color: var(--gray);
-            font-size: 16px;
-            margin-bottom: 15px;
-        }
-
-        .stat-progress {
-            height: 8px;
-            background: var(--gray-light);
-            border-radius: 4px;
-            overflow: hidden;
-            margin-top: 20px;
-        }
-
-        .progress-bar {
-            height: 100%;
-            background: var(--gradient-primary);
-            border-radius: 4px;
-            width: 75%;
-        }
-
-        .exit .progress-bar {
-            background: linear-gradient(90deg, #e63946, #ff6b6b);
-        }
-
-        /* لوحة التحكم */
-        .control-panel {
-            background: white;
-            border-radius: var(--border-radius-lg);
-            padding: 30px;
-            box-shadow: var(--shadow);
-            margin-bottom: 35px;
-        }
-
-        .panel-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-
-        .panel-title {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--dark);
-            position: relative;
-            padding-right: 15px;
-        }
-
-        .panel-title::before {
-            content: '';
-            position: absolute;
-            right: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 5px;
-            height: 30px;
-            background: var(--gradient-primary);
-            border-radius: 3px;
-        }
-
-        .control-actions {
-            display: flex;
-            gap: 15px;
+            gap: 12px;
             flex-wrap: wrap;
         }
 
-        .btn {
-            padding: 14px 28px;
-            border-radius: var(--border-radius-md);
+        .surname-badge { 
+            background: linear-gradient(135deg, var(--surname), #d35400); 
+            color: white; 
+            padding: 6px 15px;
+            border-radius: 25px; 
+            font-size: 0.9rem; 
+            font-weight: 700;
+            display: inline-block;
+            box-shadow: 0 3px 10px rgba(230, 126, 34, 0.3);
+            transition: all 0.3s ease;
+            margin-right: 8px;
+        }
+
+        .surname-badge:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 15px rgba(230, 126, 34, 0.4);
+        }
+
+        /* بادج اسم الأم الجديد */
+        .mother-badge { 
+            background: linear-gradient(135deg, var(--mother), #8e44ad); 
+            color: white; 
             border: none;
-            font-weight: 600;
-            font-size: 15px;
-            cursor: pointer;
-            transition: var(--transition);
-            display: flex;
+            padding: 6px 12px;
+            margin-left: 8px;
+        }
+
+        .student-meta { 
+            font-size: 0.95rem; 
+            color: #6c757d; 
+            margin-top: 8px; 
+            display: flex; 
+            gap: 15px; 
             align-items: center;
-            gap: 10px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.1);
-            transform: translateX(100%);
-            transition: transform 0.6s;
-        }
-
-        .btn:hover::before {
-            transform: translateX(0);
-        }
-
-        .btn-primary {
-            background: var(--gradient-primary);
-            color: white;
-            box-shadow: 0 8px 20px rgba(67, 97, 238, 0.3);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 25px rgba(67, 97, 238, 0.4);
-        }
-
-        .btn-secondary {
-            background: white;
-            color: var(--dark);
-            border: 2px solid var(--gray-light);
-        }
-
-        .btn-secondary:hover {
-            border-color: var(--primary);
-            color: var(--primary);
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #e63946, #d00000);
-            color: white;
-            box-shadow: 0 8px 20px rgba(230, 57, 70, 0.3);
-        }
-
-        .btn-danger:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 25px rgba(230, 57, 70, 0.4);
-        }
-
-        .filter-select {
-            padding: 14px 20px;
-            border-radius: var(--border-radius-md);
-            border: 2px solid var(--gray-light);
-            background: white;
-            font-size: 15px;
-            color: var(--dark);
-            cursor: pointer;
-            min-width: 200px;
-            transition: var(--transition);
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%231d3557' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: left 20px center;
-            background-size: 16px;
-            padding-left: 50px;
-        }
-
-        .filter-select:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
-        }
-
-        /* لوحة الفلاتر النشطة */
-        .active-filters {
-            display: flex;
             flex-wrap: wrap;
-            gap: 15px;
-            margin-bottom: 30px;
         }
 
-        .filter-tag {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 20px;
-            background: white;
-            border-radius: 50px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-            border: 2px solid transparent;
-            transition: var(--transition);
-            cursor: pointer;
+        /* تحسين الأزرار الصغيرة */
+        .item-actions { 
+            display: flex; 
+            gap: 10px; 
         }
 
-        .filter-tag:hover {
-            border-color: var(--primary);
-            transform: translateY(-2px);
-        }
-
-        .filter-tag i {
-            color: var(--gray);
-            transition: var(--transition);
-        }
-
-        .filter-tag:hover i {
-            color: var(--danger);
-        }
-
-        .filter-tag.all {
-            background: linear-gradient(135deg, rgba(67, 97, 238, 0.1), rgba(58, 12, 163, 0.05));
-            color: var(--primary);
-        }
-
-        .filter-tag.exit {
-            background: linear-gradient(135deg, rgba(230, 57, 70, 0.1), rgba(208, 0, 0, 0.05));
-            color: var(--danger);
-        }
-
-        /* الجدول المتقدم */
-        .data-table-container {
-            background: white;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--shadow);
-            overflow: hidden;
-            margin-bottom: 40px;
-            border: 1px solid rgba(0, 0, 0, 0.05);
-        }
-
-        .table-header {
-            padding: 25px 30px;
-            background: linear-gradient(90deg, rgba(67, 97, 238, 0.05), transparent);
-            border-bottom: 1px solid var(--gray-light);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .table-title {
-            font-size: 20px;
-            font-weight: 700;
-            color: var(--dark);
-        }
-
-        .table-actions {
-            display: flex;
-            gap: 15px;
-        }
-
-        .table-wrapper {
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 1000px;
-        }
-
-        thead {
-            background: rgba(67, 97, 238, 0.03);
-        }
-
-        th {
-            padding: 20px;
-            text-align: right;
-            font-weight: 600;
-            color: var(--dark);
-            border-bottom: 2px solid rgba(67, 97, 238, 0.1);
-            white-space: nowrap;
-        }
-
-        tbody tr {
-            border-bottom: 1px solid rgba(0, 0, 0, 0.03);
-            transition: var(--transition);
-        }
-
-        tbody tr:hover {
-            background: rgba(67, 97, 238, 0.02);
-        }
-
-        td {
-            padding: 20px;
-            text-align: right;
-            color: var(--dark);
-        }
-
-        .student-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .student-avatar {
+        .edit-btn-small, .del-btn-small, .copy-btn-small { 
+            background: white; 
+            border: 2px solid #e9ecef; 
+            border-radius: 10px; 
+            padding: 10px 15px; 
+            cursor: pointer; 
+            color: #6c757d; 
+            font-size: 1rem;
+            transition: all 0.3s ease;
             width: 45px;
             height: 45px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            font-weight: 600;
-            font-size: 18px;
         }
 
-        .status-badge {
-            padding: 8px 18px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 600;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
+        body.dark-mode .edit-btn-small,
+        body.dark-mode .del-btn-small,
+        body.dark-mode .copy-btn-small {
+            background: #34495e;
+            border-color: #404b5a;
+            color: #bdc3c7;
         }
 
-        .status-pending {
-            background: rgba(248, 150, 30, 0.1);
-            color: var(--warning);
-        }
-
-        .status-active {
-            background: rgba(76, 201, 240, 0.1);
-            color: var(--success);
-        }
-
-        .status-completed {
-            background: rgba(67, 97, 238, 0.1);
-            color: var(--primary);
-        }
-
-        .status-cancelled {
-            background: rgba(230, 57, 70, 0.1);
-            color: var(--danger);
-        }
-
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-        }
-
-        .action-btn {
-            width: 40px;
-            height: 40px;
-            border-radius: 12px;
-            border: none;
-            background: white;
-            color: var(--gray);
-            cursor: pointer;
-            transition: var(--transition);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid var(--gray-light);
-        }
-
-        .action-btn:hover {
+        .edit-btn-small:hover { 
+            background: linear-gradient(135deg, #d6eaf8, #aed6f1); 
+            color: #1a5276; 
+            border-color: #85c1e9;
             transform: translateY(-3px);
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
         }
 
-        .action-btn.view:hover {
-            color: var(--primary);
-            border-color: var(--primary);
+        .del-btn-small:hover { 
+            background: linear-gradient(135deg, #fadbd8, #f5b7b1); 
+            color: #c0392b; 
+            border-color: #e74c3c;
+            transform: translateY(-3px);
         }
 
-        .action-btn.edit:hover {
-            color: var(--success);
-            border-color: var(--success);
+        .copy-btn-small:hover { 
+            background: linear-gradient(135deg, #e8f4fc, #d1ecf1); 
+            color: #0e6251; 
+            border-color: #76d7c4;
+            transform: translateY(-3px);
         }
 
-        .action-btn.delete:hover {
-            color: var(--danger);
-            border-color: var(--danger);
-        }
-
-        /* التذييل */
-        .table-footer {
-            padding: 25px 30px;
-            background: rgba(67, 97, 238, 0.02);
-            border-top: 1px solid var(--gray-light);
+        /* تحسين التصفح بين الصفحات */
+        .pagination-container {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 20px;
+            margin: 30px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+            border: 1px solid #e9ecef;
+        }
+
+        body.dark-mode .pagination-container {
+            background: var(--card);
+            border-color: #404b5a;
         }
 
         .pagination-info {
-            color: var(--gray);
-            font-size: 15px;
-        }
-
-        .pagination {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .pagination-btn {
-            width: 45px;
-            height: 45px;
-            border-radius: 12px;
-            border: 2px solid var(--gray-light);
-            background: white;
-            color: var(--dark);
-            cursor: pointer;
-            transition: var(--transition);
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            font-size: 1rem;
+            color: var(--text);
             font-weight: 600;
         }
 
-        .pagination-btn:hover {
-            border-color: var(--primary);
-            color: var(--primary);
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .pagination-btn {
+            background: linear-gradient(135deg, var(--main), #34495e);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, var(--blue), #2980b9);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+
+        /* تحسين المودالات */
+        .modal-content { 
+            background: white; 
+            padding: 35px; 
+            border-radius: 20px; 
+            width: 90%; 
+            max-width: 450px; 
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.2);
+            animation: modalFade 0.4s ease-out;
+            border: none;
+        }
+
+        body.dark-mode .modal-content {
+            background: var(--card);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.4);
+        }
+
+        @keyframes modalFade {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -60%);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }
+        }
+
+        /* تحسين إدخال البيانات */
+        input, select, textarea { 
+            width: 100%; 
+            padding: 16px; 
+            margin-top: 10px; 
+            border: 2px solid #e9ecef; 
+            border-radius: 12px; 
+            background: #f8f9fa; 
+            color: var(--text); 
+            box-sizing: border-box;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        body.dark-mode input,
+        body.dark-mode select,
+        body.dark-mode textarea {
+            background: #34495e;
+            border-color: #404b5a;
+            color: #ecf0f1;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--blue);
+            box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.2);
+            background: white;
             transform: translateY(-2px);
         }
 
-        .pagination-btn.active {
-            background: var(--gradient-primary);
+        body.dark-mode input:focus,
+        body.dark-mode select:focus,
+        body.dark-mode textarea:focus {
+            background: #2c3e50;
+        }
+
+        /* تحسين الإشعارات */
+        .toast { 
+            position: fixed; 
+            bottom: 30px; 
+            left: 30px; 
+            padding: 18px 28px; 
+            border-radius: 12px; 
+            color: white; 
+            z-index: 9999; 
+            font-weight: 700; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); 
+            transition: 0.5s; 
+            opacity: 1;
+            animation: toastSlide 0.4s ease-out;
+            max-width: 400px;
+            backdrop-filter: blur(10px);
+            border: none;
+        }
+
+        .toast.success { 
+            background: linear-gradient(135deg, rgba(39, 174, 96, 0.9), rgba(46, 204, 113, 0.9));
+            border-right: 6px solid #27ae60;
+        }
+        
+        .toast.error { 
+            background: linear-gradient(135deg, rgba(231, 76, 60, 0.9), rgba(192, 57, 43, 0.9));
+            border-right: 6px solid #c0392b;
+        }
+
+        /* زر الواتساب الجديد */
+        .whatsapp-btn {
+            background: linear-gradient(135deg, #25D366, #128C7E);
             color: white;
-            border-color: transparent;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 20px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+            width: 100%;
+            justify-content: center;
         }
 
-        .pagination-btn.disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .whatsapp-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(37, 211, 102, 0.3);
         }
 
-        .pagination-btn.disabled:hover {
-            transform: none;
-            border-color: var(--gray-light);
-            color: var(--dark);
-        }
-
-        /* تصميم متجاوب */
-        @media (max-width: 1200px) {
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
+        /* تحسين الطباعة */
+        @media print { 
+            .print-page { 
+                padding: 0.5cm;
+            }
+            table { 
+                font-size: 11px;
+                line-height: 1.2;
+            } 
+            th, td { 
+                padding: 5px;
+                font-size: 11px;
+            }
+            th { 
+                padding: 8px !important;
+                font-size: 12px !important;
+            }
+            #printTitle {
+                font-size: 20px !important;
+            }
+            #printDate {
+                font-size: 16px !important;
             }
         }
 
-        @media (max-width: 992px) {
-            .glass-header {
-                flex-direction: column;
-                gap: 25px;
-            }
-            
-            .search-box {
-                width: 100%;
-            }
-            
-            .control-actions {
-                flex-direction: column;
-                width: 100%;
-            }
-            
-            .filter-select {
-                width: 100%;
-            }
+        /* تحسين الوضع الداكن */
+        .theme-toggle {
+            position: fixed;
+            bottom: 30px;
+            left: 30px;
+            background: linear-gradient(135deg, var(--main), #34495e);
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 100;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            font-size: 1.5rem;
         }
 
+        .theme-toggle:hover {
+            transform: scale(1.1) rotate(15deg);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+        }
+
+        /* تحسين التجاوب */
         @media (max-width: 768px) {
-            .stats-grid {
+            .container {
+                padding: 15px;
+            }
+            
+            .header-container {
+                padding: 15px 20px;
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .header-title {
+                font-size: 1.8rem;
+            }
+            
+            .header-logo {
+                height: 60px;
+            }
+            
+            .stats-bar {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .main-actions {
                 grid-template-columns: 1fr;
             }
             
-            .panel-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 20px;
+            .advanced-filters {
+                grid-template-columns: 1fr;
             }
             
-            .table-header {
+            .student-item {
                 flex-direction: column;
-                gap: 20px;
-            }
-            
-            .table-footer {
-                flex-direction: column;
+                gap: 15px;
                 text-align: center;
             }
-        }
-
-        @media (max-width: 576px) {
-            body {
-                padding: 10px;
+            
+            .item-actions {
+                justify-content: center;
+                width: 100%;
             }
             
-            .glass-header {
-                padding: 20px;
+            .pagination-container {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
             }
             
-            .stat-value {
-                font-size: 36px;
-            }
-            
-            .btn {
-                padding: 12px 20px;
+            .pagination-controls {
                 width: 100%;
                 justify-content: center;
             }
         }
+
+        /* تحسين شريط التمرير */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 5px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, var(--blue), #2980b9);
+            border-radius: 5px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #2980b9, #1c5d87);
+        }
+        
+        body.dark-mode ::-webkit-scrollbar-track {
+            background: #1a252f;
+        }
+        
+        body.dark-mode ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, var(--blue), #2980b9);
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- الهيدر الزجاجي -->
-        <header class="glass-header">
-            <div class="brand">
-                <div class="logo">
-                    <i class="fas fa-clipboard-list"></i>
-                </div>
-                <div class="title-section">
-                    <h1>فهرس القيود الذكي</h1>
-                    <p>نظام إدارة متكامل للقيود والطلبات الأكاديمية</p>
-                </div>
-            </div>
-            <div class="header-actions">
-                <div class="search-box">
-                    <input type="text" placeholder="ابحث عن طالب، رقم جامعي، أو نوع قيد...">
-                    <i class="fas fa-search"></i>
-                </div>
-                <div class="user-profile">
-                    <div class="user-avatar">
-                        <i class="fas fa-user"></i>
-                    </div>
-                    <div>
-                        <div style="font-weight: 600;">مدير النظام</div>
-                        <div style="font-size: 13px; color: var(--gray);">مسؤول القيود</div>
-                    </div>
-                    <i class="fas fa-chevron-down" style="color: var(--gray);"></i>
-                </div>
-            </div>
-        </header>
 
-        <!-- إحصائيات النظام -->
-        <div class="stats-grid">
-            <div class="stat-card exit">
-                <div class="stat-header">
-                    <div class="stat-icon">
-                        <i class="fas fa-door-open"></i>
-                    </div>
-                    <div class="stat-trend down">
-                        <i class="fas fa-arrow-down"></i>
-                        2.5%
-                    </div>
-                </div>
-                <div class="stat-value">1,544</div>
-                <div class="stat-label">إجمالي قيود الخروج</div>
-                <div class="stat-progress">
-                    <div class="progress-bar"></div>
-                </div>
-            </div>
+<div id="loader" class="loader">
+    <div class="spinner" style="width: 50px; height: 50px; border: 5px solid #e2e8f0; border-top: 5px solid var(--blue); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+    جاري المعالجة...
+</div>
 
-            <div class="stat-card request">
-                <div class="stat-header">
-                    <div class="stat-icon">
-                        <i class="fas fa-file-contract"></i>
-                    </div>
-                    <div class="stat-trend">
-                        <i class="fas fa-arrow-up"></i>
-                        12.3%
-                    </div>
-                </div>
-                <div class="stat-value">0</div>
-                <div class="stat-label">طلبات اليوم</div>
-                <div class="stat-progress">
-                    <div class="progress-bar" style="width: 10%;"></div>
-                </div>
-            </div>
+<style>
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
 
-            <div class="stat-card filter">
-                <div class="stat-header">
-                    <div class="stat-icon">
-                        <i class="fas fa-sliders-h"></i>
-                    </div>
-                    <div class="stat-trend">
-                        <i class="fas fa-check"></i>
-                        نشط
-                    </div>
-                </div>
-                <div class="stat-value">الأحدث</div>
-                <div class="stat-label">نظام التصفية المطبق</div>
-                <div class="stat-progress">
-                    <div class="progress-bar" style="width: 90%;"></div>
-                </div>
-            </div>
+<div id="toastContainer"></div>
 
-            <div class="stat-card add">
-                <div class="stat-header">
-                    <div class="stat-icon">
-                        <i class="fas fa-user-plus"></i>
-                    </div>
-                    <div class="stat-trend">
-                        <i class="fas fa-infinity"></i>
-                        متاح
-                    </div>
-                </div>
-                <div class="stat-value">جميع</div>
-                <div class="stat-label">أنواع القيود المتاحة</div>
-                <div class="stat-progress">
-                    <div class="progress-bar" style="width: 100%;"></div>
-                </div>
+<!-- مودال حذف الأرشيف -->
+<div id="masterDeleteModal" class="modal">
+    <div class="modal-content">
+        <h3 style="text-align:center; color:var(--danger); margin-bottom: 20px;">
+            <i class="fas fa-exclamation-triangle"></i> حذف الأرشيف كاملاً؟
+        </h3>
+        <p style="text-align:center; font-size:1rem; margin-bottom: 25px;">اكتب كلمة <b style="color:var(--danger);">حذف</b> للتأكيد:</p>
+        <input type="text" id="masterDeleteInput" style="text-align:center; font-size: 1.1rem; padding: 15px;">
+        <div style="display:flex; gap:15px; margin-top:25px;">
+            <button class="btn" style="background:linear-gradient(135deg, var(--danger), #c0392b); flex:1;" onclick="confirmMasterDelete()">
+                <i class="fas fa-check"></i> تأكيد
+            </button>
+            <button class="btn" style="background:linear-gradient(135deg, #6c757d, #495057); flex:1;" onclick="document.getElementById('masterDeleteModal').style.display='none'">
+                <i class="fas fa-times"></i> إلغاء
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- مودال حذف الطالب -->
+<div id="deleteModal" class="modal">
+    <div class="modal-content">
+        <h4 style="text-align:center; color:var(--danger); margin-bottom: 25px;">
+            <i class="fas fa-trash-alt"></i> حذف الطالب؟
+        </h4>
+        <div style="display:flex; gap:15px; margin-top:20px;">
+            <button class="btn" style="background:linear-gradient(135deg, var(--danger), #c0392b); flex:1;" onclick="confirmDel()">
+                <i class="fas fa-check"></i> نعم
+            </button>
+            <button class="btn" style="background:linear-gradient(135deg, #6c757d, #495057); flex:1;" onclick="document.getElementById('deleteModal').style.display='none'">
+                <i class="fas fa-times"></i> لا
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- مودال إضافة/تعديل بيانات الطالب -->
+<div id="entryModal" class="modal">
+    <div class="modal-content">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
+            <h3 style="margin:0; color:var(--blue); font-size:1.4rem; font-weight:800;">
+                <i class="fas fa-user-graduate"></i> بيانات الطالب
+            </h3>
+            <div style="display:flex; gap:10px;">
+                <button onclick="generateRandomData()" style="background:#f8f9fa; border:2px solid #e9ecef; padding:10px 15px; border-radius:10px; cursor:pointer; color:var(--text); font-size:1rem; transition:all 0.3s ease;" title="تعبئة تلقائية" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 5px 15px rgba(0,0,0,0.1)'" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='none'">
+                    <i class="fas fa-magic"></i>
+                </button>
+                <button onclick="duplicateLastStudent()" style="background:#e8f4fc; border:2px solid #d1ecf1; padding:10px 15px; border-radius:10px; cursor:pointer; color:#0e6251; font-size:1rem; transition:all 0.3s ease;" title="نسخ آخر طالب" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 5px 15px rgba(0,0,0,0.1)'" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='none'">
+                    <i class="fas fa-copy"></i>
+                </button>
             </div>
         </div>
-
-        <!-- لوحة التحكم -->
-        <div class="control-panel">
-            <div class="panel-header">
-                <div class="panel-title">التحكم في النظام</div>
-                <div class="control-actions">
-                    <select class="filter-select">
-                        <option>الأحدث أولاً</option>
-                        <option>الأقدم أولاً</option>
-                        <option>حسب الأسم (أ-ي)</option>
-                        <option>حسب الرقم (تصاعدي)</option>
-                        <option>حسب الحالة</option>
-                    </select>
-                    
-                    <button class="btn btn-secondary">
-                        <i class="fas fa-broom"></i> مسح جميع الفلاتر
-                    </button>
-                    
-                    <button class="btn btn-primary">
-                        <i class="fas fa-plus-circle"></i> إضافة طالب جديد
-                    </button>
-                </div>
-            </div>
-
-            <!-- الفلاتر النشطة -->
-            <div class="active-filters">
-                <div class="filter-tag all">
-                    <span>جميع القيود</span>
-                    <i class="fas fa-times"></i>
-                </div>
-                <div class="filter-tag exit">
-                    <span>نوع: خروج</span>
-                    <i class="fas fa-times"></i>
-                </div>
-                <div class="filter-tag">
-                    <span>الفصل: 2024/2023</span>
-                    <i class="fas fa-times"></i>
-                </div>
-                <div class="filter-tag">
-                    <span>الحالة: نشط</span>
-                    <i class="fas fa-times"></i>
-                </div>
-            </div>
+        
+        <!-- زر تحميل الاسم من الواتساب -->
+        <button class="whatsapp-btn" onclick="document.getElementById('whatsappModal').style.display='flex'">
+            <i class="fab fa-whatsapp"></i> تحميل الاسم من الواتساب
+        </button>
+        
+        <input type="hidden" id="editId">
+        <input type="text" id="fName" placeholder="الاسم الرباعي" oninput="checkDuplicateStudent()">
+        <input type="text" id="surname" placeholder="اللقب">
+        <input type="text" id="motherName" placeholder="اسم الأم (اختياري)">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin:15px 0;">
+            <input type="text" id="qNum" placeholder="القيد">
+            <input type="number" id="pNum" placeholder="الصفحة">
         </div>
+        <textarea id="note" placeholder="ملاحظات..." rows="3" style="margin-bottom: 20px;"></textarea>
+        
+        <div style="display:flex; gap:15px; margin-top:25px;">
+            <button id="saveBtn" class="btn btn-primary" style="flex:2;" onclick="saveData()">
+                <i class="fas fa-save"></i> حفظ
+            </button>
+            <button class="btn btn-secondary" style="flex:1;" onclick="closeAddModal()">
+                <i class="fas fa-times"></i> إلغاء
+            </button>
+        </div>
+    </div>
+</div>
 
-        <!-- جدول البيانات -->
-        <div class="data-table-container">
-            <div class="table-header">
-                <div class="table-title">سجل القيود والطلبات</div>
-                <div class="table-actions">
-                    <button class="btn btn-secondary" style="padding: 10px 20px;">
-                        <i class="fas fa-download"></i> تصدير
-                    </button>
-                    <button class="btn btn-secondary" style="padding: 10px 20px;">
-                        <i class="fas fa-print"></i> طباعة
-                    </button>
+<!-- مودال الواتساب الجديد -->
+<div id="whatsappModal" class="modal">
+    <div class="modal-content">
+        <h3 style="margin-bottom: 20px; color: #25D366;">
+            <i class="fab fa-whatsapp"></i> تحميل الاسم من الواتساب
+        </h3>
+        <p style="color: #666; margin-bottom: 15px; font-size: 0.9rem;">
+            الصق النص كاملاً من الواتساب (الاسم الرباعي + اسم الأم + اللقب)
+        </p>
+        <textarea id="whatsappInput" placeholder="مثال: احمد محمد علي سعاد الكبيسي" rows="5" style="margin-bottom: 20px; font-size: 1.1rem;"></textarea>
+        <div style="display:flex; gap:15px;">
+            <button class="btn" style="background:linear-gradient(135deg, #25D366, #128C7E); flex:1;" onclick="extractNameFromWhatsApp()">
+                <i class="fas fa-check"></i> استخراج البيانات
+            </button>
+            <button class="btn btn-secondary" style="flex:1;" onclick="document.getElementById('whatsappModal').style.display='none'">
+                <i class="fas fa-times"></i> إلغاء
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- مودال الطباعة -->
+<div id="printModal" class="modal">
+    <div class="modal-content">
+        <h3 style="margin-bottom: 25px; color: var(--blue);">
+            <i class="fas fa-print"></i> طباعة
+        </h3>
+        <button class="btn" style="background:linear-gradient(135deg, var(--accent), #8e44ad); width:100%; margin-bottom:15px; padding: 18px;" onclick="printAllAlpha()">
+            <i class="fas fa-print"></i> السجل العام
+        </button>
+        <select id="qaidSelect" style="margin-bottom: 15px; padding: 15px;"></select>
+        <button class="btn btn-primary" style="width:100%; margin-bottom:15px; padding: 18px;" onclick="printSelectedQaid()">
+            <i class="fas fa-print"></i> طباعة القيد
+        </button>
+        <button class="btn btn-secondary" style="width:100%; padding: 18px;" onclick="document.getElementById('printModal').style.display='none'">
+            <i class="fas fa-times"></i> إلغاء
+        </button>
+    </div>
+</div>
+
+<!-- صفحة الدخول -->
+<div id="loginPage" style="height: 100vh; flex-direction: column; align-items: center; justify-content: center; display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+    <div class="card" style="width: 90%; max-width: 450px; text-align: center; padding: 40px 35px; border-radius: 20px; box-shadow: 0 25px 50px rgba(0,0,0,0.2); background: white;">
+        <div style="margin-bottom: 10px;">
+            <img src="https://i.imgur.com/05ANc5p.png" alt="شعار قيودكوم" style="height: 80px; border-radius: 12px; margin-bottom: 20px;">
+        </div>
+        <h2 style="margin-bottom: 30px; color: var(--blue); font-size: 2rem; font-weight: 800;">
+            <i class="fas fa-lock"></i> دخول النظام
+        </h2>
+        <input type="email" id="loginEmail" placeholder="البريد الإلكتروني" style="margin-bottom: 20px; padding: 16px;">
+        <input type="password" id="loginPass" placeholder="كلمة المرور" style="margin-bottom: 25px; padding: 16px;">
+        <button class="btn btn-primary" style="width:100%; padding: 18px;" onclick="login()">
+            <i class="fas fa-sign-in-alt"></i> دخول
+        </button>
+    </div>
+</div>
+
+<!-- المحتوى الرئيسي -->
+<div id="appContent" style="display: none;">
+    <div class="app-wrapper">
+        <div class="container">
+            <div class="print-area">
+                <div style="text-align:center; border-bottom: 2px solid #000; margin-bottom: 15px; padding-bottom: 10px;">
+                    <h2 id="printTitle" style="margin: 10px 0; font-size: 18px; font-weight: bold;"></h2>
+                    <span id="printDate" style="font-size: 14px; color: #666; font-weight: bold;"></span>
                 </div>
+                <div id="printTablesContainer"></div>
             </div>
-            
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>الطالب</th>
-                            <th>الرقم الجامعي</th>
-                            <th>القسم</th>
-                            <th>نوع القيد</th>
-                            <th>التاريخ</th>
-                            <th>الحالة</th>
-                            <th>الإجراءات</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>1</td>
-                            <td>
-                                <div class="student-info">
-                                    <div class="student-avatar">أح</div>
-                                    <div>
-                                        <div style="font-weight: 600;">أحمد محمد علي</div>
-                                        <div style="font-size: 13px; color: var(--gray);">ماجستير علوم حاسب</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>202110001</td>
-                            <td>علوم الحاسب</td>
-                            <td>
-                                <span class="status-badge status-cancelled">
-                                    <i class="fas fa-door-open"></i> خروج
-                                </span>
-                            </td>
-                            <td>2024-03-15</td>
-                            <td>
-                                <span class="status-badge status-pending">
-                                    <i class="fas fa-clock"></i> قيد المراجعة
-                                </span>
-                            </td>
-                            <td>
-                                <div class="action-buttons">
-                                    <button class="action-btn view" title="عرض التفاصيل">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="action-btn edit" title="تعديل">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="action-btn delete" title="حذف">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
+
+            <div class="no-print">
+                <!-- الهيدر -->
+                <div class="header-container">
+                    <div class="logo-container">
+                        <a href="#" onclick="window.location.reload(); return false;" title="قيودكوم">
+                            <img src="https://i.imgur.com/05ANc5p.png" 
+                                 alt="شعار قيودكوم" 
+                                 class="header-logo">
+                        </a>
+                        <div>
+                            <h1 class="header-title">قيودكوم</h1>
+                            <p style="color: #6c757d; margin: 5px 0 0 0; font-size: 1rem; font-weight: 500;">
+                                نظام إدارة القيود الطلابية المتقدم
+                            </p>
+                        </div>
+                    </div>
+                    <div class="header-actions" style="display: flex; align-items: center; gap: 20px;">
+                        <!-- قائمة الإعدادات -->
+                        <div class="settings-container">
+                            <button class="settings-btn" id="settingsBtn" title="الإعدادات">
+                                <i class="fas fa-cog"></i>
+                            </button>
+                            <div class="settings-dropdown" id="settingsDropdown">
+                                <button onclick="document.getElementById('fileInput').click()">
+                                    <i class="fas fa-file-import"></i> استيراد من Excel
+                                </button>
+                                <button onclick="downloadExcelTemplate()">
+                                    <i class="fas fa-file-excel"></i> تحميل نموذج Excel
+                                </button>
+                                <button onclick="exportExcel()">
+                                    <i class="fas fa-file-export"></i> تصدير إلى Excel
+                                </button>
+                                <button onclick="showPrintOptions()">
+                                    <i class="fas fa-print"></i> طباعة
+                                </button>
+                                <div class="dropdown-divider"></div>
+                                <button onclick="openMasterDelete()" class="delete-btn">
+                                    <i class="fas fa-trash-alt"></i> مسح السجل
+                                </button>
+                            </div>
+                        </div>
                         
-                        <tr>
-                            <td>2</td>
-                            <td>
-                                <div class="student-info">
-                                    <div class="student-avatar">سا</div>
-                                    <div>
-                                        <div style="font-weight: 600;">سارة خالد سالم</div>
-                                        <div style="font-size: 13px; color: var(--gray);">بكالوريوس إدارة أعمال</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>202110002</td>
-                            <td>إدارة الأعمال</td>
-                            <td>
-                                <span class="status-badge status-completed">
-                                    <i class="fas fa-user-plus"></i> إضافة
-                                </span>
-                            </td>
-                            <td>2024-03-14</td>
-                            <td>
-                                <span class="status-badge status-active">
-                                    <i class="fas fa-check-circle"></i> مكتمل
-                                </span>
-                            </td>
-                            <td>
-                                <div class="action-buttons">
-                                    <button class="action-btn view" title="عرض التفاصيل">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="action-btn edit" title="تعديل">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="action-btn delete" title="حذف">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        
-                        <tr>
-                            <td>3</td>
-                            <td>
-                                <div class="student-info">
-                                    <div class="student-avatar">فع</div>
-                                    <div>
-                                        <div style="font-weight: 600;">فاطمة عبدالله ناصر</div>
-                                        <div style="font-size: 13px; color: var(--gray);">دكتوراه هندسة</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>202110003</td>
-                            <td>الهندسة الكهربائية</td>
-                            <td>
-                                <span class="status-badge status-cancelled">
-                                    <i class="fas fa-door-open"></i> خروج
-                                </span>
-                            </td>
-                            <td>2024-03-13</td>
-                            <td>
-                                <span class="status-badge status-pending">
-                                    <i class="fas fa-clock"></i> قيد المراجعة
-                                </span>
-                            </td>
-                            <td>
-                                <div class="action-buttons">
-                                    <button class="action-btn view" title="عرض التفاصيل">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="action-btn edit" title="تعديل">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="action-btn delete" title="حذف">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        
-                        <tr>
-                            <td>4</td>
-                            <td>
-                                <div class="student-info">
-                                    <div class="student-avatar">عب</div>
-                                    <div>
-                                        <div style="font-weight: 600;">عبدالرحمن سعيد أحمد</div>
-                                        <div style="font-size: 13px; color: var(--gray);">بكالوريوس طب</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>202110004</td>
-                            <td>الطب البشري</td>
-                            <td>
-                                <span class="status-badge status-completed">
-                                    <i class="fas fa-file-contract"></i> طلب
-                                </span>
-                            </td>
-                            <td>2024-03-12</td>
-                            <td>
-                                <span class="status-badge status-active">
-                                    <i class="fas fa-check-circle"></i> معتمد
-                                </span>
-                            </td>
-                            <td>
-                                <div class="action-buttons">
-                                    <button class="action-btn view" title="عرض التفاصيل">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="action-btn edit" title="تعديل">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="action-btn delete" title="حذف">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            
-            <div class="table-footer">
-                <div class="pagination-info">
-                    عرض 100-1 من 1544 طالب | الصفحة 1 من 16
+                        <button onclick="logout()" class="btn" style="background:linear-gradient(135deg, var(--danger), #c0392b); padding: 12px 20px; font-size: 0.9rem;">
+                            <i class="fas fa-sign-out-alt"></i> خروج
+                        </button>
+                    </div>
+                </div>
+
+                <!-- الإحصائيات -->
+                <div class="stats-bar">
+                    <div class="stat-item">
+                        <i class="fas fa-users"></i>
+                        <span class="stat-val" id="statTotal">0</span>
+                        <span class="stat-label">إجمالي الطلاب</span>
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-calendar-day"></i>
+                        <span class="stat-val" style="color:var(--success)" id="statToday">0</span>
+                        <span class="stat-label">المضافين اليوم</span>
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-folder"></i>
+                        <span class="stat-val" style="color:var(--accent)" id="statQaids">0</span>
+                        <span class="stat-label">عدد القيود</span>
+                    </div>
+                </div>
+
+                <!-- الأزرار الرئيسية -->
+                <div class="action-buttons-container">
+                    <div class="main-actions">
+                        <button class="btn btn-primary" onclick="openAddModal()">
+                            <i class="fas fa-plus"></i> إضافة طالب جديد
+                        </button>
+                        <button class="btn btn-secondary" onclick="clearFilters()" title="مسح الفلاتر">
+                            <i class="fas fa-filter"></i> مسح الفلاتر
+                        </button>
+                    </div>
                 </div>
                 
-                <div class="pagination">
-                    <button class="pagination-btn disabled">
-                        <i class="fas fa-chevron-right"></i>
-                    </button>
-                    <button class="pagination-btn active">1</button>
-                    <button class="pagination-btn">2</button>
-                    <button class="pagination-btn">3</button>
-                    <button class="pagination-btn">4</button>
-                    <button class="pagination-btn">5</button>
-                    <span style="padding: 0 10px; color: var(--gray);">...</span>
-                    <button class="pagination-btn">15</button>
-                    <button class="pagination-btn">16</button>
-                    <button class="pagination-btn">
-                        <i class="fas fa-chevron-left"></i>
-                    </button>
+                <input type="file" id="fileInput" hidden onchange="importExcel(event)" accept=".xlsx, .xls">
+
+                <!-- الفلاتر المتقدمة -->
+                <div class="advanced-filters">
+                    <select id="filterQaid" onchange="applyFilters()">
+                        <option value="">جميع القيود</option>
+                    </select>
+                    <input type="number" id="filterPage" placeholder="رقم الصفحة" oninput="applyFilters()">
+                    <select id="filterMother" onchange="applyFilters()">
+                        <option value="">اسم الأم</option>
+                    </select>
+                    <select id="sortSelect" onchange="applyFilters()">
+                        <option value="newest">الأحدث أولاً</option>
+                        <option value="alpha">الاسم أبجدي</option>
+                        <option value="surname">اللقب أبجدي</option>
+                        <option value="mother">اسم الأم أبجدي</option>
+                        <option value="qaid">حسب القيد</option>
+                        <option value="page">حسب الصفحة</option>
+                    </select>
+                </div>
+
+                <!-- شريط البحث -->
+                <div class="search-wrapper">
+                    <input type="text" id="searchInput" placeholder="ابحث عن اسم، لقب، قيد، أو اسم الأم..." onkeyup="applyFilters()">
+                </div>
+
+                <!-- التصفح بين الصفحات - أعلى -->
+                <div class="pagination-container">
+                    <div class="pagination-info" id="pageInfo">عرض 1-100 من 0 طالب</div>
+                    <div class="pagination-controls">
+                        <button class="pagination-btn" id="prevPage" onclick="prevPage()" title="الصفحة السابقة">
+                            <i class="fas fa-chevron-right"></i> السابق
+                        </button>
+                        <div class="page-numbers">
+                            <span class="page-number" id="pageNumber">1</span>
+                            <span style="color: var(--text); font-weight: 600;">من</span>
+                            <span class="page-number" id="totalPages">1</span>
+                        </div>
+                        <button class="pagination-btn" id="nextPage" onclick="nextPage()" title="الصفحة التالية">
+                            التالي <i class="fas fa-chevron-left"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- قائمة الطلاب -->
+                <div id="studentsList" class="students-list-container"></div>
+
+                <!-- التصفح بين الصفحات - أسفل -->
+                <div class="pagination-container">
+                    <div class="pagination-info" id="pageInfoBottom">عرض 1-100 من 0 طالب</div>
+                    <div class="pagination-controls">
+                        <button class="pagination-btn" id="prevPageBottom" onclick="prevPage()" title="الصفحة السابقة">
+                            <i class="fas fa-chevron-right"></i> السابق
+                        </button>
+                        <div class="page-numbers">
+                            <span class="page-number" id="pageNumberBottom">1</span>
+                            <span style="color: var(--text); font-weight: 600;">من</span>
+                            <span class="page-number" id="totalPagesBottom">1</span>
+                        </div>
+                        <button class="pagination-btn" id="nextPageBottom" onclick="nextPage()" title="الصفحة التالية">
+                            التالي <i class="fas fa-chevron-left"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // تفعيل أزرار حذف الفلاتر
-            const filterTags = document.querySelectorAll('.filter-tag i');
-            filterTags.forEach(tag => {
-                tag.addEventListener('click', function() {
-                    const tagElement = this.parentElement;
-                    tagElement.style.opacity = '0';
-                    tagElement.style.transform = 'translateX(20px)';
-                    setTimeout(() => {
-                        tagElement.remove();
-                    }, 300);
-                });
-            });
-            
-            // تفعيل أزرار الإجراءات في الجدول
-            const actionButtons = document.querySelectorAll('.action-btn');
-            actionButtons.forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const action = this.classList.contains('view') ? 'عرض' : 
-                                  this.classList.contains('edit') ? 'تعديل' : 'حذف';
-                    alert(`سيتم ${action} السجل المحدد`);
-                });
-            });
-            
-            // تفعيل أزرار الصفحات
-            const pageButtons = document.querySelectorAll('.pagination-btn:not(.disabled)');
-            pageButtons.forEach(btn => {
-                btn.addEventListener('click', function() {
-                    if (!this.classList.contains('active')) {
-                        document.querySelector('.pagination-btn.active').classList.remove('active');
-                        this.classList.add('active');
-                    }
-                });
-            });
-            
-            // تأثيرات عند التمرير
-            const statCards = document.querySelectorAll('.stat-card');
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        entry.target.style.opacity = '1';
-                        entry.target.style.transform = 'translateY(0)';
-                    }
-                });
-            }, { threshold: 0.1 });
-            
-            statCards.forEach(card => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(30px)';
-                card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
-                observer.observe(card);
-            });
-            
-            // تأثيرات على أزرار الإضافة
-            const addButton = document.querySelector('.btn-primary');
-            addButton.addEventListener('mouseenter', function() {
-                this.style.transform = 'translateY(-3px) scale(1.02)';
-            });
-            
-            addButton.addEventListener('mouseleave', function() {
-                this.style.transform = 'translateY(0) scale(1)';
-            });
-        });
-    </script>
+<!-- زر تبديل الوضع الداكن -->
+<div class="theme-toggle no-print" onclick="toggleDarkMode()" title="تبديل الوضع الليلي">
+    <i class="fas fa-moon"></i>
+</div>
+
+<script>
+    function updatePaginationControls() {
+        const prevBtn = document.getElementById('prevPage');
+        const nextBtn = document.getElementById('nextPage');
+        const prevBtnBottom = document.getElementById('prevPageBottom');
+        const nextBtnBottom = document.getElementById('nextPageBottom');
+        
+        const disabled = window.currentPage <= 1;
+        prevBtn.disabled = disabled;
+        prevBtnBottom.disabled = disabled;
+        
+        const nextDisabled = window.currentPage >= window.totalPages;
+        nextBtn.disabled = nextDisabled;
+        nextBtnBottom.disabled = nextDisabled;
+        
+        document.getElementById('pageNumber').innerText = window.currentPage;
+        document.getElementById('totalPages').innerText = window.totalPages;
+        document.getElementById('pageNumberBottom').innerText = window.currentPage;
+        document.getElementById('totalPagesBottom').innerText = window.totalPages;
+        
+        const totalStudents = window.filteredStudentsData.length;
+        const startIndex = (window.currentPage - 1) * window.pageSize + 1;
+        const endIndex = Math.min(window.currentPage * window.pageSize, totalStudents);
+        
+        const pageInfo = `عرض ${startIndex}-${endIndex} من ${totalStudents} طالب`;
+        document.getElementById('pageInfo').innerText = pageInfo;
+        document.getElementById('pageInfoBottom').innerText = pageInfo;
+    }
+</script>
+
 </body>
 </html>
