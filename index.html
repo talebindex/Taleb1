@@ -1484,13 +1484,17 @@
             gap: 15px;
         }
         
+        /* تنسيق الشعار */
         .header-logo {
-            height: 50px;
+            height: 60px;
             width: auto;
             border-radius: 8px;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
             cursor: pointer;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            object-fit: contain;
+            background: white;
+            padding: 5px;
         }
         
         .header-logo:hover {
@@ -1502,12 +1506,6 @@
             margin: 0;
             color: var(--blue);
             font-size: 1.5rem;
-        }
-        
-        @media (min-width: 768px) {
-            .header-title {
-                font-size: 1.8rem;
-            }
         }
         
         /* تصميم قائمة الإعدادات */
@@ -1643,12 +1641,10 @@
             .advanced-filters input {
                 width: 100%;
             }
-        }
-        
-        /* تصميم الشعار للشاشات الصغيرة */
-        @media (max-width: 767px) {
+            
+            /* تعديلات الشعار في الجوال */
             .header-logo {
-                height: 40px;
+                height: 50px;
             }
             
             .logo-container {
@@ -1788,19 +1784,20 @@
     </div>
 
     <div class="no-print">
+        <!-- الهيدر مع الشعار - التعديل الرئيسي هنا -->
         <div class="header-container">
             <div class="logo-container">
                 <!-- تم إضافة الشعار هنا -->
                 <a href="#" onclick="window.location.reload(); return false;" title="الرئيسية">
-                    <img src="https://drive.google.com/uc?export=view&id=1ipntb1oQIGuaGTJrd3wbi5w1UHRbHBh5" 
-                         alt="شعار نظام الأرشيف الذكي" 
+                    <img src="https://i.imgur.com/05ANc5p.png" 
+                         alt="شعار نظام الأرشيف الذكي - الجامعة الوطنية للعلوم والتكنولوجيا" 
                          class="header-logo">
                 </a>
                 <h4 class="header-title">
                     <i class="fas fa-archive"></i> نظام الأرشيف الذكي
                 </h4>
             </div>
-            <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="header-actions">
                 <!-- إضافة أيقونة الإعدادات هنا -->
                 <div class="settings-container">
                     <button class="settings-btn" id="settingsBtn" title="الإعدادات">
