@@ -1468,7 +1468,7 @@
             background: #64748b;
         }
         
-        /* تصميم العنوان الرئيسي */
+        /* تصميم العنوان الرئيسي مع الشعار */
         .header-container {
             display: flex;
             justify-content: space-between;
@@ -1476,6 +1476,26 @@
             padding: 15px 0;
             margin-bottom: 15px;
             border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .header-logo {
+            height: 50px;
+            width: auto;
+            border-radius: 8px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header-logo:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
         }
         
         .header-title {
@@ -1624,6 +1644,21 @@
                 width: 100%;
             }
         }
+        
+        /* تصميم الشعار للشاشات الصغيرة */
+        @media (max-width: 767px) {
+            .header-logo {
+                height: 40px;
+            }
+            
+            .logo-container {
+                gap: 10px;
+            }
+            
+            .header-title {
+                font-size: 1.3rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1754,9 +1789,17 @@
 
     <div class="no-print">
         <div class="header-container">
-            <h4 class="header-title">
-                <i class="fas fa-archive"></i> نظام الأرشيف الذكي
-            </h4>
+            <div class="logo-container">
+                <!-- تم إضافة الشعار هنا -->
+                <a href="#" onclick="window.location.reload(); return false;" title="الرئيسية">
+                    <img src="https://drive.google.com/uc?export=view&id=1ipntb1oQIGuaGTJrd3wbi5w1UHRbHBh5" 
+                         alt="شعار نظام الأرشيف الذكي" 
+                         class="header-logo">
+                </a>
+                <h4 class="header-title">
+                    <i class="fas fa-archive"></i> نظام الأرشيف الذكي
+                </h4>
+            </div>
             <div style="display: flex; align-items: center; gap: 10px;">
                 <!-- إضافة أيقونة الإعدادات هنا -->
                 <div class="settings-container">
