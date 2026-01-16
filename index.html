@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام الأرشيف الذكي - النسخة المحسنة</title>
+    <title>نظام الأرشيف الذكي - النسخة المتطورة</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     
@@ -30,20 +30,26 @@
 
         let deleteTargetId = null;
         window.allStudentsData = [];
+        window.activeLetter = null;
+        let unsavedChanges = false;
+
+        // متغيرات للتحكم في عرض البيانات التدريجي
+        let displayLimit = 50; 
+        let filteredDataGlobal = [];
 
         window.showToast = (msg, type = 'success') => {
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
-            toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i> ${msg}`;
+            toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-trash-alt'}"></i> ${msg}`;
             container.appendChild(toast);
             setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
         };
 
-        onAuthStateChanged(auth, user => {
+        onAuthStateChanged(auth, (user) => {
             document.getElementById('loginPage').style.display = user ? 'none' : 'flex';
             document.getElementById('appContent').style.display = user ? 'block' : 'none';
-            if(user) loadData();
+            if(user) { loadData(); }
         });
 
         function loadData() {
@@ -65,8 +71,10 @@
         function updateQaidFilter() {
             const qaidSelect = document.getElementById('filterQaid');
             const uniqueQaids = [...new Set(window.allStudentsData.map(s => s.qaid))].sort();
-            qaidSelect.innerHTML = '<option value="">جميع القيود</option>' + 
-                uniqueQaids.map(q => `<option value="${q}">قيد ${q}</option>`).join('');
+            qaidSelect.innerHTML = '<option value="">جميع القيود</option>';
+            uniqueQaids.forEach(q => {
+                qaidSelect.innerHTML += `<option value="${q}">قيد ${q}</option>`;
+            });
         }
 
         window.applyFilters = () => {
@@ -76,99 +84,290 @@
             const filterPage = document.getElementById('filterPage').value;
             
             let filtered = window.allStudentsData.filter(s => {
-                const matchSearch = (s.name + s.surname + (s.qaid||'')).toLowerCase().includes(term);
-                const matchQaid = !filterQaid || String(s.qaid) === filterQaid;
-                const matchPage = !filterPage || String(s.page).includes(filterPage);
+                const matchSearch = 
+                    (s.name || '').toLowerCase().includes(term) || 
+                    (s.surname || '').toLowerCase().includes(term) ||
+                    String(s.qaid).includes(term);
+                const matchQaid = filterQaid ? String(s.qaid) === filterQaid : true;
+                const matchPage = filterPage ? String(s.page).includes(filterPage) : true;
                 return matchSearch && matchQaid && matchPage;
             });
             
-            const sortMaps = {
-                alpha: (a, b) => (a.name||'').localeCompare(b.name||'', 'ar'),
-                qaid: (a, b) => String(a.qaid||'').localeCompare(String(b.qaid||'')),
-                page: (a, b) => Number(a.page||0) - Number(b.page||0)
-            };
-            if(sortMaps[sortBy]) filtered.sort(sortMaps[sortBy]);
-            window.render(filtered);
+            if (sortBy === "alpha") filtered.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+            else if (sortBy === "qaid") filtered.sort((a, b) => String(a.qaid).localeCompare(String(b.qaid)));
+            else if (sortBy === "page") filtered.sort((a, b) => String(a.page).localeCompare(String(b.page)));
+            else if (sortBy === "surname") filtered.sort((a, b) => (a.surname || '').localeCompare(b.surname || '', 'ar'));
+            
+            displayLimit = 50; 
+            filteredDataGlobal = filtered;
+            window.render(filtered.slice(0, displayLimit));
         };
 
-        window.executePrint = (data, title) => {
-            if(data.length === 0) return showToast("لا توجد بيانات للطباعة", "error");
-            
-            const container = document.getElementById('printTablesContainer');
-            document.getElementById('printTitle').innerText = title;
-            container.innerHTML = '';
-            
-            const rowsPerPage = 70; 
-            const rowsPerCol = 35;
+        window.loadMore = () => {
+            displayLimit += 50;
+            window.render(filteredDataGlobal.slice(0, displayLimit));
+        };
 
-            for (let i = 0; i < data.length; i += rowsPerPage) {
-                const pageData = data.slice(i, i + rowsPerPage);
+        window.clearFilters = () => {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('filterQaid').value = '';
+            document.getElementById('filterPage').value = '';
+            document.getElementById('sortSelect').value = 'newest';
+            window.applyFilters();
+            showToast("تم مسح جميع الفلاتر");
+        };
+
+        window.downloadExcelTemplate = () => {
+            const templateData = [
+                ["الاسم", "اللقب", "القيد", "الصفحة", "ملاحظات"],
+                ["أحمد محمد علي", "الكبيسي", "12345", "25", "-"],
+                ["سارة خالد حسن", "العبيدي", "12346", "26", "طالبة متفوقة"]
+            ];
+            const ws = XLSX.utils.aoa_to_sheet(templateData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
+            XLSX.writeFile(wb, "نموذج_اسماء_الطلاب.xlsx");
+            showToast("تم تحميل النموذج بنجاح");
+        };
+
+        function isDuplicateQaidPage(qaid, page, existingStudents, excludeId = null) {
+            return existingStudents.some(student => 
+                (excludeId ? student.id !== excludeId : true) &&
+                String(student.qaid).trim() === String(qaid).trim() &&
+                String(student.page).trim() === String(page).trim()
+            );
+        }
+
+        window.importExcel = (event) => {
+            const file = event.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            document.getElementById('loader').style.display = 'flex';
+            reader.onload = async (e) => {
+                try {
+                    const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                    const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                    
+                    const existingStudents = window.allStudentsData;
+                    let added = 0;
+                    let skipped = 0;
+                    const chunkSize = 100;
+
+                    for (let i = 0; i < json.length; i += chunkSize) {
+                        const batch = writeBatch(db);
+                        const chunk = json.slice(i, i + chunkSize);
+                        
+                        chunk.forEach((row) => {
+                            const rName = String(row.name || row["الاسم"] || "").trim();
+                            const rQaid = String(row.qaid || row["القيد"] || "").trim();
+                            const rPage = String(row.page || row["الصفحة"] || "").trim();
+                            
+                            if (rName === "" || rQaid === "" || rPage === "" || isDuplicateQaidPage(rQaid, rPage, existingStudents)) {
+                                skipped++;
+                                return;
+                            }
+                            
+                            const newDoc = doc(collection(db, "students"));
+                            batch.set(newDoc, {
+                                name: rName, 
+                                surname: String(row.surname || row["اللقب"] || "").trim(),
+                                qaid: rQaid,
+                                page: rPage,
+                                note: String(row.note || row["ملاحظات"] || "").trim(),
+                                timestamp: Date.now()
+                            });
+                            added++;
+                        });
+                        await batch.commit();
+                        console.log(`تم رفع دفعة ${i / chunkSize + 1}`);
+                    }
+                    
+                    if (added > 0) {
+                        showToast(`تم استيراد ${added} طالب (تم تخطي ${skipped})`);
+                    } else {
+                        showToast("لم يتم استيراد أي بيانات جديدة", "error");
+                    }
+                    
+                } catch(err) { showToast("خطأ في الملف", "error"); }
+                document.getElementById('loader').style.display = 'none';
+            };
+            reader.readAsArrayBuffer(file);
+        };
+
+        window.exportExcel = () => {
+            const ws = XLSX.utils.json_to_sheet(window.allStudentsData.map(({id, timestamp, ...rest}) => rest));
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
+            XLSX.writeFile(wb, "الارشيف.xlsx");
+        };
+
+        window.openMasterDelete = () => {
+            document.getElementById('masterDeleteInput').value = '';
+            document.getElementById('masterDeleteModal').style.display = 'flex';
+        };
+
+        window.confirmMasterDelete = async () => {
+            if(document.getElementById('masterDeleteInput').value !== 'حذف') return showToast("اكتب كلمة حذف", "error");
+            document.getElementById('loader').style.display = 'flex';
+            try {
+                const snapshot = await getDocs(studentsCol);
+                const batch = writeBatch(db);
+                snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+                await batch.commit();
+                showToast("تم مسح السجل بنجاح", "error");
+                document.getElementById('masterDeleteModal').style.display = 'none';
+            } catch(e) { showToast("خطأ في المسح", "error"); }
+            document.getElementById('loader').style.display = 'none';
+        };
+
+        window.showPrintOptions = () => {
+            const qSelect = document.getElementById('qaidSelect');
+            qSelect.innerHTML = '<option value="">-- اختر القيد --</option>';
+            [...new Set(window.allStudentsData.map(s => s.qaid))].sort().forEach(q => {
+                qSelect.innerHTML += `<option value="${q}">قيد رقم ${q}</option>`;
+            });
+            document.getElementById('printModal').style.display = 'flex';
+        };
+
+        window.printSelectedQaid = () => {
+            const q = document.getElementById('qaidSelect').value;
+            if(!q) return;
+            const data = window.allStudentsData.filter(s => String(s.qaid) === String(q)).sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+            executePrint(data, `سجل القيد رقم (${q})`);
+        };
+
+        window.printAllAlpha = () => {
+            executePrint([...window.allStudentsData].sort((a,b)=>a.name.localeCompare(b.name,'ar')), "السجل العام");
+        };
+
+        function executePrint(data, title) {
+            document.getElementById('printTitle').innerText = title;
+            const container = document.getElementById('printTablesContainer');
+            container.innerHTML = '';
+            const rowsPerColumn = 35;
+            const totalRowsPerPage = 70;
+            for (let pageNum = 0; pageNum < Math.ceil(data.length / totalRowsPerPage); pageNum++) {
+                const pageStartIndex = pageNum * totalRowsPerPage;
+                const pageData = data.slice(pageStartIndex, pageStartIndex + totalRowsPerPage);
                 const pageDiv = document.createElement('div');
                 pageDiv.className = 'print-page';
-                
-                const buildTable = (colData, startIdx) => {
-                    let rows = '';
-                    for(let j=0; j < rowsPerCol; j++) {
-                        const s = colData[j] || {};
-                        rows += `<tr>
-                            <td>${s.name ? (startIdx + j + 1) : ''}</td>
-                            <td>${s.name || ''}</td>
-                            <td>${s.surname || ''}</td>
-                            <td>${s.qaid || ''}</td>
-                            <td>${s.page || ''}</td>
-                        </tr>`;
+                const rightData = pageData.slice(0, rowsPerColumn);
+                const leftData = pageData.slice(rowsPerColumn, totalRowsPerPage);
+                const createTable = (colData, startSeq) => {
+                    let html = '<table><thead><tr><th>ت</th><th>الاسم</th><th>اللقب</th><th>القيد</th><th>الصفحة</th></tr></thead><tbody>';
+                    for (let i = 0; i < rowsPerColumn; i++) {
+                        const student = colData[i];
+                        const currentSeq = startSeq + i;
+                        if (student) {
+                            html += `<tr><td>${currentSeq}</td><td style="text-align:right; padding-right:5px;">${student.name || ''}</td><td>${student.surname || ''}</td><td>${student.qaid || ''}</td><td>${student.page || ''}</td></tr>`;
+                        } else {
+                            html += `<tr><td>${currentSeq}</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
+                        }
                     }
-                    return `<table><thead><tr><th>ت</th><th>الاسم</th><th>اللقب</th><th>القيد</th><th>ص</th></tr></thead><tbody>${rows}</tbody></table>`;
+                    html += '</tbody></table>';
+                    return html;
                 };
-
-                pageDiv.innerHTML = `<div class="print-grid">
-                    <div class="print-col">${buildTable(pageData.slice(0, rowsPerCol), i)}</div>
-                    <div class="print-col">${buildTable(pageData.slice(rowsPerCol), i + rowsPerCol)}</div>
-                </div>`;
+                pageDiv.innerHTML = `<div class="print-grid"><div class="print-col print-col-right">${createTable(rightData, pageStartIndex + 1)}</div><div class="print-col print-col-left">${createTable(leftData, pageStartIndex + rowsPerColumn + 1)}</div></div>`;
                 container.appendChild(pageDiv);
             }
-            
-            // إخفاء الواجهة وإظهار منطقة الطباعة مؤقتاً
-            window.print();
-        };
+            document.getElementById('printDate').innerText = "تاريخ الاستخراج: " + new Date().toLocaleDateString('ar-EG');
+            document.getElementById('printModal').style.display = 'none';
+            setTimeout(() => { window.print(); }, 500);
+        }
 
         window.saveData = async () => {
             const id = document.getElementById('editId').value;
-            const fields = {
-                name: document.getElementById('fName').value.trim(),
-                surname: document.getElementById('surname').value.trim(),
-                qaid: document.getElementById('qNum').value.trim(),
-                page: document.getElementById('pNum').value.trim(),
-                note: document.getElementById('note').value.trim(),
-                timestamp: Date.now()
-            };
-            if(!fields.name || !fields.qaid || !fields.page) return showToast("أكمل البيانات", "error");
+            const name = document.getElementById('fName').value.trim();
+            const qaid = document.getElementById('qNum').value.trim();
+            const page = document.getElementById('pNum').value.trim();
+            if(!name || !qaid || !page) return showToast("أكمل البيانات", "error");
+            if (isDuplicateQaidPage(qaid, page, window.allStudentsData, id)) {
+                showToast("هذا القيد والصفحة مسجلين مسبقاً لطالب آخر", "error");
+                return;
+            }
             try {
-                id ? await updateDoc(doc(db, "students", id), fields) : await addDoc(studentsCol, fields);
-                showToast("تم الحفظ");
-                window.closeAddModal();
-            } catch(e) { showToast("خطأ في الاتصال", "error"); }
+                const data = { name, surname: document.getElementById('surname').value, qaid, page, note: document.getElementById('note').value, timestamp: Date.now() };
+                if(id) await updateDoc(doc(db, "students", id), data);
+                else await addDoc(studentsCol, data);
+                showToast("تم الحفظ بنجاح"); 
+                window.closeAddModal(); 
+                window.resetForm();
+                unsavedChanges = false;
+            } catch(e) { showToast("خطأ شبكة", "error"); }
+        };
+
+        window.del = (id) => { deleteTargetId = id; document.getElementById('deleteModal').style.display = 'flex'; };
+        window.confirmDel = async () => { if(deleteTargetId) { await deleteDoc(doc(db, "students", deleteTargetId)); showToast("تم الحذف", "error"); document.getElementById('deleteModal').style.display = 'none'; } };
+        
+        window.copyStudentData = (id) => {
+            const student = window.allStudentsData.find(s => s.id === id);
+            const text = `الاسم: ${student.name}\nاللقب: ${student.surname || ''}\nالقيد: ${student.qaid}\nالصفحة: ${student.page}`;
+            navigator.clipboard.writeText(text).then(() => showToast("تم نسخ بيانات الطالب"));
+        };
+
+        window.duplicateLastStudent = () => {
+            if (window.allStudentsData.length > 0) {
+                const lastStudent = window.allStudentsData[0];
+                document.getElementById('fName').value = lastStudent.name;
+                document.getElementById('surname').value = lastStudent.surname;
+                document.getElementById('qNum').value = lastStudent.qaid;
+                document.getElementById('pNum').value = lastStudent.page;
+                document.getElementById('note').value = lastStudent.note;
+                showToast("تم نسخ بيانات آخر طالب");
+                unsavedChanges = true;
+            } else { showToast("لا توجد بيانات للنسخ", "error"); }
+        };
+
+        window.generateRandomData = () => {
+            const names = ["أحمد محمد علي", "سارة خالد حسن", "علي محمود سعيد"];
+            const surnames = ["الكبيسي", "العبيدي", "الجبوري"];
+            document.getElementById('fName').value = names[Math.floor(Math.random() * names.length)];
+            document.getElementById('surname').value = surnames[Math.floor(Math.random() * surnames.length)];
+            document.getElementById('qNum').value = Math.floor(Math.random() * 90000) + 10000;
+            document.getElementById('pNum').value = Math.floor(Math.random() * 50) + 1;
+            document.getElementById('note').value = "بيانات تجريبية";
+            showToast("تم تعبئة بيانات تجريبية");
+            unsavedChanges = true;
         };
 
         window.render = (data) => {
             const list = document.getElementById('studentsList');
-            list.innerHTML = data.map((s, i) => `
-                <div class="student-item card">
-                    <div class="student-number">${i + 1}</div>
-                    <div class="card-body-wrapper">
-                        <div class="student-details">
-                            <p class="student-name">${s.name} <span class="surname-badge">${s.surname || ''}</span></p>
-                            <div class="student-meta">
-                                <span class="highlight-badge qaid-badge"># ${s.qaid}</span>
-                                <span class="highlight-badge page-badge"><i class="fas fa-file-alt"></i> ${s.page}</span>
+            if (displayLimit === 50) list.innerHTML = ''; 
+            else {
+                const existingItems = list.querySelectorAll('.student-item');
+                if (existingItems.length >= data.length + 50) list.innerHTML = '';
+            }
+            
+            let html = '';
+            data.forEach((s, index) => {
+                html += `
+                    <div class="student-item card">
+                        <div class="student-number">${index + 1}</div>
+                        <div class="card-body-wrapper">
+                            <div class="user-icon" title="آخر رقمين من القيد: ${String(s.qaid).slice(-2)}">
+                                <i class="fas fa-user-graduate"></i>
+                                <small class="qaid-end">${String(s.qaid).slice(-2)}</small>
+                            </div>
+                            <div class="student-details">
+                                <p class="student-name">${s.name} <span class="surname-badge">${s.surname || ''}</span></p>
+                                <div class="student-meta">
+                                    <span class="highlight-badge qaid-badge"><i class="fas fa-hashtag"></i> ${s.qaid}</span>
+                                    <span class="highlight-badge page-badge"><i class="fas fa-file-alt"></i> ${s.page}</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="item-actions">
-                        <button onclick="edit('${s.id}')" class="edit-btn-small"><i class="fas fa-edit"></i></button>
-                        <button onclick="del('${s.id}')" class="del-btn-small"><i class="fas fa-trash"></i></button>
-                    </div>
-                </div>`).join('');
+                        <div class="item-actions">
+                            <button onclick="copyStudentData('${s.id}')" class="copy-btn-small"><i class="fas fa-copy"></i></button>
+                            <button onclick="edit('${s.id}')" class="edit-btn-small"><i class="fas fa-edit"></i></button>
+                            <button onclick="del('${s.id}')" class="del-btn-small"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>`;
+            });
+            list.innerHTML = html;
+
+            if (filteredDataGlobal.length > displayLimit) {
+                list.innerHTML += `<button id="loadMoreBtn" onclick="loadMore()" class="btn" style="background:var(--blue); width:200px; margin: 20px auto; display:block;">عرض المزيد (${filteredDataGlobal.length - displayLimit})</button>`;
+            }
         };
 
         window.edit = (id) => {
@@ -179,151 +378,179 @@
             document.getElementById('qNum').value = s.qaid;
             document.getElementById('pNum').value = s.page;
             document.getElementById('note').value = s.note;
+            document.getElementById('saveBtn').innerText = "تحديث";
             document.getElementById('entryModal').style.display = 'flex';
+            unsavedChanges = false;
+            setupInputListeners();
         };
 
-        window.del = (id) => { deleteTargetId = id; document.getElementById('deleteModal').style.display = 'flex'; };
-        window.confirmDel = async () => { if(deleteTargetId) { await deleteDoc(doc(db, "students", deleteTargetId)); document.getElementById('deleteModal').style.display = 'none'; showToast("تم الحذف", "error"); } };
-        window.closeAddModal = () => { document.getElementById('entryModal').style.display = 'none'; document.getElementById('editId').value = ''; document.querySelectorAll('#entryModal input, #entryModal textarea').forEach(i => i.value = ''); };
-        window.login = () => signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value, document.getElementById('loginPass').value).catch(() => showToast("بيانات خاطئة", "error"));
+        function setupInputListeners() {
+            document.querySelectorAll('#entryModal input, #entryModal textarea').forEach(input => {
+                input.addEventListener('input', () => { unsavedChanges = true; });
+            });
+        }
+
+        window.openAddModal = () => { window.resetForm(); document.getElementById('entryModal').style.display = 'flex'; unsavedChanges = false; setupInputListeners(); };
+        window.closeAddModal = () => { document.getElementById('entryModal').style.display = 'none'; unsavedChanges = false; };
+        window.resetForm = () => { 
+            document.getElementById('editId').value = ''; 
+            document.querySelectorAll('#entryModal input, #entryModal textarea').forEach(i => i.value = ''); 
+            document.getElementById('saveBtn').innerText = "حفظ"; 
+            const existingAlert = document.getElementById('duplicateStudentAlert');
+            if(existingAlert) existingAlert.remove();
+        };
+        
+        window.login = async () => { try { await signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value, document.getElementById('loginPass').value); } catch(e) { showToast("بيانات خاطئة", "error"); } };
         window.logout = () => signOut(auth);
         window.toggleDarkMode = () => document.body.classList.toggle('dark-mode');
-        window.toggleSettings = () => document.getElementById('settingsDropdown').classList.toggle('show');
-        window.showPrintOptions = () => {
-            const qSelect = document.getElementById('qaidSelect');
-            qSelect.innerHTML = '<option value="">-- اختر القيد --</option>' + 
-                [...new Set(window.allStudentsData.map(s => s.qaid))].sort().map(q => `<option value="${q}">قيد رقم ${q}</option>`).join('');
-            document.getElementById('printModal').style.display = 'flex';
+        
+        window.checkDuplicateStudent = () => {
+            const nameInput = document.getElementById('fName');
+            const nameValue = nameInput.value.trim();
+            const existingAlert = document.getElementById('duplicateStudentAlert');
+            if(existingAlert) existingAlert.remove();
+            if(nameValue) {
+                const existingStudent = window.allStudentsData.find(student => student.name.trim().toLowerCase() === nameValue.toLowerCase());
+                if(existingStudent) {
+                    const alertDiv = document.createElement('div');
+                    alertDiv.id = 'duplicateStudentAlert';
+                    alertDiv.className = 'duplicate-alert';
+                    alertDiv.style.cssText = `background: #fef3c7; border: 1px solid #f59e0b; color: #92400e; padding: 8px 12px; border-radius: 6px; margin-top: 8px; font-size: 0.85rem; text-align: center;`;
+                    alertDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> هذا الطالب مسجل مسبقاً: <br> <strong>رقم القيد: ${existingStudent.qaid}</strong> | <strong>رقم الصفحة: ${existingStudent.page}</strong>`;
+                    nameInput.parentNode.insertBefore(alertDiv, nameInput.nextSibling);
+                }
+            }
         };
+
+        window.toggleSettings = () => {
+            const dropdown = document.getElementById('settingsDropdown');
+            dropdown.classList.toggle('show');
+            document.addEventListener('click', (e) => { if (!e.target.closest('.settings-container')) dropdown.classList.remove('show'); }, { once: true });
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('settingsBtn').addEventListener('click', window.toggleSettings);
+        });
     </script>
     
     <style>
-        :root { --main: #1e293b; --blue: #0ea5e9; --bg: #f8fafc; --card: #ffffff; --text: #334155; --success: #10b981; --danger: #ef4444; }
-        body.dark-mode { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); direction: rtl; margin: 0; }
-        .container { max-width: 900px; margin: auto; padding: 15px; }
-        .card { background: var(--card); padding: 12px; border-radius: 10px; margin-bottom: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-right: 4px solid var(--blue); position: relative; }
-        .student-item { display: flex; align-items: center; justify-content: space-between; }
-        .student-name { font-weight: bold; margin: 0; }
-        .surname-badge { background: #7c3aed; color: #fff; padding: 1px 7px; border-radius: 8px; font-size: 0.75rem; }
-        .btn { border: none; border-radius: 6px; cursor: pointer; padding: 8px 15px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 5px; }
-        .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
-        .stat-item { background: var(--card); padding: 8px; border-radius: 8px; text-align: center; border: 1px solid #e2e8f0; }
-        .stat-val { display: block; font-size: 1.2rem; font-weight: 800; color: var(--blue); }
-        .search-wrapper { background: var(--card); padding: 8px 15px; border-radius: 25px; border: 2px solid var(--blue); margin-bottom: 15px; }
+        :root { --main: #1e293b; --blue: #0ea5e9; --bg: #f8fafc; --card: #ffffff; --text: #334155; --accent: #6366f1; --success: #10b981; --warning: #f59e0b; --danger: #ef4444; --surname: #7c3aed; }
+        body.dark-mode { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --success: #34d399; --warning: #fbbf24; --danger: #f87171; --surname: #a78bfa; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); direction: rtl; margin: 0; transition: background 0.3s, color 0.3s; min-height: 100vh; }
+        .container { max-width: 1200px; margin: auto; padding: 15px; }
+        @media (min-width: 768px) { .stats-bar { grid-template-columns: repeat(3, 1fr); gap: 15px; } .advanced-filters { display: flex; gap: 12px; padding: 15px; } }
+        @media (max-width: 767px) { .stats-bar { grid-template-columns: repeat(3, 1fr); gap: 8px; } .advanced-filters { flex-direction: column; gap: 10px; } }
+        .card { background: var(--card); padding: 12px 15px; border-radius: 12px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); position: relative; border: 1px solid rgba(0,0,0,0.05); }
+        .student-item { display: flex; align-items: center; justify-content: space-between; border-right: 4px solid var(--blue); }
+        .student-number { position: absolute; right: -20px; top: 50%; transform: translateY(-50%); background: var(--blue); color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; z-index: 1; }
+        .surname-badge { background: var(--surname); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; margin-right: 5px; }
+        .user-icon { width: 42px; height: 42px; background: linear-gradient(135deg, #e0f2fe, #bae6fd); border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--blue); }
+        .highlight-badge { padding: 3px 10px; border-radius: 20px; font-weight: 600; font-size: 0.8rem; display: flex; align-items: center; gap: 5px; }
+        .qaid-badge { background: #e0f2fe; color: #0369a1; }
+        .page-badge { background: #fef9c3; color: #854d0e; }
+        .btn { border: none; border-radius: 10px; cursor: pointer; padding: 12px 15px; font-weight: 600; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; }
+        .stats-bar { display: grid; gap: 10px; margin-bottom: 15px; }
+        .stat-item { background: var(--card); padding: 15px; border-radius: 12px; text-align: center; }
+        .stat-val { display: block; font-size: 1.8rem; font-weight: 800; color: var(--blue); }
+        .search-wrapper { display: flex; align-items: center; gap: 10px; background: var(--card); padding: 12px 20px; border-radius: 50px; border: 2px solid var(--blue); margin-bottom: 15px; }
         .search-wrapper input { border: none; width: 100%; outline: none; background: transparent; color: inherit; }
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
-        .modal-content { background: var(--card); padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; }
-        input, select, textarea { width: 100%; padding: 8px; margin-top: 5px; border: 1px solid #e2e8f0; border-radius: 6px; background: var(--card); color: var(--text); box-sizing: border-box; }
-        .toast { position: fixed; bottom: 20px; left: 20px; padding: 10px 20px; border-radius: 8px; color: #fff; z-index: 2000; transition: 0.5s; }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 5000; backdrop-filter: blur(3px); }
+        .modal-content { background: var(--card); padding: 25px; border-radius: 16px; width: 90%; max-width: 400px; position: relative; }
+        .toast { position: fixed; bottom: 20px; left: 20px; padding: 14px 22px; border-radius: 10px; color: white; z-index: 9999; }
         .toast.success { background: var(--success); } .toast.error { background: var(--danger); }
-        .settings-dropdown { position: absolute; left: 0; top: 100%; background: var(--card); border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); display: none; min-width: 180px; z-index: 100; }
+        .loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 10000; display: none; align-items: center; justify-content: center; flex-direction: column; }
+        .theme-toggle { position: fixed; bottom: 20px; left: 20px; background: var(--main); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .settings-container { position: relative; }
+        .settings-btn { background: none; border: none; color: var(--text); font-size: 1.2rem; cursor: pointer; }
+        .settings-dropdown { position: absolute; left: 0; top: 100%; background: var(--card); border-radius: 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); min-width: 200px; display: none; padding: 8px 0; z-index: 1000; }
         .settings-dropdown.show { display: block; }
-        .settings-dropdown button { width: 100%; padding: 10px; background: none; border: none; text-align: right; color: var(--text); border-bottom: 1px solid #eee; cursor: pointer; }
-
-        /* تنسيقات الطباعة */
-        #printArea { display: none; }
-        @media print {
-            .no-print, .modal, .toast, .theme-toggle { display: none !important; }
-            #printArea { display: block !important; position: absolute; top: 0; left: 0; width: 100%; }
-            .print-page { page-break-after: always; padding: 20px; direction: rtl; }
-            .print-grid { display: flex; gap: 15px; justify-content: space-between; }
-            .print-col { width: 49%; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 11px; }
-            th, td { border: 1px solid #000; padding: 3px; text-align: center; }
-            th { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; }
-            h2 { text-align: center; font-size: 18px; margin-bottom: 15px; }
-        }
-        .theme-toggle { position: fixed; bottom: 20px; left: 20px; background: var(--main); color: #fff; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .settings-dropdown button { width: 100%; padding: 12px; border: none; background: none; text-align: right; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 10px; }
+        .main-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
+        .advanced-filters { background: var(--card); padding: 15px; border-radius: 12px; margin: 15px 0; display: flex; gap: 12px; }
+        @media print { .no-print { display: none !important; } .print-area { display: block !important; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #000; padding: 4px; font-size: 12px; } }
+        .print-area { display: none; }
     </style>
 </head>
 <body>
 
+<div id="loader" class="loader">
+    <div class="spinner" style="width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top: 4px solid var(--blue); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+    جاري المعالجة...
+</div>
+
+<style> @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } } </style>
 <div id="toastContainer"></div>
 
+<div id="masterDeleteModal" class="modal"><div class="modal-content"><h3>حذف الأرشيف كاملاً؟</h3><input type="text" id="masterDeleteInput" placeholder="اكتب حذف للتأكيد"><div style="display:flex; gap:12px; margin-top:20px;"><button class="btn" style="background:var(--danger); flex:1;" onclick="confirmMasterDelete()">تأكيد</button><button class="btn" style="background:#64748b; flex:1;" onclick="document.getElementById('masterDeleteModal').style.display='none'">إلغاء</button></div></div></div>
+<div id="deleteModal" class="modal"><div class="modal-content"><h4>حذف الطالب؟</h4><div style="display:flex; gap:12px; margin-top:15px;"><button class="btn" style="background:var(--danger); flex:1;" onclick="confirmDel()">نعم</button><button class="btn" style="background:#64748b; flex:1;" onclick="document.getElementById('deleteModal').style.display='none'">لا</button></div></div></div>
+<div id="entryModal" class="modal"><div class="modal-content"><h3>بيانات الطالب</h3><input type="hidden" id="editId"><input type="text" id="fName" placeholder="الاسم الرباعي" oninput="checkDuplicateStudent()"><input type="text" id="surname" placeholder="اللقب"><div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;"><input type="text" id="qNum" placeholder="القيد"><input type="number" id="pNum" placeholder="الصفحة"></div><textarea id="note" placeholder="ملاحظات..."></textarea><div style="display:flex; gap:12px; margin-top:20px;"><button id="saveBtn" class="btn" style="background:var(--main); flex:2;" onclick="saveData()">حفظ</button><button class="btn" style="background:#64748b; flex:1;" onclick="closeAddModal()">إلغاء</button></div></div></div>
+<div id="printModal" class="modal"><div class="modal-content"><h3>طباعة</h3><button class="btn" style="background:var(--accent); width:100%; margin-bottom:10px" onclick="printAllAlpha()">السجل العام</button><select id="qaidSelect"></select><button class="btn" style="background:var(--blue); width:100%; margin-top:10px" onclick="printSelectedQaid()">طباعة القيد</button><button class="btn" style="background:#64748b; width:100%; margin-top:10px" onclick="document.getElementById('printModal').style.display='none'">إلغاء</button></div></div>
+
+<div id="loginPage" style="height: 100vh; flex-direction: column; align-items: center; justify-content: center; display: none;">
+    <div class="card" style="width: 90%; max-width: 400px; text-align: center; padding: 30px;">
+        <h2 style="color: var(--blue);">دخول النظام</h2>
+        <input type="email" id="loginEmail" placeholder="البريد الإلكتروني"><br>
+        <input type="password" id="loginPass" placeholder="كلمة المرور"><br>
+        <button class="btn" style="background:var(--main); width:100%;" onclick="login()">دخول</button>
+    </div>
+</div>
+
 <div id="appContent" class="container" style="display: none;">
+    <div class="print-area">
+        <div style="text-align:center; border-bottom: 2px solid #000; margin-bottom: 15px;">
+            <h2 id="printTitle"></h2><span id="printDate"></span>
+        </div>
+        <div id="printTablesContainer"></div>
+    </div>
+
     <div class="no-print">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h4><i class="fas fa-archive"></i> الأرشيف</h4>
-            <div style="display:flex; gap:10px; position:relative;">
-                <button onclick="toggleSettings()" class="btn" style="background:#64748b; padding:6px 10px;"><i class="fas fa-cog"></i></button>
-                <div id="settingsDropdown" class="settings-dropdown">
-                    <button onclick="document.getElementById('fileInput').click()">استيراد Excel</button>
-                    <button onclick="showPrintOptions()">طباعة</button>
-                    <button onclick="logout()" style="color:var(--danger)">خروج</button>
+        <div class="header-container" style="display:flex; justify-content:space-between; align-items:center;">
+            <h4 class="header-title">نظام الأرشيف الذكي</h4>
+            <div style="display:flex; gap:10px;">
+                <div class="settings-container">
+                    <button class="settings-btn" id="settingsBtn"><i class="fas fa-cog"></i></button>
+                    <div class="settings-dropdown" id="settingsDropdown">
+                        <button onclick="document.getElementById('fileInput').click()">استيراد Excel</button>
+                        <button onclick="downloadExcelTemplate()">تحميل نموذج</button>
+                        <button onclick="exportExcel()">تصدير Excel</button>
+                        <button onclick="showPrintOptions()">طباعة</button>
+                        <button onclick="openMasterDelete()" style="color:var(--danger)">مسح السجل</button>
+                    </div>
                 </div>
+                <button onclick="logout()" style="background:none; border:none; color:var(--danger); cursor:pointer;">خروج</button>
             </div>
         </div>
 
         <div class="stats-bar">
-            <div class="stat-item"><small>الكل</small><span class="stat-val" id="statTotal">0</span></div>
-            <div class="stat-item"><small>اليوم</small><span class="stat-val" id="statToday">0</span></div>
-            <div class="stat-item"><small>قيود</small><span class="stat-val" id="statQaids">0</span></div>
+            <div class="stat-item"><span class="stat-val" id="statTotal">0</span><span class="stat-label">طلاب</span></div>
+            <div class="stat-item"><span class="stat-val" style="color:var(--success)" id="statToday">0</span><span class="stat-label">اليوم</span></div>
+            <div class="stat-item"><span class="stat-val" style="color:var(--accent)" id="statQaids">0</span><span class="stat-label">قيود</span></div>
         </div>
 
-        <button class="btn" style="background:var(--main); width:100%; margin-bottom:10px;" onclick="document.getElementById('entryModal').style.display='flex'"><i class="fas fa-plus"></i> إضافة طالب جديد</button>
-
-        <div class="search-wrapper"><input type="text" id="searchInput" placeholder="بحث سريع..."></div>
+        <div class="main-actions">
+            <button class="btn" style="background:var(--main)" onclick="openAddModal()">إضافة طالب</button>
+            <button class="btn" onclick="clearFilters()" style="background:#64748b;">مسح الفلاتر</button>
+        </div>
         
-        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:5px; margin-bottom:10px;">
-            <select id="filterQaid" onchange="applyFilters()"></select>
-            <input type="number" id="filterPage" placeholder="صفحة" oninput="applyFilters()">
+        <input type="file" id="fileInput" hidden onchange="importExcel(event)" accept=".xlsx, .xls">
+
+        <div class="advanced-filters">
+            <select id="filterQaid" onchange="applyFilters()"><option value="">جميع القيود</option></select>
+            <input type="number" id="filterPage" placeholder="رقم الصفحة" oninput="applyFilters()">
             <select id="sortSelect" onchange="applyFilters()">
                 <option value="newest">الأحدث</option>
                 <option value="alpha">أبجدي</option>
+                <option value="surname">اللقب</option>
+                <option value="qaid">القيد</option>
+                <option value="page">الصفحة</option>
             </select>
         </div>
 
+        <div class="search-wrapper"><input type="text" id="searchInput" placeholder="ابحث..." onkeyup="applyFilters()"></div>
         <div id="studentsList"></div>
     </div>
-
-    <div id="printArea">
-        <h2 id="printTitle"></h2>
-        <div id="printTablesContainer"></div>
-    </div>
 </div>
 
-<div id="entryModal" class="modal">
-    <div class="modal-content">
-        <h4>بيانات الطالب</h4>
-        <input type="hidden" id="editId">
-        <input type="text" id="fName" placeholder="الاسم الكامل">
-        <input type="text" id="surname" placeholder="اللقب">
-        <input type="text" id="qNum" placeholder="القيد">
-        <input type="number" id="pNum" placeholder="الصفحة">
-        <textarea id="note" placeholder="ملاحظات"></textarea>
-        <button class="btn" style="background:var(--main); width:100%; margin-top:10px;" onclick="saveData()">حفظ</button>
-        <button class="btn" style="background:#64748b; width:100%; margin-top:5px;" onclick="closeAddModal()">إغلاق</button>
-    </div>
-</div>
-
-<div id="printModal" class="modal">
-    <div class="modal-content">
-        <h4>خيارات الطباعة</h4>
-        <button class="btn" style="background:var(--blue); width:100%; margin-bottom:8px;" onclick="executePrint(window.allStudentsData.sort((a,b)=>(a.name||'').localeCompare(b.name||'','ar')), 'السجل العام للطلاب')">طباعة السجل العام</button>
-        <select id="qaidSelect"></select>
-        <button class="btn" style="background:var(--main); width:100%; margin-top:8px;" onclick="const q=document.getElementById('qaidSelect').value; executePrint(window.allStudentsData.filter(s=>s.qaid==q), 'قيد رقم '+q)">طباعة هذا القيد</button>
-        <button class="btn" style="background:#64748b; width:100%; margin-top:8px;" onclick="document.getElementById('printModal').style.display='none'">إلغاء</button>
-    </div>
-</div>
-
-<div id="loginPage" style="height:100vh; display:none; align-items:center; justify-content:center;">
-    <div class="card" style="width:300px; text-align:center;">
-        <h3>دخول الأرشيف</h3>
-        <input type="email" id="loginEmail" placeholder="البريد">
-        <input type="password" id="loginPass" placeholder="كلمة المرور">
-        <button class="btn" style="background:var(--main); width:100%; margin-top:10px;" onclick="login()">دخول</button>
-    </div>
-</div>
-
-<div id="deleteModal" class="modal">
-    <div class="modal-content" style="text-align:center;">
-        <p>هل أنت متأكد من حذف هذا الطالب؟</p>
-        <button class="btn" style="background:var(--danger); width:100%;" onclick="confirmDel()">تأكيد الحذف</button>
-    </div>
-</div>
-
-<input type="file" id="fileInput" hidden onchange="importExcel(event)">
 <div class="theme-toggle no-print" onclick="toggleDarkMode()"><i class="fas fa-moon"></i></div>
 
 </body>
