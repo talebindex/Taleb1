@@ -9,7 +9,7 @@
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, writeBatch, getDocs, getCountFromServer } 
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, writeBatch, getDocs } 
         from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } 
         from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
@@ -30,14 +30,8 @@
 
         let deleteTargetId = null;
         window.allStudentsData = [];
-        window.filteredStudentsData = [];
         window.activeLetter = null;
         let unsavedChanges = false;
-        
-        // متغيرات التقسيم إلى صفحات
-        window.currentPage = 1;
-        window.pageSize = 100; // عرض 100 سجل في كل صفحة
-        window.totalPages = 1;
 
         // نظام الإشعارات الملون وغير الشفاف
         window.showToast = (msg, type = 'success') => {
@@ -52,22 +46,8 @@
         onAuthStateChanged(auth, (user) => {
             document.getElementById('loginPage').style.display = user ? 'none' : 'flex';
             document.getElementById('appContent').style.display = user ? 'block' : 'none';
-            if(user) { 
-                loadData(); 
-                updateTotalCount();
-            }
+            if(user) { loadData(); }
         });
-
-        // دالة للحصول على العدد الإجمالي للطلاب
-        async function updateTotalCount() {
-            try {
-                const snapshot = await getCountFromServer(studentsCol);
-                const totalCount = snapshot.data().count;
-                document.getElementById('statTotal').innerText = totalCount;
-            } catch (error) {
-                console.error("Error getting total count:", error);
-            }
-        }
 
         function loadData() {
             onSnapshot(query(studentsCol, orderBy("timestamp", "desc")), (snapshot) => {
@@ -80,8 +60,8 @@
 
         function updateQuickStats() {
             const startOfDay = new Date().setHours(0,0,0,0);
-            const todayCount = window.allStudentsData.filter(s => s.timestamp >= startOfDay).length;
-            document.getElementById('statToday').innerText = todayCount;
+            document.getElementById('statTotal').innerText = window.allStudentsData.length;
+            document.getElementById('statToday').innerText = window.allStudentsData.filter(s => s.timestamp >= startOfDay).length;
             document.getElementById('statQaids').innerText = new Set(window.allStudentsData.map(s => s.qaid)).size;
         }
 
@@ -116,58 +96,8 @@
             else if (sortBy === "page") filtered.sort((a, b) => String(a.page).localeCompare(String(b.page)));
             else if (sortBy === "surname") filtered.sort((a, b) => (a.surname || '').localeCompare(b.surname || '', 'ar'));
             
-            window.filteredStudentsData = filtered;
-            window.totalPages = Math.ceil(filtered.length / window.pageSize);
-            window.currentPage = 1;
-            
-            window.renderPage();
-            updatePaginationControls();
+            window.render(filtered);
         };
-
-        // دالة لعرض الصفحة الحالية
-        window.renderPage = () => {
-            const startIndex = (window.currentPage - 1) * window.pageSize;
-            const endIndex = startIndex + window.pageSize;
-            const pageData = window.filteredStudentsData.slice(startIndex, endIndex);
-            
-            window.render(pageData);
-            updatePaginationInfo();
-        };
-
-        // تحديث معلومات الصفحة
-        function updatePaginationInfo() {
-            const totalStudents = window.filteredStudentsData.length;
-            const startIndex = (window.currentPage - 1) * window.pageSize + 1;
-            const endIndex = Math.min(window.currentPage * window.pageSize, totalStudents);
-            
-            document.getElementById('pageInfo').innerText = 
-                `عرض ${startIndex}-${endIndex} من ${totalStudents} طالب`;
-        }
-
-        // تحديث عناصر التحكم في التصفح
-        function updatePaginationControls() {
-            const prevBtn = document.getElementById('prevPage');
-            const nextBtn = document.getElementById('nextPage');
-            
-            prevBtn.disabled = window.currentPage <= 1;
-            nextBtn.disabled = window.currentPage >= window.totalPages;
-            
-            document.getElementById('pageNumber').innerText = window.currentPage;
-            document.getElementById('totalPages').innerText = window.totalPages;
-        }
-
-        // التنقل بين الصفحات
-        window.goToPage = (page) => {
-            if (page < 1 || page > window.totalPages) return;
-            window.currentPage = page;
-            window.renderPage();
-            updatePaginationControls();
-            // التمرير إلى أعلى القائمة
-            document.getElementById('studentsList').scrollIntoView({ behavior: 'smooth', block: 'start' });
-        };
-
-        window.prevPage = () => window.goToPage(window.currentPage - 1);
-        window.nextPage = () => window.goToPage(window.currentPage + 1);
 
         window.clearFilters = () => {
             document.getElementById('searchInput').value = '';
@@ -252,7 +182,6 @@
                     if (added > 0) {
                         await batch.commit();
                         showToast(`تم استيراد ${added} طالب (تم تخطي ${skipped})`);
-                        updateTotalCount();
                     } else {
                         showToast("لم يتم استيراد أي بيانات جديدة", "error");
                     }
@@ -285,7 +214,6 @@
                 await batch.commit();
                 showToast("تم مسح السجل بنجاح", "error");
                 document.getElementById('masterDeleteModal').style.display = 'none';
-                updateTotalCount();
             } catch(e) { showToast("خطأ في المسح", "error"); }
             document.getElementById('loader').style.display = 'none';
         };
@@ -334,10 +262,9 @@
                         const student = colData[i];
                         const currentSeq = startSeq + i;
                         if (student) {
-                            // تم إضافة تنسيق عريض للأسماء
                             html += `<tr>
                                 <td>${currentSeq}</td>
-                                <td style="text-align:right; padding-right:5px; font-weight: bold;">${student.name || ''}</td>
+                                <td style="text-align:right; padding-right:5px;">${student.name || ''}</td>
                                 <td>${student.surname || ''}</td>
                                 <td>${student.qaid || ''}</td>
                                 <td>${student.page || ''}</td>
@@ -398,14 +325,13 @@
                 window.closeAddModal(); 
                 window.resetForm();
                 unsavedChanges = false;
-                updateTotalCount();
             } catch(e) { 
                 showToast("خطأ شبكة", "error"); 
             }
         };
 
         window.del = (id) => { deleteTargetId = id; document.getElementById('deleteModal').style.display = 'flex'; };
-        window.confirmDel = async () => { if(deleteTargetId) { await deleteDoc(doc(db, "students", deleteTargetId)); showToast("تم الحذف", "error"); document.getElementById('deleteModal').style.display = 'none'; updateTotalCount(); } };
+        window.confirmDel = async () => { if(deleteTargetId) { await deleteDoc(doc(db, "students", deleteTargetId)); showToast("تم الحذف", "error"); document.getElementById('deleteModal').style.display = 'none'; } };
         
         window.copyStudentData = (id) => {
             const student = window.allStudentsData.find(s => s.id === id);
@@ -454,10 +380,9 @@
             const list = document.getElementById('studentsList');
             list.innerHTML = ''; 
             data.forEach((s, index) => {
-                const globalIndex = (window.currentPage - 1) * window.pageSize + index + 1;
                 list.innerHTML += `
                     <div class="student-item card">
-                        <div class="student-number">${globalIndex}</div>
+                        <div class="student-number">${index + 1}</div>
                         <div class="card-body-wrapper">
                             <div class="user-icon" title="آخر رقمين من القيد: ${String(s.qaid).slice(-2)}">
                                 <i class="fas fa-user-graduate"></i>
@@ -488,13 +413,6 @@
                         </div>
                     </div>`;
             });
-            
-            // إضافة عنصر فارغ إذا كانت البيانات أقل من الحد الأدنى للحفاظ على التنسيق
-            if (data.length < 5) {
-                for (let i = data.length; i < 5; i++) {
-                    list.innerHTML += `<div class="student-item card empty-card" style="opacity: 0.3; min-height: 70px;"></div>`;
-                }
-            }
         };
 
         window.edit = (id) => {
@@ -528,6 +446,7 @@
             setupInputListeners();
         };
         
+        // التعديل هنا: إزالة رسالة التحذير عند إغلاق النافذة
         window.closeAddModal = () => {
             document.getElementById('entryModal').style.display = 'none';
             unsavedChanges = false;
@@ -1002,13 +921,6 @@
             transform: translateY(0);
         }
         
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-        
         .stats-bar { 
             display: grid; 
             gap: 10px; 
@@ -1047,86 +959,6 @@
             font-size: 0.9rem; 
             color: #64748b; 
             font-weight: 500;
-        }
-        
-        /* التصفح بين الصفحات */
-        .pagination-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin: 20px 0;
-            padding: 15px;
-            background: var(--card);
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-        
-        .pagination-info {
-            font-size: 0.9rem;
-            color: var(--text);
-            font-weight: 500;
-            flex: 1;
-            text-align: center;
-        }
-        
-        .pagination-controls {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .pagination-btn {
-            background: var(--main);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 8px 16px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        
-        .pagination-btn:hover:not(:disabled) {
-            background: var(--blue);
-            transform: translateY(-2px);
-        }
-        
-        .pagination-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        .page-numbers {
-            display: flex;
-            gap: 5px;
-            align-items: center;
-        }
-        
-        .page-number {
-            padding: 8px 12px;
-            border-radius: 6px;
-            background: var(--bg);
-            color: var(--text);
-            font-weight: 600;
-            min-width: 40px;
-            text-align: center;
-        }
-        
-        @media (max-width: 767px) {
-            .pagination-container {
-                flex-direction: column;
-                text-align: center;
-            }
-            
-            .pagination-controls {
-                width: 100%;
-                justify-content: center;
-            }
         }
         
         .search-wrapper { 
@@ -1290,6 +1122,41 @@
             background: rgba(15, 23, 42, 0.9);
         }
         
+        /* تلميحات (Tooltips) */
+        [title] {
+            position: relative;
+            cursor: help;
+        }
+        
+        [title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--main);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            z-index: 1000;
+            margin-bottom: 5px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        [title]:hover::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: var(--main);
+            z-index: 1000;
+            margin-bottom: -5px;
+        }
+        
         /* تحسينات الطباعة - لاستيعاب 70 سطر في الصفحة */
         @media print { 
             .no-print { display: none !important; }
@@ -1361,11 +1228,10 @@
                 min-width: 30px;
             }
             
-            /* تحسين عرض الأسماء - أصبحت عريضة */
+            /* تحسين عرض الأسماء */
             td:nth-child(2) {
                 text-align: right;
                 padding-right: 5px !important;
-                font-weight: bold; /* إضافة تنسيق عريض للأسماء */
             }
             
             /* تحسين عرض الألقاب */
@@ -1488,6 +1354,52 @@
             .header-title {
                 font-size: 1.8rem;
             }
+        }
+        
+        /* تحسين عرض قائمة الطلاب للشاشات الكبيرة */
+        #studentsList {
+            display: grid;
+            gap: 12px;
+        }
+        
+        @media (min-width: 768px) {
+            #studentsList {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (min-width: 1200px) {
+            #studentsList {
+                grid-template-columns: 1fr;
+            }
+            
+            .student-item {
+                display: grid;
+                grid-template-columns: 1fr auto;
+                gap: 15px;
+            }
+        }
+        
+        /* تحسين تصميم الفلاتر */
+        .filters-container {
+            background: var(--card);
+            padding: 15px;
+            border-radius: 12px;
+            margin: 15px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .filters-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .filters-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: var(--text);
         }
         
         /* تصميم قائمة الإعدادات */
@@ -1726,7 +1638,7 @@
         </button>
         <button class="btn" style="background:#64748b; width:100%;" onclick="document.getElementById('printModal').style.display='none'">
             <i class="fas fa-times"></i> إلغاء
-            </button>
+        </button>
     </div>
 </div>
 
@@ -1838,80 +1750,13 @@
             <input type="text" id="searchInput" placeholder="ابحث عن اسم أو لقب أو قيد..." onkeyup="applyFilters()">
         </div>
 
-        <!-- عناصر التصفح بين الصفحات -->
-        <div class="pagination-container">
-            <div class="pagination-info" id="pageInfo">عرض 1-100 من 0 طالب</div>
-            <div class="pagination-controls">
-                <button class="pagination-btn" id="prevPage" onclick="prevPage()" title="الصفحة السابقة">
-                    <i class="fas fa-chevron-right"></i> السابق
-                </button>
-                <div class="page-numbers">
-                    <span class="page-number" id="pageNumber">1</span>
-                    <span style="color: var(--text);">من</span>
-                    <span class="page-number" id="totalPages">1</span>
-                </div>
-                <button class="pagination-btn" id="nextPage" onclick="nextPage()" title="الصفحة التالية">
-                    التالي <i class="fas fa-chevron-left"></i>
-                </button>
-            </div>
-        </div>
-
         <div id="studentsList"></div>
-
-        <!-- عناصر التصفح بين الصفحات في الأسفل أيضًا -->
-        <div class="pagination-container">
-            <div class="pagination-info" id="pageInfoBottom">عرض 1-100 من 0 طالب</div>
-            <div class="pagination-controls">
-                <button class="pagination-btn" id="prevPageBottom" onclick="prevPage()" title="الصفحة السابقة">
-                    <i class="fas fa-chevron-right"></i> السابق
-                </button>
-                <div class="page-numbers">
-                    <span class="page-number" id="pageNumberBottom">1</span>
-                    <span style="color: var(--text);">من</span>
-                    <span class="page-number" id="totalPagesBottom">1</span>
-                </div>
-                <button class="pagination-btn" id="nextPageBottom" onclick="nextPage()" title="الصفحة التالية">
-                    التالي <i class="fas fa-chevron-left"></i>
-                </button>
-            </div>
-        </div>
     </div>
 </div>
 
 <div class="theme-toggle no-print" onclick="toggleDarkMode()" title="تبديل الوضع الليلي">
     <i class="fas fa-moon"></i>
 </div>
-
-<script>
-    // تحديث عناصر التصفح السفلية أيضاً
-    function updatePaginationControls() {
-        const prevBtn = document.getElementById('prevPage');
-        const nextBtn = document.getElementById('nextPage');
-        const prevBtnBottom = document.getElementById('prevPageBottom');
-        const nextBtnBottom = document.getElementById('nextPageBottom');
-        
-        const disabled = window.currentPage <= 1;
-        prevBtn.disabled = disabled;
-        prevBtnBottom.disabled = disabled;
-        
-        const nextDisabled = window.currentPage >= window.totalPages;
-        nextBtn.disabled = nextDisabled;
-        nextBtnBottom.disabled = nextDisabled;
-        
-        document.getElementById('pageNumber').innerText = window.currentPage;
-        document.getElementById('totalPages').innerText = window.totalPages;
-        document.getElementById('pageNumberBottom').innerText = window.currentPage;
-        document.getElementById('totalPagesBottom').innerText = window.totalPages;
-        
-        const totalStudents = window.filteredStudentsData.length;
-        const startIndex = (window.currentPage - 1) * window.pageSize + 1;
-        const endIndex = Math.min(window.currentPage * window.pageSize, totalStudents);
-        
-        const pageInfo = `عرض ${startIndex}-${endIndex} من ${totalStudents} طالب`;
-        document.getElementById('pageInfo').innerText = pageInfo;
-        document.getElementById('pageInfoBottom').innerText = pageInfo;
-    }
-</script>
 
 </body>
 </html>
