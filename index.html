@@ -229,22 +229,39 @@
 
         window.printSelectedQaid = () => {
             const q = document.getElementById('qaidSelect').value;
-            if(!q) return;
+            if(!q) return showToast("يرجى اختيار قيد للطباعة", "error");
             const data = window.allStudentsData.filter(s => String(s.qaid) === String(q)).sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+            if (data.length === 0) {
+                showToast("لا توجد بيانات للقيد المحدد", "error");
+                return;
+            }
             executePrint(data, `سجل القيد رقم (${q})`);
         };
 
         window.printAllAlpha = () => {
+            if (window.allStudentsData.length === 0) {
+                showToast("لا توجد بيانات للطباعة", "error");
+                return;
+            }
             executePrint([...window.allStudentsData].sort((a,b)=>a.name.localeCompare(b.name,'ar')), "السجل العام");
         };
 
         function executePrint(data, title) {
-            document.getElementById('printTitle').innerText = title;
+            // إعادة تهيئة محتوى الطباعة
             const container = document.getElementById('printTablesContainer');
             container.innerHTML = '';
             
-            const rowsPerColumn = 35;      // تم زيادة العدد إلى 35 سطر في كل جهة
-            const totalRowsPerPage = 70;   // المجموع أصبح 70 اسماً في الورقة الواحدة
+            // إضافة الترويسة الرئيسية مرة واحدة فقط
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'print-header';
+            headerDiv.innerHTML = `
+                <h2 id="printTitle">${title}</h2>
+                <span id="printDate">تاريخ الاستخراج: ${new Date().toLocaleDateString('ar-EG')}</span>
+            `;
+            container.appendChild(headerDiv);
+            
+            const rowsPerColumn = 35;
+            const totalRowsPerPage = 70;
             
             for (let pageNum = 0; pageNum < Math.ceil(data.length / totalRowsPerPage); pageNum++) {
                 const pageStartIndex = pageNum * totalRowsPerPage;
@@ -256,43 +273,60 @@
                 const rightData = pageData.slice(0, rowsPerColumn);
                 const leftData = pageData.slice(rowsPerColumn, totalRowsPerPage);
 
-                const createTable = (colData, startSeq) => {
-                    let html = '<table><thead><tr><th>ت</th><th>الاسم</th><th>اللقب</th><th>القيد</th><th>الصفحة</th></tr></thead><tbody>';
+                const createTable = (colData, startSeq, isRight = true) => {
+                    let html = '<table>';
+                    html += '<thead><tr><th>ت</th><th>الاسم</th><th>اللقب</th><th>القيد</th><th>الصفحة</th></tr></thead><tbody>';
                     for (let i = 0; i < rowsPerColumn; i++) {
                         const student = colData[i];
                         const currentSeq = startSeq + i;
                         if (student) {
                             html += `<tr>
-                                <td>${currentSeq}</td>
-                                <td style="text-align:right; padding-right:5px;">${student.name || ''}</td>
-                                <td>${student.surname || ''}</td>
-                                <td>${student.qaid || ''}</td>
-                                <td>${student.page || ''}</td>
+                                <td class="seq-cell">${currentSeq}</td>
+                                <td class="name-cell">${student.name || ''}</td>
+                                <td class="surname-cell">${student.surname || ''}</td>
+                                <td class="qaid-cell">${student.qaid || ''}</td>
+                                <td class="page-cell">${student.page || ''}</td>
                             </tr>`;
                         } else {
-                            html += `<tr><td>${currentSeq}</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
+                            html += `<tr>
+                                <td class="seq-cell">${currentSeq}</td>
+                                <td class="name-cell">&nbsp;</td>
+                                <td class="surname-cell">&nbsp;</td>
+                                <td class="qaid-cell">&nbsp;</td>
+                                <td class="page-cell">&nbsp;</td>
+                            </tr>`;
                         }
                     }
                     html += '</tbody></table>';
                     return html;
                 };
 
-                // التعديل هنا: وضع الترويسة مع الجدول في نفس الصفحة
                 pageDiv.innerHTML = `
-                    <div class="print-header">
-                        <h2 id="printTitle">${title}</h2>
-                        <span id="printDate">تاريخ الاستخراج: ${new Date().toLocaleDateString('ar-EG')}</span>
-                    </div>
                     <div class="print-grid">
-                        <div class="print-col print-col-right">${createTable(rightData, pageStartIndex + 1)}</div>
-                        <div class="print-col print-col-left">${createTable(leftData, pageStartIndex + rowsPerColumn + 1)}</div>
+                        <div class="print-col print-col-right">
+                            <div class="table-wrapper">
+                                ${createTable(rightData, pageStartIndex + 1, true)}
+                            </div>
+                        </div>
+                        <div class="print-col print-col-left">
+                            <div class="table-wrapper">
+                                ${createTable(leftData, pageStartIndex + rowsPerColumn + 1, false)}
+                            </div>
+                        </div>
                     </div>
+                    <div class="page-number">الصفحة ${pageNum + 1}</div>
                 `;
                 container.appendChild(pageDiv);
             }
             
             document.getElementById('printModal').style.display = 'none';
-            setTimeout(() => { window.print(); }, 500);
+            setTimeout(() => { 
+                window.print();
+                // بعد الطباعة، إعادة تعيين محتوى الطباعة
+                setTimeout(() => {
+                    container.innerHTML = '';
+                }, 500);
+            }, 500);
         }
 
         window.saveData = async () => {
@@ -1186,12 +1220,12 @@
             
             #printTitle {
                 margin: 10px 0;
-                font-size: 18px !important;
+                font-size: 20px !important; /* تم زيادة حجم الخط */
                 font-weight: bold;
             }
             
             #printDate {
-                font-size: 14px !important;
+                font-size: 16px !important; /* تم زيادة حجم الخط */
                 color: #666;
                 font-weight: bold;
                 display: block;
@@ -1199,7 +1233,7 @@
             
             .print-grid { 
                 display: flex; 
-                gap: 15px;
+                gap: 20px;
                 height: 100%;
                 justify-content: space-between;
             }
@@ -1208,55 +1242,83 @@
                 height: 100%;
             }
             .print-col-left {
-                padding-left: 10px;
+                padding-left: 15px;
             }
             .print-col-right {
-                padding-right: 10px;
+                padding-right: 15px;
             }
+            
+            .table-wrapper {
+                width: 100%;
+                overflow: hidden;
+            }
+            
             table { 
                 width: 100%; 
                 border-collapse: collapse; 
-                font-size: 11px !important; /* تم تصحيح حجم الخط إلى 11px بدلاً من 14px */
-                line-height: 1.2;
+                font-size: 14px !important; /* تم تغيير حجم الخط إلى 14px كما طلبت */
+                line-height: 1.4;
             } 
             th, td { 
                 border: 1px solid #000; 
-                padding: 3px !important; /* تم تقليل الحشوة */
+                padding: 6px !important; /* زيادة الحشوة لتناسب حجم الخط الكبير */
                 text-align: center; 
-                font-size: 11px !important; /* تم تصحيح حجم الخط إلى 11px */
+                font-size: 14px !important; /* تم تغيير حجم الخط إلى 14px */
                 font-weight: normal;
             }
             th { 
                 background: #f0f0f0 !important; 
                 font-weight: bold;
-                padding: 4px !important;
-                font-size: 12px !important;
+                padding: 8px !important;
+                font-size: 15px !important;
             }
             
             /* تنسيق خاص للأرقام التسلسلية */
-            td:first-child {
+            .seq-cell {
                 font-weight: bold;
                 background-color: #f8fafc;
-                width: 25px;
-                min-width: 25px;
+                width: 35px;
+                min-width: 35px;
             }
             
             /* تحسين عرض الأسماء */
-            td:nth-child(2) {
+            .name-cell {
                 text-align: right;
-                padding-right: 3px !important;
+                padding-right: 8px !important;
             }
             
             /* تحسين عرض الألقاب */
-            td:nth-child(3) {
+            .surname-cell {
                 text-align: right;
                 font-style: italic;
                 color: #555;
             }
             
+            /* تحسين عرض القيد */
+            .qaid-cell {
+                font-weight: bold;
+                color: #1e40af;
+            }
+            
+            /* تحسين عرض الصفحة */
+            .page-cell {
+                font-weight: bold;
+                color: #92400e;
+            }
+            
+            /* ترقيم الصفحات */
+            .page-number {
+                position: absolute;
+                bottom: 10px;
+                left: 50%;
+                transform: translateX(-50%);
+                font-size: 12px;
+                color: #666;
+            }
+            
             /* جعل الصفحة تأخذ المساحة الكاملة */
             @page {
-                margin: 0.5cm;
+                margin: 0.7cm;
                 size: A4 portrait;
             }
             
@@ -1267,28 +1329,15 @@
                 print-color-adjust: exact;
             }
             
-            /* إضافة ترقيم الصفحات */
-            .print-page::after {
-                content: "الصفحة " counter(page);
-                position: absolute;
-                bottom: 5px;
-                left: 50%;
-                transform: translateX(-50%);
-                font-size: 10px;
-                color: #666;
-            }
-            
-            /* بدء ترقيم الصفحات */
-            body {
-                counter-reset: page;
-            }
-            .print-page {
-                counter-increment: page;
-            }
-            
             /* التأكد من أن كل صفحة تبدأ من الأعلى */
             .print-page {
                 break-inside: avoid;
+            }
+            
+            /* منع الطباعة للعناصر غير المرغوبة */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
         }
         
