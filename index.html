@@ -229,39 +229,22 @@
 
         window.printSelectedQaid = () => {
             const q = document.getElementById('qaidSelect').value;
-            if(!q) return showToast("يرجى اختيار قيد للطباعة", "error");
+            if(!q) return;
             const data = window.allStudentsData.filter(s => String(s.qaid) === String(q)).sort((a,b)=>a.name.localeCompare(b.name,'ar'));
-            if (data.length === 0) {
-                showToast("لا توجد بيانات للقيد المحدد", "error");
-                return;
-            }
             executePrint(data, `سجل القيد رقم (${q})`);
         };
 
         window.printAllAlpha = () => {
-            if (window.allStudentsData.length === 0) {
-                showToast("لا توجد بيانات للطباعة", "error");
-                return;
-            }
             executePrint([...window.allStudentsData].sort((a,b)=>a.name.localeCompare(b.name,'ar')), "السجل العام");
         };
 
         function executePrint(data, title) {
-            // إعادة تهيئة محتوى الطباعة
+            document.getElementById('printTitle').innerText = title;
             const container = document.getElementById('printTablesContainer');
             container.innerHTML = '';
             
-            // إضافة الترويسة الرئيسية مرة واحدة فقط
-            const headerDiv = document.createElement('div');
-            headerDiv.className = 'print-header';
-            headerDiv.innerHTML = `
-                <h2 id="printTitle">${title}</h2>
-                <span id="printDate">تاريخ الاستخراج: ${new Date().toLocaleDateString('ar-EG')}</span>
-            `;
-            container.appendChild(headerDiv);
-            
-            const rowsPerColumn = 35;
-            const totalRowsPerPage = 70;
+            const rowsPerColumn = 35;      // تم زيادة العدد إلى 35 سطر في كل جهة
+            const totalRowsPerPage = 70;   // المجموع أصبح 70 اسماً في الورقة الواحدة
             
             for (let pageNum = 0; pageNum < Math.ceil(data.length / totalRowsPerPage); pageNum++) {
                 const pageStartIndex = pageNum * totalRowsPerPage;
@@ -273,28 +256,21 @@
                 const rightData = pageData.slice(0, rowsPerColumn);
                 const leftData = pageData.slice(rowsPerColumn, totalRowsPerPage);
 
-                const createTable = (colData, startSeq, isRight = true) => {
-                    let html = '<table>';
-                    html += '<thead><tr><th>ت</th><th>الاسم</th><th>اللقب</th><th>القيد</th><th>الصفحة</th></tr></thead><tbody>';
+                const createTable = (colData, startSeq) => {
+                    let html = '<table><thead><tr><th>ت</th><th>الاسم</th><th>اللقب</th><th>القيد</th><th>الصفحة</th></tr></thead><tbody>';
                     for (let i = 0; i < rowsPerColumn; i++) {
                         const student = colData[i];
                         const currentSeq = startSeq + i;
                         if (student) {
                             html += `<tr>
-                                <td class="seq-cell">${currentSeq}</td>
-                                <td class="name-cell">${student.name || ''}</td>
-                                <td class="surname-cell">${student.surname || ''}</td>
-                                <td class="qaid-cell">${student.qaid || ''}</td>
-                                <td class="page-cell">${student.page || ''}</td>
+                                <td>${currentSeq}</td>
+                                <td style="text-align:right; padding-right:5px;">${student.name || ''}</td>
+                                <td>${student.surname || ''}</td>
+                                <td>${student.qaid || ''}</td>
+                                <td>${student.page || ''}</td>
                             </tr>`;
                         } else {
-                            html += `<tr>
-                                <td class="seq-cell">${currentSeq}</td>
-                                <td class="name-cell">&nbsp;</td>
-                                <td class="surname-cell">&nbsp;</td>
-                                <td class="qaid-cell">&nbsp;</td>
-                                <td class="page-cell">&nbsp;</td>
-                            </tr>`;
+                            html += `<tr><td>${currentSeq}</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
                         }
                     }
                     html += '</tbody></table>';
@@ -303,30 +279,16 @@
 
                 pageDiv.innerHTML = `
                     <div class="print-grid">
-                        <div class="print-col print-col-right">
-                            <div class="table-wrapper">
-                                ${createTable(rightData, pageStartIndex + 1, true)}
-                            </div>
-                        </div>
-                        <div class="print-col print-col-left">
-                            <div class="table-wrapper">
-                                ${createTable(leftData, pageStartIndex + rowsPerColumn + 1, false)}
-                            </div>
-                        </div>
+                        <div class="print-col print-col-right">${createTable(rightData, pageStartIndex + 1)}</div>
+                        <div class="print-col print-col-left">${createTable(leftData, pageStartIndex + rowsPerColumn + 1)}</div>
                     </div>
-                    <div class="page-number">الصفحة ${pageNum + 1}</div>
                 `;
                 container.appendChild(pageDiv);
             }
             
+            document.getElementById('printDate').innerText = "تاريخ الاستخراج: " + new Date().toLocaleDateString('ar-EG');
             document.getElementById('printModal').style.display = 'none';
-            setTimeout(() => { 
-                window.print();
-                // بعد الطباعة، إعادة تعيين محتوى الطباعة
-                setTimeout(() => {
-                    container.innerHTML = '';
-                }, 500);
-            }, 500);
+            setTimeout(() => { window.print(); }, 500);
         }
 
         window.saveData = async () => {
@@ -1195,7 +1157,7 @@
             margin-bottom: -5px;
         }
         
-        /* تحسينات الطباعة - الحل الجديد */
+        /* تحسينات الطباعة - لاستيعاب 70 سطر في الصفحة */
         @media print { 
             .no-print { display: none !important; }
             .print-area { 
@@ -1209,31 +1171,9 @@
                 height: 100%;
                 position: relative;
             }
-            
-            .print-header {
-                text-align: center;
-                border-bottom: 2px solid #000;
-                margin-bottom: 15px;
-                padding-bottom: 10px;
-                page-break-inside: avoid; /* منع فصل الترويسة عن المحتوى */
-            }
-            
-            #printTitle {
-                margin: 10px 0;
-                font-size: 20px !important; /* تم زيادة حجم الخط */
-                font-weight: bold;
-            }
-            
-            #printDate {
-                font-size: 16px !important; /* تم زيادة حجم الخط */
-                color: #666;
-                font-weight: bold;
-                display: block;
-            }
-            
             .print-grid { 
                 display: flex; 
-                gap: 20px;
+                gap: 15px;
                 height: 100%;
                 justify-content: space-between;
             }
@@ -1242,83 +1182,68 @@
                 height: 100%;
             }
             .print-col-left {
-                padding-left: 15px;
+                padding-left: 10px;
             }
             .print-col-right {
-                padding-right: 15px;
+                padding-right: 10px;
             }
-            
-            .table-wrapper {
-                width: 100%;
-                overflow: hidden;
-            }
-            
             table { 
                 width: 100%; 
                 border-collapse: collapse; 
-                font-size: 14px !important; /* تم تغيير حجم الخط إلى 14px كما طلبت */
-                line-height: 1.4;
+                font-size: 12px; /* تعديل حجم الخط إلى 12px */
+                line-height: 1.3;
             } 
             th, td { 
                 border: 1px solid #000; 
-                padding: 6px !important; /* زيادة الحشوة لتناسب حجم الخط الكبير */
+                padding: 4px;
                 text-align: center; 
-                font-size: 14px !important; /* تم تغيير حجم الخط إلى 14px */
+                font-size: 12px; /* تعديل حجم الخط إلى 12px */
                 font-weight: normal;
             }
             th { 
                 background: #f0f0f0 !important; 
                 font-weight: bold;
-                padding: 8px !important;
-                font-size: 15px !important;
+                padding: 5px !important;
+                font-size: 13px !important;
+            }
+            #printTitle {
+                font-size: 18px !important;
+                margin-bottom: 10px;
+                text-align: center;
+                font-weight: bold;
+            }
+            #printDate {
+                font-size: 14px !important;
+                text-align: center;
+                margin-bottom: 15px;
+                display: block;
+                font-weight: bold;
             }
             
             /* تنسيق خاص للأرقام التسلسلية */
-            .seq-cell {
+            td:first-child {
                 font-weight: bold;
                 background-color: #f8fafc;
-                width: 35px;
-                min-width: 35px;
+                width: 30px;
+                min-width: 30px;
             }
             
             /* تحسين عرض الأسماء */
-            .name-cell {
+            td:nth-child(2) {
                 text-align: right;
-                padding-right: 8px !important;
+                padding-right: 5px !important;
             }
             
             /* تحسين عرض الألقاب */
-            .surname-cell {
+            td:nth-child(3) {
                 text-align: right;
                 font-style: italic;
                 color: #555;
             }
             
-            /* تحسين عرض القيد */
-            .qaid-cell {
-                font-weight: bold;
-                color: #1e40af;
-            }
-            
-            /* تحسين عرض الصفحة */
-            .page-cell {
-                font-weight: bold;
-                color: #92400e;
-            }
-            
-            /* ترقيم الصفحات */
-            .page-number {
-                position: absolute;
-                bottom: 10px;
-                left: 50%;
-                transform: translateX(-50%);
-                font-size: 12px;
-                color: #666;
-            }
-            
             /* جعل الصفحة تأخذ المساحة الكاملة */
             @page {
-                margin: 0.7cm;
+                margin: 0.5cm;
                 size: A4 portrait;
             }
             
@@ -1329,15 +1254,23 @@
                 print-color-adjust: exact;
             }
             
-            /* التأكد من أن كل صفحة تبدأ من الأعلى */
-            .print-page {
-                break-inside: avoid;
+            /* إضافة ترقيم الصفحات */
+            .print-page::after {
+                content: "الصفحة " counter(page);
+                position: absolute;
+                bottom: 5px;
+                left: 50%;
+                transform: translateX(-50%);
+                font-size: 11px;
+                color: #666;
             }
             
-            /* منع الطباعة للعناصر غير المرغوبة */
-            * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
+            /* بدء ترقيم الصفحات */
+            body {
+                counter-reset: page;
+            }
+            .print-page {
+                counter-increment: page;
             }
         }
         
@@ -1724,6 +1657,10 @@
 
 <div id="appContent" class="container" style="display: none;">
     <div class="print-area">
+        <div style="text-align:center; border-bottom: 2px solid #000; margin-bottom: 15px; padding-bottom: 10px;">
+            <h2 id="printTitle" style="margin: 10px 0; font-size: 18px; font-weight: bold;"></h2>
+            <span id="printDate" style="font-size: 14px; color: #666; font-weight: bold;"></span>
+        </div>
         <div id="printTablesContainer"></div>
     </div>
 
@@ -1822,4 +1759,4 @@
 </div>
 
 </body>
-</html>
+    </html>
