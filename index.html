@@ -11,7 +11,7 @@
         :root { 
             --main: #1e293b; --blue: #0ea5e9; --bg: #f8fafc; --card: #ffffff; 
             --text: #334155; --accent: #6366f1; --success: #10b981; --danger: #ef4444;
-            --surname: #7c3aed; --warning: #f59e0b; --border: #e2e8f0; --radius: 12px;
+            --surname: #7c3aed; --border: #e2e8f0; --radius: 12px;
             --shadow: 0 2px 8px rgba(0,0,0,0.08); --spacing-sm: 10px; --spacing-md: 15px;
         }
         
@@ -41,6 +41,7 @@
         .student-item { 
             display: flex; align-items: center; justify-content: space-between; 
             border-right: 4px solid var(--blue); position: relative; gap: var(--spacing-md);
+            cursor: pointer;
         }
         
         .student-number {
@@ -51,7 +52,7 @@
         }
         
         .student-name { 
-            margin: 0 0 8px 0; font-weight: 700; font-size: 1rem; 
+            margin: 0 0 8px 0; font-weight: 700; font-size: 1.1rem; 
             display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
         }
         
@@ -60,16 +61,22 @@
             font-size: 0.85rem; font-weight: 600; box-shadow: 0 2px 4px rgba(124, 58, 237, 0.2);
         }
         
+        .date-badge {
+            background: #f0f9ff; color: #0369a1; padding: 2px 8px; border-radius: 12px;
+            font-size: 0.8rem; border: 1px solid #bae6fd; margin-right: 5px;
+        }
+        
         .student-meta-row { 
-            font-size: 0.85rem; color: #64748b; display: flex; gap: var(--spacing-md); 
+            font-size: 0.9rem; color: #64748b; display: flex; gap: 15px; 
             align-items: center; flex-wrap: wrap;
         }
         
         .meta-item {
             display: flex; align-items: center; gap: 5px; background: #f8fafc;
-            padding: 4px 10px; border-radius: 15px; border: 1px solid #e2e8f0;
+            padding: 5px 12px; border-radius: 15px; border: 1px solid #e2e8f0;
+            font-weight: bold; font-size: 1rem;
         }
-        .meta-item i { color: var(--blue); font-size: 0.8rem; }
+        .meta-item i { color: var(--blue); font-size: 0.9rem; }
         
         .user-icon { 
             width: 42px; height: 42px; background: linear-gradient(135deg, #e0f2fe, #bae6fd); 
@@ -77,14 +84,26 @@
             justify-content: center; color: var(--blue); font-size: 1rem; position: relative;
             box-shadow: 0 2px 5px rgba(14, 165, 233, 0.2);
         }
-        .user-icon .qaid-end { font-size: 0.6rem; font-weight: bold; color: #0369a1; margin-top: 2px; }
         
-        .card-body-wrapper { display: flex; align-items: center; gap: var(--spacing-md); flex: 1; margin-right: 10px; }
-        .item-actions { display: flex; gap: 8px; }
+        .card-body-wrapper { 
+            display: flex; align-items: center; gap: var(--spacing-md); 
+            flex: 1; margin-right: 10px;
+        }
+        
+        .item-actions { 
+            display: flex; gap: 8px; opacity: 0; 
+            transition: opacity 0.3s, transform 0.3s;
+            transform: translateX(10px);
+        }
+        
+        .student-item.active .item-actions {
+            opacity: 1;
+            transform: translateX(0);
+        }
         
         .edit-btn-small, .del-btn-small, .copy-btn-small { 
             background: none; border: 1px solid var(--border); border-radius: 8px; 
-            padding: 6px 12px; cursor: pointer; color: #64748b; font-size: 0.9rem;
+            padding: 8px 14px; cursor: pointer; color: #64748b; font-size: 0.9rem;
             transition: all 0.2s;
         }
         .edit-btn-small:hover { background: #dbeafe; color: #1d4ed8; border-color: #93c5fd; }
@@ -93,10 +112,10 @@
         
         /* Buttons */
         .btn { 
-            border: none; border-radius: 10px; cursor: pointer; padding: 12px 15px; 
+            border: none; border-radius: 10px; cursor: pointer; padding: 12px 20px; 
             font-weight: 600; color: white; display: flex; align-items: center; 
             justify-content: center; gap: 8px; font-size: 0.95rem; transition: all 0.2s;
-            min-height: 48px;
+            min-height: 48px; flex: 1;
         }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
@@ -107,20 +126,26 @@
         .btn-secondary:hover { background: #475569; }
         .btn-danger { background: var(--danger); }
         .btn-danger:hover { background: #dc2626; }
-        .btn-accent { background: var(--accent); }
-        .btn-accent:hover { background: #4f46e5; }
         
-        /* Total Students Card */
-        .total-students-card {
+        /* Stats Card - Smaller */
+        .stats-card {
             background: linear-gradient(135deg, var(--blue), #3b82f6); color: white;
-            padding: var(--spacing-md); border-radius: var(--radius); text-align: center;
+            padding: 15px; border-radius: var(--radius); text-align: center;
             margin-bottom: var(--spacing-md); box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
-            display: flex; align-items: center; justify-content: center; gap: var(--spacing-md);
-            position: relative; min-height: 100px;
+            display: flex; align-items: center; justify-content: center; gap: 15px;
+            max-width: 300px; margin-left: auto; margin-right: auto;
         }
-        .total-students-card i { font-size: 2rem; opacity: 0.9; }
-        .total-students-count { font-size: 2.5rem; font-weight: 800; line-height: 1; }
-        .total-students-label { font-size: 1rem; opacity: 0.9; }
+        .stats-card i { font-size: 1.5rem; opacity: 0.9; }
+        .stats-count { font-size: 2rem; font-weight: 800; line-height: 1; }
+        .stats-label { font-size: 0.9rem; opacity: 0.9; }
+        
+        /* Main Actions Row */
+        .main-actions-row {
+            display: flex; gap: 10px; margin-bottom: 20px;
+        }
+        .main-actions-row .btn {
+            flex: 1;
+        }
         
         /* Search */
         .search-wrapper { 
@@ -180,58 +205,6 @@
             border-radius: 50%; animation: spin 1s linear infinite;
         }
         
-        /* Pagination */
-        .pagination-container {
-            display: flex; justify-content: space-between; align-items: center;
-            margin: var(--spacing-md) 0; padding: var(--spacing-md); background: var(--card);
-            border-radius: var(--radius); box-shadow: var(--shadow); flex-wrap: wrap; gap: var(--spacing-md);
-        }
-        .pagination-info { font-size: 0.9rem; color: var(--text); font-weight: 500; flex: 1; text-align: center; }
-        .pagination-controls { display: flex; align-items: center; gap: var(--spacing-sm); }
-        .pagination-btn {
-            background: var(--main); color: white; border: none; border-radius: 8px; padding: 8px 16px;
-            cursor: pointer; font-size: 0.9rem; transition: all 0.2s; display: flex; align-items: center; gap: 5px;
-        }
-        .pagination-btn:hover:not(:disabled) { background: var(--blue); transform: translateY(-2px); }
-        .pagination-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .page-numbers { display: flex; gap: 5px; align-items: center; }
-        .page-number { padding: 8px 12px; border-radius: 6px; background: var(--bg); color: var(--text); font-weight: 600; min-width: 40px; text-align: center; }
-        
-        /* Header */
-        .header-container {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: var(--spacing-md) 0; margin-bottom: var(--spacing-md); border-bottom: 1px solid var(--border);
-        }
-        .logo-container { display: flex; align-items: center; gap: var(--spacing-md); }
-        .header-logo {
-            height: 60px; width: auto; border-radius: 8px; transition: transform 0.3s;
-            cursor: pointer; object-fit: contain; background: white; padding: 5px;
-        }
-        .header-logo:hover { transform: scale(1.05); }
-        .header-title { margin: 0; color: var(--blue); font-size: 1.5rem; }
-        
-        /* Settings */
-        .settings-container { position: relative; }
-        .settings-btn {
-            background: none; border: none; color: var(--text); font-size: 1.2rem;
-            cursor: pointer; padding: 8px 12px; border-radius: 8px; transition: all 0.2s;
-        }
-        .settings-btn:hover { background: rgba(0, 0, 0, 0.05); color: var(--blue); }
-        .settings-dropdown {
-            position: absolute; left: 0; top: 100%; background: var(--card); border-radius: var(--radius);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); min-width: 200px; z-index: 1000;
-            display: none; padding: 8px 0; margin-top: 5px; border: 1px solid var(--border);
-            animation: fadeIn 0.2s ease-out;
-        }
-        .settings-dropdown.show { display: block; }
-        .settings-dropdown button {
-            width: 100%; padding: 12px 16px; background: none; border: none; text-align: right;
-            color: var(--text); font-size: 0.9rem; cursor: pointer; display: flex;
-            align-items: center; gap: 10px; transition: all 0.2s;
-        }
-        .settings-dropdown button:hover { background: rgba(14, 165, 233, 0.1); color: var(--blue); }
-        .dropdown-divider { height: 1px; background: rgba(0, 0, 0, 0.1); margin: 8px 0; }
-        
         /* Advanced Filters */
         .advanced-filters {
             background: var(--card); padding: var(--spacing-md); border-radius: var(--radius);
@@ -262,7 +235,6 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         @keyframes modalFade { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes toastSlide { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         
         /* Responsive */
         @media (max-width: 767px) {
@@ -270,69 +242,142 @@
             .student-number { right: -15px; width: 25px; height: 25px; font-size: 0.8rem; }
             .advanced-filters { flex-direction: column; }
             .advanced-filters select, .advanced-filters input { width: 100%; }
-            .header-logo { height: 50px; }
-            .header-title { font-size: 1.3rem; }
-            .pagination-container { flex-direction: column; text-align: center; }
-            .pagination-controls { width: 100%; justify-content: center; }
+            .main-actions-row { flex-direction: column; }
+            .student-name { font-size: 1rem; }
+            .meta-item { font-size: 0.9rem; }
         }
         
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        .dark-mode ::-webkit-scrollbar-track { background: #1e293b; }
-        .dark-mode ::-webkit-scrollbar-thumb { background: #475569; }
-        
-        /* Print */
+        /* Print Styles */
         @media print { 
             .no-print { display: none !important; }
             .print-area { display: block !important; }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; } 
-            th, td { border: 1px solid #000; padding: 4px; text-align: center; }
-            th { background: #f0f0f0 !important; font-weight: bold; }
-            @page { margin: 0.5cm; }
+            
+            body {
+                font-family: 'Arial', sans-serif;
+                margin: 0;
+                padding: 0;
+                font-size: 14px;
+                line-height: 1.4;
+            }
+            
+            .print-page {
+                page-break-after: always;
+                padding: 1cm;
+                height: 100%;
+                position: relative;
+            }
+            
+            .print-grid {
+                display: flex;
+                justify-content: space-between;
+                gap: 2cm;
+                height: 100%;
+            }
+            
+            .print-col {
+                width: 48%;
+            }
+            
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 13px;
+                font-weight: bold !important;
+            }
+            
+            th, td {
+                border: 1.5px solid #000;
+                padding: 6px 4px;
+                text-align: center;
+                font-weight: bold !important;
+                font-size: 13px;
+            }
+            
+            th {
+                background: #f0f0f0 !important;
+                font-weight: bold;
+                padding: 8px 4px !important;
+                font-size: 14px !important;
+            }
+            
+            td:first-child {
+                font-weight: bold;
+                background-color: #f8fafc;
+                width: 35px;
+            }
+            
+            td:nth-child(2) {
+                text-align: right;
+                padding-right: 8px !important;
+                font-weight: bold;
+            }
+            
+            #printTitle {
+                font-size: 20px !important;
+                margin-bottom: 15px;
+                text-align: center;
+                font-weight: bold;
+            }
+            
+            #printDate {
+                font-size: 16px !important;
+                text-align: center;
+                margin-bottom: 20px;
+                display: block;
+                font-weight: bold;
+            }
+            
+            @page {
+                margin: 1cm;
+                size: A4 portrait;
+            }
+            
+            .print-page::after {
+                content: "الصفحة " counter(page);
+                position: absolute;
+                bottom: 5px;
+                left: 50%;
+                transform: translateX(-50%);
+                font-size: 12px;
+                color: #666;
+            }
+            
+            body {
+                counter-reset: page;
+            }
+            .print-page {
+                counter-increment: page;
+            }
         }
+        
         .print-area { display: none; }
         
         /* Empty State */
-        .empty-state { text-align: center; padding: 40px 20px; color: #64748b; }
+        .empty-state { 
+            text-align: center; 
+            padding: 40px 20px; 
+            color: #64748b;
+        }
         
-        /* Logout Button */
+        /* Header */
+        .header-container {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: var(--spacing-md) 0; margin-bottom: var(--spacing-md);
+            border-bottom: 1px solid var(--border);
+        }
+        .logo-container { display: flex; align-items: center; gap: var(--spacing-md); }
+        .header-logo {
+            height: 60px; width: auto; border-radius: 8px; transition: transform 0.3s;
+            cursor: pointer; object-fit: contain; background: white; padding: 5px;
+        }
+        .header-logo:hover { transform: scale(1.05); }
+        .header-title { margin: 0; color: var(--blue); font-size: 1.5rem; }
+        
         .logout-btn {
             background: none; border: none; color: var(--danger); font-size: 0.9rem; 
             cursor: pointer; padding: 8px 12px; border-radius: 8px; transition: background 0.2s;
         }
         .logout-btn:hover { background: #fee2e2; }
-        
-        /* Stats Popup */
-        .stats-popup {
-            position: absolute; left: 20px; bottom: calc(100% + 10px); background: var(--card);
-            border-radius: 12px; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); min-width: 250px;
-            z-index: 1000; display: none; padding: 15px; border: 1px solid var(--border);
-            animation: fadeIn 0.2s ease-out;
-        }
-        .stats-popup.show { display: block; }
-        .stats-popup-item {
-            padding: 10px 0; display: flex; align-items: center; gap: 10px;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-        }
-        .stats-popup-item:last-child { border-bottom: none; }
-        .stats-popup-item i { color: var(--blue); font-size: 1.1rem; width: 24px; }
-        .stats-popup-item span { flex: 1; font-size: 0.9rem; }
-        .stats-popup-item strong { color: var(--blue); font-size: 1rem; }
-        
-        /* Stats Toggle */
-        .stats-toggle {
-            position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
-            background: rgba(255, 255, 255, 0.2); border: none; color: white;
-            width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-            transition: all 0.3s; z-index: 10;
-        }
-        .stats-toggle:hover {
-            background: rgba(255, 255, 255, 0.3); transform: translateY(-50%) scale(1.1);
-        }
     </style>
     
     <script type="module">
@@ -403,34 +448,12 @@
         const loadData = () => {
             onSnapshot(query(studentsCol, orderBy("timestamp", "desc")), (snapshot) => {
                 window.allStudentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                updateStats();
                 updateQaidFilter();
                 window.applyFilters();
                 updateTotalCount();
             }, (error) => {
                 showToast("خطأ في تحميل البيانات", "error");
             });
-        };
-        
-        const updateStats = () => {
-            const startOfDay = new Date().setHours(0,0,0,0);
-            const todayCount = window.allStudentsData.filter(s => s.timestamp >= startOfDay).length;
-            const qaidsCount = new Set(window.allStudentsData.map(s => s.qaid)).size;
-            
-            document.getElementById('statsPopupContent').innerHTML = `
-                <div class="stats-popup-item">
-                    <i class="fas fa-users"></i>
-                    <span>إجمالي الطلاب: <strong>${window.allStudentsData.length}</strong></span>
-                </div>
-                <div class="stats-popup-item">
-                    <i class="fas fa-calendar-day"></i>
-                    <span>الطلاب المضافون اليوم: <strong>${todayCount}</strong></span>
-                </div>
-                <div class="stats-popup-item">
-                    <i class="fas fa-folder"></i>
-                    <span>عدد القيود: <strong>${qaidsCount}</strong></span>
-                </div>
-            `;
         };
         
         const updateQaidFilter = () => {
@@ -481,36 +504,6 @@
         };
         
         window.applyFilters = filterStudents;
-        
-        // Pagination
-        const updatePagination = () => {
-            const totalStudents = window.filteredStudentsData.length;
-            const startIndex = (window.currentPage - 1) * window.pageSize + 1;
-            const endIndex = Math.min(window.currentPage * window.pageSize, totalStudents);
-            const pageInfo = `عرض ${startIndex}-${endIndex} من ${totalStudents} طالب`;
-            
-            document.getElementById('pageInfo').innerText = pageInfo;
-            document.getElementById('pageInfoBottom').innerText = pageInfo;
-            
-            document.getElementById('pageNumber').innerText = window.currentPage;
-            document.getElementById('pageNumberBottom').innerText = window.currentPage;
-            document.getElementById('totalPages').innerText = window.totalPages;
-            document.getElementById('totalPagesBottom').innerText = window.totalPages;
-            
-            const prevBtns = document.querySelectorAll('.pagination-btn[id^="prevPage"]');
-            const nextBtns = document.querySelectorAll('.pagination-btn[id^="nextPage"]');
-            prevBtns.forEach(btn => btn.disabled = window.currentPage <= 1);
-            nextBtns.forEach(btn => btn.disabled = window.currentPage >= window.totalPages);
-        };
-        
-        window.goToPage = (page) => {
-            if (page < 1 || page > window.totalPages) return;
-            window.currentPage = page;
-            window.renderPage();
-        };
-        
-        window.prevPage = () => window.goToPage(window.currentPage - 1);
-        window.nextPage = () => window.goToPage(window.currentPage + 1);
         
         // CRUD Operations
         const isDuplicate = (qaid, page, excludeId = null) => {
@@ -573,19 +566,6 @@
         };
         
         // Import/Export
-        window.downloadExcelTemplate = () => {
-            const templateData = [
-                ["الاسم", "اللقب", "القيد", "الصفحة", "ملاحظات"],
-                ["أحمد محمد علي", "الكبيسي", "12345", "25", "-"]
-            ];
-            
-            const ws = XLSX.utils.aoa_to_sheet(templateData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
-            XLSX.writeFile(wb, "نموذج_اسماء_الطلاب.xlsx");
-            showToast("تم تحميل النموذج بنجاح");
-        };
-        
         window.importExcel = async (event) => {
             const file = event.target.files[0];
             if(!file) return;
@@ -659,8 +639,8 @@
             const container = document.getElementById('printTablesContainer');
             container.innerHTML = '';
             
-            const rowsPerColumn = 35;
-            const totalRowsPerPage = 70;
+            const rowsPerColumn = 30; // 30 في كل عمود = 60 في الصفحة
+            const totalRowsPerPage = 60; // 60 اسماً في الصفحة الواحدة
             
             for (let pageNum = 0; pageNum < Math.ceil(data.length / totalRowsPerPage); pageNum++) {
                 const pageStartIndex = pageNum * totalRowsPerPage;
@@ -669,29 +649,36 @@
                 const pageDiv = document.createElement('div');
                 pageDiv.className = 'print-page';
                 
-                const createTable = (colData, startSeq) => {
+                const createTable = (colData, startSeq, isRightColumn = true) => {
                     let html = '<table><thead><tr><th>ت</th><th>الاسم</th><th>اللقب</th><th>القيد</th><th>الصفحة</th></tr></thead><tbody>';
                     for (let i = 0; i < rowsPerColumn; i++) {
                         const student = colData[i];
+                        const currentSeq = startSeq + i;
                         if (student) {
                             html += `<tr>
-                                <td>${startSeq + i}</td>
-                                <td>${student.name || ''}</td>
+                                <td>${currentSeq}</td>
+                                <td style="font-weight: bold;">${student.name || ''}</td>
                                 <td>${student.surname || ''}</td>
-                                <td>${student.qaid || ''}</td>
-                                <td>${student.page || ''}</td>
+                                <td style="font-weight: bold;">${student.qaid || ''}</td>
+                                <td style="font-weight: bold;">${student.page || ''}</td>
                             </tr>`;
                         } else {
-                            html += `<tr><td>${startSeq + i}</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
+                            html += `<tr><td>${currentSeq}</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
                         }
                     }
-                    return html + '</tbody></table>';
+                    html += '</tbody></table>';
+                    return html;
                 };
-        
+
+                // العمود الأيمن: 1-30
+                const rightData = pageData.slice(0, rowsPerColumn);
+                // العمود الأيسر: 31-60
+                const leftData = pageData.slice(rowsPerColumn, totalRowsPerPage);
+                
                 pageDiv.innerHTML = `
                     <div class="print-grid">
-                        <div class="print-col">${createTable(pageData.slice(0, rowsPerColumn), pageStartIndex + 1)}</div>
-                        <div class="print-col">${createTable(pageData.slice(rowsPerColumn, totalRowsPerPage), pageStartIndex + rowsPerColumn + 1)}</div>
+                        <div class="print-col">${createTable(rightData, pageStartIndex + 1, true)}</div>
+                        <div class="print-col">${createTable(leftData, pageStartIndex + rowsPerColumn + 1, false)}</div>
                     </div>
                 `;
                 container.appendChild(pageDiv);
@@ -747,7 +734,7 @@
             showToast("تم تعبئة بيانات تجريبية");
         };
         
-        // Render Students
+        // Render Students with click functionality
         window.render = (data) => {
             const list = document.getElementById('studentsList');
             if (!list) return;
@@ -768,19 +755,21 @@
                 const formattedDate = formatDate(s.timestamp);
                 
                 return `
-                    <div class="student-item card">
+                    <div class="student-item card" onclick="toggleStudentActions(this, '${s.id}')">
                         <div class="student-number">${globalIndex}</div>
                         <div class="card-body-wrapper">
-                            <div class="user-icon" title="آخر رقمين من القيد: ${String(s.qaid).slice(-2)}">
+                            <div class="user-icon">
                                 <i class="fas fa-user-graduate"></i>
-                                <small class="qaid-end">${String(s.qaid).slice(-2)}</small>
                             </div>
                             <div class="student-details">
-                                <p class="student-name">${s.name} <span class="surname-badge">${s.surname || ''}</span></p>
+                                <p class="student-name">
+                                    ${s.name} 
+                                    <span class="surname-badge">${s.surname || ''}</span>
+                                    <span class="date-badge">${formattedDate}</span>
+                                </p>
                                 <div class="student-meta-row">
                                     <span class="meta-item"><i class="fas fa-hashtag"></i> ${s.qaid || ''}</span>
                                     <span class="meta-item"><i class="fas fa-file-alt"></i> ${s.page || ''}</span>
-                                    <span class="meta-item date-item"><i class="fas fa-calendar-alt"></i> ${formattedDate}</span>
                                 </div>
                             </div>
                         </div>
@@ -793,11 +782,34 @@
             }).join('');
         };
         
+        window.toggleStudentActions = (element, studentId) => {
+            // إغلاق جميع العناصر النشطة الأخرى
+            document.querySelectorAll('.student-item.active').forEach(item => {
+                if (item !== element) {
+                    item.classList.remove('active');
+                }
+            });
+            
+            // تبديل حالة العنصر الحالي
+            element.classList.toggle('active');
+            
+            // إيقاف انتشار الحدث لمنع النقر على الأزرار
+            event.stopPropagation();
+        };
+        
+        // إغلاق الأزرار عند النقر في أي مكان آخر
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.student-item')) {
+                document.querySelectorAll('.student-item.active').forEach(item => {
+                    item.classList.remove('active');
+                });
+            }
+        });
+        
         window.renderPage = () => {
             const startIndex = (window.currentPage - 1) * window.pageSize;
             const endIndex = startIndex + window.pageSize;
             window.render(window.filteredStudentsData.slice(startIndex, endIndex));
-            updatePagination();
         };
         
         // Edit Student
@@ -855,6 +867,7 @@
             showToast("تم مسح جميع الفلاتر");
         };
         
+        // البحث عن أسماء مطابقة تماماً للأحرف المدخلة
         window.checkDuplicateStudent = () => {
             const nameInput = document.getElementById('fName');
             const nameValue = nameInput.value.trim();
@@ -862,15 +875,17 @@
             document.getElementById('duplicateStudentAlert')?.remove();
             
             if(nameValue) {
-                const enteredWords = nameValue.toLowerCase().split(/\s+/).filter(word => word.length > 0);
+                const enteredName = nameValue.toLowerCase();
+                
+                // البحث عن تطابق تام أو جزئي للأحرف المدخلة
                 const matchingStudents = window.allStudentsData.filter(student => {
                     if (!student.name) return false;
-                    const studentWords = student.name.toLowerCase().split(/\s+/).filter(word => word.length > 0);
-                    return enteredWords.some(enteredWord => 
-                        studentWords.some(studentWord => 
-                            studentWord.includes(enteredWord) || enteredWord.includes(studentWord)
-                        )
-                    );
+                    const studentName = student.name.toLowerCase();
+                    
+                    // البحث عن تطابق تام أو بداية الاسم
+                    return studentName === enteredName || 
+                           studentName.startsWith(enteredName) ||
+                           studentName.includes(enteredName);
                 });
                 
                 if (matchingStudents.length > 0) {
@@ -929,26 +944,6 @@
         
         window.toggleDarkMode = () => document.body.classList.toggle('dark-mode');
         
-        window.toggleSettings = () => {
-            const dropdown = document.getElementById('settingsDropdown');
-            dropdown.classList.toggle('show');
-            document.addEventListener('click', (e) => {
-                if (!e.target.closest('.settings-container')) {
-                    dropdown.classList.remove('show');
-                }
-            }, { once: true });
-        };
-        
-        window.toggleStatsPopup = () => {
-            const popup = document.getElementById('statsPopup');
-            popup.classList.toggle('show');
-            document.addEventListener('click', (e) => {
-                if (!e.target.closest('.stats-toggle') && !e.target.closest('.stats-popup')) {
-                    popup.classList.remove('show');
-                }
-            }, { once: true });
-        };
-        
         // Master Delete
         window.openMasterDelete = () => {
             document.getElementById('masterDeleteInput').value = '';
@@ -975,12 +970,6 @@
             }
             document.getElementById('loader').style.display = 'none';
         };
-        
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('settingsBtn')?.addEventListener('click', window.toggleSettings);
-            document.getElementById('statsToggle')?.addEventListener('click', window.toggleStatsPopup);
-        });
     </script>
 </head>
 <body>
@@ -1044,7 +1033,7 @@
 <div id="printModal" class="modal">
     <div class="modal-content">
         <h3><i class="fas fa-print"></i> طباعة</h3>
-        <button class="btn btn-accent" onclick="printAllAlpha()"><i class="fas fa-print"></i> السجل العام</button>
+        <button class="btn btn-primary" onclick="printAllAlpha()"><i class="fas fa-print"></i> السجل العام</button>
         <select id="qaidSelect"></select>
         <button class="btn btn-primary" onclick="printSelectedQaid()"><i class="fas fa-print"></i> طباعة القيد</button>
         <button class="btn btn-secondary" onclick="closeModal('printModal')"><i class="fas fa-times"></i> إلغاء</button>
@@ -1076,54 +1065,41 @@
     <div class="no-print">
         <div class="header-container">
             <div class="logo-container">
-                <a href="#" onclick="window.location.reload(); return false;" title="الرئيسية">
-                    <img src="https://i.imgur.com/05ANc5p.png" alt="شعار فهرس القيد" class="header-logo">
-                </a>
+                <img src="https://i.imgur.com/05ANc5p.png" alt="شعار فهرس القيد" class="header-logo">
                 <h4 class="header-title"><i class="fas fa-book"></i> فهرس القيد</h4>
             </div>
             <div class="header-actions">
-                <div class="settings-container">
-                    <button class="settings-btn" id="settingsBtn" title="الإعدادات"><i class="fas fa-cog"></i></button>
-                    <div class="settings-dropdown" id="settingsDropdown">
-                        <button onclick="document.getElementById('fileInput').click()"><i class="fas fa-file-import"></i> استيراد من Excel</button>
-                        <button onclick="downloadExcelTemplate()"><i class="fas fa-file-excel"></i> تحميل نموذج Excel</button>
-                        <button onclick="exportExcel()"><i class="fas fa-file-export"></i> تصدير إلى Excel</button>
-                        <button onclick="showPrintOptions()"><i class="fas fa-print"></i> طباعة</button>
-                        <div class="dropdown-divider"></div>
-                        <button onclick="openMasterDelete()" class="delete-btn"><i class="fas fa-trash-alt"></i> مسح السجل</button>
-                    </div>
-                </div>
                 <button onclick="logout()" class="logout-btn"><i class="fas fa-sign-out-alt"></i> خروج</button>
             </div>
         </div>
 
-        <!-- Stats Card -->
-        <div class="total-students-card">
-            <button class="stats-toggle" id="statsToggle" title="إظهار الإحصائيات"><i class="fas fa-chart-bar"></i></button>
+        <!-- Stats Card - Small -->
+        <div class="stats-card">
             <i class="fas fa-users"></i>
             <div>
-                <div class="total-students-count" id="totalStudentsCard">0</div>
-                <div class="total-students-label">إجمالي الطلاب</div>
-            </div>
-            <div class="stats-popup" id="statsPopup">
-                <div id="statsPopupContent"></div>
+                <div class="stats-count" id="totalStudentsCard">0</div>
+                <div class="stats-label">إجمالي الطلاب</div>
             </div>
         </div>
 
-        <!-- Main Actions -->
-        <div class="action-buttons-container">
-            <div class="main-actions">
-                <button class="btn btn-primary" onclick="openAddModal()"><i class="fas fa-plus"></i> إضافة طالب</button>
-                <button class="btn btn-secondary" onclick="clearFilters()" title="مسح الفلاتر"><i class="fas fa-filter"></i> مسح الفلاتر</button>
-            </div>
+        <!-- Main Actions Row -->
+        <div class="main-actions-row">
+            <button class="btn btn-primary" onclick="openAddModal()"><i class="fas fa-plus"></i> إضافة طالب</button>
+            <button class="btn btn-secondary" onclick="clearFilters()"><i class="fas fa-filter"></i> مسح الفلاتر</button>
         </div>
         
-        <!-- File Input -->
+        <!-- File Input for Excel Import -->
         <input type="file" id="fileInput" hidden onchange="importExcel(event)" accept=".xlsx, .xls">
 
-        <!-- Filters -->
+        <!-- Search and Filters -->
+        <div class="search-wrapper">
+            <input type="text" id="searchInput" placeholder="ابحث عن اسم أو لقب أو قيد..." onkeyup="applyFilters()">
+        </div>
+
         <div class="advanced-filters">
-            <select id="filterQaid" onchange="applyFilters()"><option value="">جميع القيود</option></select>
+            <select id="filterQaid" onchange="applyFilters()">
+                <option value="">جميع القيود</option>
+            </select>
             <input type="number" id="filterPage" placeholder="رقم الصفحة" oninput="applyFilters()">
             <select id="sortSelect" onchange="applyFilters()">
                 <option value="newest">الأحدث أولاً</option>
@@ -1134,36 +1110,20 @@
             </select>
         </div>
 
-        <!-- Search -->
-        <div class="search-wrapper">
-            <input type="text" id="searchInput" placeholder="ابحث عن اسم أو لقب أو قيد..." onkeyup="applyFilters()">
-        </div>
-
-        <!-- Pagination Top -->
-        <div class="pagination-container">
-            <div class="pagination-info" id="pageInfo">عرض 1-100 من 0 طالب</div>
-            <div class="pagination-controls">
-                <button class="pagination-btn" id="prevPage" onclick="prevPage()" title="الصفحة السابقة"><i class="fas fa-chevron-right"></i> السابق</button>
-                <div class="page-numbers">
-                    <span class="page-number" id="pageNumber">1</span><span>من</span><span class="page-number" id="totalPages">1</span>
-                </div>
-                <button class="pagination-btn" id="nextPage" onclick="nextPage()" title="الصفحة التالية">التالي <i class="fas fa-chevron-left"></i></button>
-            </div>
-        </div>
-
         <!-- Students List -->
         <div id="studentsList"></div>
 
-        <!-- Pagination Bottom -->
-        <div class="pagination-container">
-            <div class="pagination-info" id="pageInfoBottom">عرض 1-100 من 0 طالب</div>
-            <div class="pagination-controls">
-                <button class="pagination-btn" id="prevPageBottom" onclick="prevPage()" title="الصفحة السابقة"><i class="fas fa-chevron-right"></i> السابق</button>
-                <div class="page-numbers">
-                    <span class="page-number" id="pageNumberBottom">1</span><span>من</span><span class="page-number" id="totalPagesBottom">1</span>
-                </div>
-                <button class="pagination-btn" id="nextPageBottom" onclick="nextPage()" title="الصفحة التالية">التالي <i class="fas fa-chevron-left"></i></button>
-            </div>
+        <!-- Simple Export and Print Buttons -->
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
+                <i class="fas fa-file-import"></i> استيراد
+            </button>
+            <button class="btn btn-secondary" onclick="exportExcel()">
+                <i class="fas fa-file-export"></i> تصدير
+            </button>
+            <button class="btn btn-primary" onclick="showPrintOptions()">
+                <i class="fas fa-print"></i> طباعة
+            </button>
         </div>
     </div>
 </div>
