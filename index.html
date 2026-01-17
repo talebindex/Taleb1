@@ -3,17 +3,348 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>فهرس القيد</title>
+    <title>فهرس القيد - النظام الإلكتروني</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     
+    <style>
+        :root { 
+            --main: #1e293b; --blue: #0ea5e9; --bg: #f8fafc; --card: #ffffff; 
+            --text: #334155; --accent: #6366f1; --success: #10b981; --danger: #ef4444;
+            --surname: #7c3aed; --warning: #f59e0b; --border: #e2e8f0; --radius: 12px;
+            --shadow: 0 2px 8px rgba(0,0,0,0.08); --spacing-sm: 10px; --spacing-md: 15px;
+        }
+        
+        body.dark-mode { 
+            --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --success: #34d399;
+            --danger: #f87171; --surname: #a78bfa; --border: #334155;
+            --shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        
+        body { 
+            font-family: 'Segoe UI', Tahoma, sans-serif; 
+            background: var(--bg); color: var(--text); 
+            direction: rtl; margin: 0; padding: 0;
+            transition: background 0.3s, color 0.3s;
+        }
+        
+        .container { max-width: 1200px; margin: auto; padding: var(--spacing-md); }
+        
+        /* Cards */
+        .card { 
+            background: var(--card); padding: var(--spacing-md); border-radius: var(--radius); 
+            margin-bottom: var(--spacing-sm); box-shadow: var(--shadow); border: 1px solid var(--border);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover { transform: translateY(-3px); box-shadow: 0 6px 16px rgba(0,0,0,0.12); }
+        
+        .student-item { 
+            display: flex; align-items: center; justify-content: space-between; 
+            border-right: 4px solid var(--blue); position: relative; gap: var(--spacing-md);
+        }
+        
+        .student-number {
+            position: absolute; right: -20px; top: 50%; transform: translateY(-50%);
+            background: var(--blue); color: white; width: 30px; height: 30px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; font-weight: bold;
+            font-size: 0.9rem; z-index: 1; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        .student-name { 
+            margin: 0 0 8px 0; font-weight: 700; font-size: 1rem; 
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+        }
+        
+        .surname-badge { 
+            background: var(--surname); color: white; padding: 3px 10px; border-radius: 20px; 
+            font-size: 0.85rem; font-weight: 600; box-shadow: 0 2px 4px rgba(124, 58, 237, 0.2);
+        }
+        
+        .student-meta-row { 
+            font-size: 0.85rem; color: #64748b; display: flex; gap: var(--spacing-md); 
+            align-items: center; flex-wrap: wrap;
+        }
+        
+        .meta-item {
+            display: flex; align-items: center; gap: 5px; background: #f8fafc;
+            padding: 4px 10px; border-radius: 15px; border: 1px solid #e2e8f0;
+        }
+        .meta-item i { color: var(--blue); font-size: 0.8rem; }
+        
+        .user-icon { 
+            width: 42px; height: 42px; background: linear-gradient(135deg, #e0f2fe, #bae6fd); 
+            border-radius: 50%; display: flex; flex-direction: column; align-items: center; 
+            justify-content: center; color: var(--blue); font-size: 1rem; position: relative;
+            box-shadow: 0 2px 5px rgba(14, 165, 233, 0.2);
+        }
+        .user-icon .qaid-end { font-size: 0.6rem; font-weight: bold; color: #0369a1; margin-top: 2px; }
+        
+        .card-body-wrapper { display: flex; align-items: center; gap: var(--spacing-md); flex: 1; margin-right: 10px; }
+        .item-actions { display: flex; gap: 8px; }
+        
+        .edit-btn-small, .del-btn-small, .copy-btn-small { 
+            background: none; border: 1px solid var(--border); border-radius: 8px; 
+            padding: 6px 12px; cursor: pointer; color: #64748b; font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .edit-btn-small:hover { background: #dbeafe; color: #1d4ed8; border-color: #93c5fd; }
+        .del-btn-small:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+        .copy-btn-small:hover { background: #f0f9ff; color: var(--blue); border-color: #7dd3fc; }
+        
+        /* Buttons */
+        .btn { 
+            border: none; border-radius: 10px; cursor: pointer; padding: 12px 15px; 
+            font-weight: 600; color: white; display: flex; align-items: center; 
+            justify-content: center; gap: 8px; font-size: 0.95rem; transition: all 0.2s;
+            min-height: 48px;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+        
+        .btn-primary { background: var(--main); }
+        .btn-primary:hover { background: var(--blue); }
+        .btn-secondary { background: #64748b; }
+        .btn-secondary:hover { background: #475569; }
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-accent { background: var(--accent); }
+        .btn-accent:hover { background: #4f46e5; }
+        
+        /* Total Students Card */
+        .total-students-card {
+            background: linear-gradient(135deg, var(--blue), #3b82f6); color: white;
+            padding: var(--spacing-md); border-radius: var(--radius); text-align: center;
+            margin-bottom: var(--spacing-md); box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
+            display: flex; align-items: center; justify-content: center; gap: var(--spacing-md);
+            position: relative; min-height: 100px;
+        }
+        .total-students-card i { font-size: 2rem; opacity: 0.9; }
+        .total-students-count { font-size: 2.5rem; font-weight: 800; line-height: 1; }
+        .total-students-label { font-size: 1rem; opacity: 0.9; }
+        
+        /* Search */
+        .search-wrapper { 
+            display: flex; align-items: center; gap: var(--spacing-sm); background: var(--card); 
+            padding: 12px 20px; border-radius: 50px; border: 2px solid var(--blue); 
+            margin-bottom: var(--spacing-md); box-shadow: 0 2px 8px rgba(14, 165, 233, 0.1);
+        }
+        .search-wrapper input { 
+            border: none; padding: 8px; font-size: 1rem; width: 100%; outline: none; 
+            background: transparent; color: inherit; 
+        }
+        .search-wrapper::before { content: "🔍"; font-size: 1.2rem; color: var(--blue); }
+        
+        /* Modal */
+        .modal { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.5); display: none; align-items: center; 
+            justify-content: center; z-index: 5000; backdrop-filter: blur(3px);
+        }
+        .modal-content { 
+            background: var(--card); padding: 25px; border-radius: 16px; 
+            width: 90%; max-width: 400px; animation: modalFade 0.3s ease-out;
+        }
+        .modal-buttons { display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-md); }
+        .modal-buttons .btn { flex: 1; }
+        
+        /* Inputs */
+        input, select, textarea { 
+            width: 100%; padding: 12px; margin-top: 8px; border: 1px solid var(--border); 
+            border-radius: 10px; background: var(--card); color: var(--text); 
+            font-size: 0.95rem; box-sizing: border-box; transition: border 0.2s;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+        }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-sm); margin: var(--spacing-sm) 0; }
+        
+        /* Toast */
+        .toast { 
+            position: fixed; bottom: 20px; left: 20px; padding: 14px 22px; border-radius: 10px; 
+            color: white; z-index: 9999; font-weight: 600; box-shadow: 0 6px 16px rgba(0,0,0,0.15); 
+            animation: toastSlide 0.3s ease-out; max-width: 350px; opacity: 1; transition: 0.5s;
+        }
+        .toast.success { background: var(--success); border-right: 5px solid #065f46; }
+        .toast.error { background: var(--danger); border-right: 5px solid #991b1b; }
+        
+        /* Loader */
+        .loader { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(255,255,255,0.9); z-index: 10000; display: none; 
+            align-items: center; justify-content: center; flex-direction: column;
+            gap: var(--spacing-md); backdrop-filter: blur(5px);
+        }
+        .loader.dark-mode { background: rgba(15, 23, 42, 0.9); }
+        .spinner {
+            width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top: 4px solid var(--blue);
+            border-radius: 50%; animation: spin 1s linear infinite;
+        }
+        
+        /* Pagination */
+        .pagination-container {
+            display: flex; justify-content: space-between; align-items: center;
+            margin: var(--spacing-md) 0; padding: var(--spacing-md); background: var(--card);
+            border-radius: var(--radius); box-shadow: var(--shadow); flex-wrap: wrap; gap: var(--spacing-md);
+        }
+        .pagination-info { font-size: 0.9rem; color: var(--text); font-weight: 500; flex: 1; text-align: center; }
+        .pagination-controls { display: flex; align-items: center; gap: var(--spacing-sm); }
+        .pagination-btn {
+            background: var(--main); color: white; border: none; border-radius: 8px; padding: 8px 16px;
+            cursor: pointer; font-size: 0.9rem; transition: all 0.2s; display: flex; align-items: center; gap: 5px;
+        }
+        .pagination-btn:hover:not(:disabled) { background: var(--blue); transform: translateY(-2px); }
+        .pagination-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .page-numbers { display: flex; gap: 5px; align-items: center; }
+        .page-number { padding: 8px 12px; border-radius: 6px; background: var(--bg); color: var(--text); font-weight: 600; min-width: 40px; text-align: center; }
+        
+        /* Header */
+        .header-container {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: var(--spacing-md) 0; margin-bottom: var(--spacing-md); border-bottom: 1px solid var(--border);
+        }
+        .logo-container { display: flex; align-items: center; gap: var(--spacing-md); }
+        .header-logo {
+            height: 60px; width: auto; border-radius: 8px; transition: transform 0.3s;
+            cursor: pointer; object-fit: contain; background: white; padding: 5px;
+        }
+        .header-logo:hover { transform: scale(1.05); }
+        .header-title { margin: 0; color: var(--blue); font-size: 1.5rem; }
+        
+        /* Settings */
+        .settings-container { position: relative; }
+        .settings-btn {
+            background: none; border: none; color: var(--text); font-size: 1.2rem;
+            cursor: pointer; padding: 8px 12px; border-radius: 8px; transition: all 0.2s;
+        }
+        .settings-btn:hover { background: rgba(0, 0, 0, 0.05); color: var(--blue); }
+        .settings-dropdown {
+            position: absolute; left: 0; top: 100%; background: var(--card); border-radius: var(--radius);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); min-width: 200px; z-index: 1000;
+            display: none; padding: 8px 0; margin-top: 5px; border: 1px solid var(--border);
+            animation: fadeIn 0.2s ease-out;
+        }
+        .settings-dropdown.show { display: block; }
+        .settings-dropdown button {
+            width: 100%; padding: 12px 16px; background: none; border: none; text-align: right;
+            color: var(--text); font-size: 0.9rem; cursor: pointer; display: flex;
+            align-items: center; gap: 10px; transition: all 0.2s;
+        }
+        .settings-dropdown button:hover { background: rgba(14, 165, 233, 0.1); color: var(--blue); }
+        .dropdown-divider { height: 1px; background: rgba(0, 0, 0, 0.1); margin: 8px 0; }
+        
+        /* Advanced Filters */
+        .advanced-filters {
+            background: var(--card); padding: var(--spacing-md); border-radius: var(--radius);
+            margin: var(--spacing-md) 0; display: flex; gap: var(--spacing-sm);
+            align-items: center; flex-wrap: wrap;
+        }
+        
+        /* Theme Toggle */
+        .theme-toggle {
+            position: fixed; bottom: 20px; left: 20px; background: var(--main); color: white;
+            width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; cursor: pointer; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transition: all 0.3s;
+        }
+        .theme-toggle:hover { transform: scale(1.1); }
+        
+        /* Login */
+        #loginPage {
+            height: 100vh; display: none; flex-direction: column; 
+            align-items: center; justify-content: center;
+        }
+        .login-card {
+            width: 90%; max-width: 400px; text-align: center; padding: 30px;
+            border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        /* Animations */
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes modalFade { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes toastSlide { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Responsive */
+        @media (max-width: 767px) {
+            .container { padding: var(--spacing-sm); }
+            .student-number { right: -15px; width: 25px; height: 25px; font-size: 0.8rem; }
+            .advanced-filters { flex-direction: column; }
+            .advanced-filters select, .advanced-filters input { width: 100%; }
+            .header-logo { height: 50px; }
+            .header-title { font-size: 1.3rem; }
+            .pagination-container { flex-direction: column; text-align: center; }
+            .pagination-controls { width: 100%; justify-content: center; }
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .dark-mode ::-webkit-scrollbar-track { background: #1e293b; }
+        .dark-mode ::-webkit-scrollbar-thumb { background: #475569; }
+        
+        /* Print */
+        @media print { 
+            .no-print { display: none !important; }
+            .print-area { display: block !important; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; } 
+            th, td { border: 1px solid #000; padding: 4px; text-align: center; }
+            th { background: #f0f0f0 !important; font-weight: bold; }
+            @page { margin: 0.5cm; }
+        }
+        .print-area { display: none; }
+        
+        /* Empty State */
+        .empty-state { text-align: center; padding: 40px 20px; color: #64748b; }
+        
+        /* Logout Button */
+        .logout-btn {
+            background: none; border: none; color: var(--danger); font-size: 0.9rem; 
+            cursor: pointer; padding: 8px 12px; border-radius: 8px; transition: background 0.2s;
+        }
+        .logout-btn:hover { background: #fee2e2; }
+        
+        /* Stats Popup */
+        .stats-popup {
+            position: absolute; left: 20px; bottom: calc(100% + 10px); background: var(--card);
+            border-radius: 12px; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); min-width: 250px;
+            z-index: 1000; display: none; padding: 15px; border: 1px solid var(--border);
+            animation: fadeIn 0.2s ease-out;
+        }
+        .stats-popup.show { display: block; }
+        .stats-popup-item {
+            padding: 10px 0; display: flex; align-items: center; gap: 10px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        .stats-popup-item:last-child { border-bottom: none; }
+        .stats-popup-item i { color: var(--blue); font-size: 1.1rem; width: 24px; }
+        .stats-popup-item span { flex: 1; font-size: 0.9rem; }
+        .stats-popup-item strong { color: var(--blue); font-size: 1rem; }
+        
+        /* Stats Toggle */
+        .stats-toggle {
+            position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.2); border: none; color: white;
+            width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s; z-index: 10;
+        }
+        .stats-toggle:hover {
+            background: rgba(255, 255, 255, 0.3); transform: translateY(-50%) scale(1.1);
+        }
+    </style>
+    
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, writeBatch, getDocs, getCountFromServer } 
-        from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
-        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } 
-        from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-
+        import { 
+            getFirestore, collection, addDoc, onSnapshot, query, orderBy, 
+            deleteDoc, doc, updateDoc, writeBatch, getDocs, getCountFromServer 
+        } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { 
+            getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut 
+        } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        
         const firebaseConfig = {
             apiKey: "AIzaSyC-RyeNVI6aNmWSJIYhQCG_4J_RQDAovds",
             authDomain: "student-archive-f8689.firebaseapp.com",
@@ -22,90 +353,70 @@
             messagingSenderId: "815104091476",
             appId: "1:815104091476:web:8e725238d8ebabaf26d4c1"
         };
-
+        
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
         const studentsCol = collection(db, "students");
-
+        
+        // Global Variables
         let deleteTargetId = null;
         window.allStudentsData = [];
         window.filteredStudentsData = [];
-        window.activeLetter = null;
-        let unsavedChanges = false;
-        
-        // متغيرات التقسيم إلى صفحات
         window.currentPage = 1;
-        window.pageSize = 100; // عرض 100 سجل في كل صفحة
+        window.pageSize = 100;
         window.totalPages = 1;
-
-        // نظام الإشعارات الملون وغير الشفاف
+        
+        // Helper Functions
         window.showToast = (msg, type = 'success') => {
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
             toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-trash-alt'}"></i> ${msg}`;
             container.appendChild(toast);
-            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 500);
+            }, 3000);
         };
-
-        onAuthStateChanged(auth, (user) => {
-            document.getElementById('loginPage').style.display = user ? 'none' : 'flex';
-            document.getElementById('appContent').style.display = user ? 'block' : 'none';
-            if(user) { 
-                loadData(); 
-                updateTotalCount();
-            }
-        });
-
-        // دالة للحصول على العدد الإجمالي للطلاب
-        async function updateTotalCount() {
+        
+        window.closeModal = (modalId) => {
+            document.getElementById(modalId).style.display = 'none';
+        };
+        
+        const formatDate = (timestamp) => {
+            return new Date(timestamp).toLocaleDateString('ar-EG', {
+                year: 'numeric', month: 'short', day: 'numeric'
+            });
+        };
+        
+        // Firebase Operations
+        const updateTotalCount = async () => {
             try {
                 const snapshot = await getCountFromServer(studentsCol);
-                const totalCount = snapshot.data().count;
-                document.getElementById('totalStudentsCard').innerText = totalCount;
-                console.log("إجمالي الطلاب من Firebase:", totalCount);
+                document.getElementById('totalStudentsCard').innerText = snapshot.data().count;
             } catch (error) {
-                console.error("Error getting total count:", error);
-                // في حالة الخطأ، نعرض عدد الطلاب المحلي
-                const localCount = window.allStudentsData.length;
-                document.getElementById('totalStudentsCard').innerText = localCount;
-                console.log("إجمالي الطلاب من البيانات المحلية:", localCount);
+                document.getElementById('totalStudentsCard').innerText = window.allStudentsData.length;
             }
-        }
-
-        function loadData() {
-            console.log("جاري تحميل البيانات من Firebase...");
+        };
+        
+        const loadData = () => {
             onSnapshot(query(studentsCol, orderBy("timestamp", "desc")), (snapshot) => {
                 window.allStudentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                console.log("تم تحميل", window.allStudentsData.length, "طالب");
-                
-                updateQuickStats();
+                updateStats();
                 updateQaidFilter();
-                window.applyFilters(); 
-                
-                // تحديث بطاقة العدد الإجمالي
-                document.getElementById('totalStudentsCard').innerText = window.allStudentsData.length;
-                console.log("تم تحديث بطاقة العدد إلى:", window.allStudentsData.length);
-                
-                // عرض بيانات أول طالب للتأكد
-                if (window.allStudentsData.length > 0) {
-                    console.log("أول طالب:", window.allStudentsData[0]);
-                }
+                window.applyFilters();
+                updateTotalCount();
             }, (error) => {
-                console.error("خطأ في تحميل البيانات:", error);
                 showToast("خطأ في تحميل البيانات", "error");
             });
-        }
-
-        function updateQuickStats() {
+        };
+        
+        const updateStats = () => {
             const startOfDay = new Date().setHours(0,0,0,0);
             const todayCount = window.allStudentsData.filter(s => s.timestamp >= startOfDay).length;
             const qaidsCount = new Set(window.allStudentsData.map(s => s.qaid)).size;
             
-            console.log("إحصائيات اليوم:", todayCount, "إجمالي القيود:", qaidsCount);
-            
-            // تحديث محتوى القائمة المنبثقة
             document.getElementById('statsPopupContent').innerHTML = `
                 <div class="stats-popup-item">
                     <i class="fas fa-users"></i>
@@ -120,323 +431,96 @@
                     <span>عدد القيود: <strong>${qaidsCount}</strong></span>
                 </div>
             `;
-        }
-
-        function updateQaidFilter() {
+        };
+        
+        const updateQaidFilter = () => {
             const qaidSelect = document.getElementById('filterQaid');
             const uniqueQaids = [...new Set(window.allStudentsData.map(s => s.qaid))].sort((a, b) => {
-                // ترتيب القيود كأرقام إذا كانت أرقاماً، وإلا كسلاسل نصية
-                const aNum = Number(a);
-                const bNum = Number(b);
-                if (!isNaN(aNum) && !isNaN(bNum)) {
-                    return aNum - bNum;
-                }
+                const aNum = Number(a), bNum = Number(b);
+                if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
                 return String(a).localeCompare(String(b));
             });
-            
-            console.log("القيود المتاحة:", uniqueQaids);
             
             qaidSelect.innerHTML = '<option value="">جميع القيود</option>';
             uniqueQaids.forEach(q => {
                 qaidSelect.innerHTML += `<option value="${q}">قيد ${q}</option>`;
             });
-            
-            console.log("تم تحديث قائمة القيود بعدد:", uniqueQaids.length);
-        }
-
-        window.applyFilters = () => {
+        };
+        
+        // Filter Functions
+        const filterStudents = () => {
             const term = document.getElementById('searchInput').value.toLowerCase();
             const sortBy = document.getElementById('sortSelect').value;
             const filterQaid = document.getElementById('filterQaid').value;
             const filterPage = document.getElementById('filterPage').value;
             
-            console.log("جاري تطبيق الفلاتر:", { term, sortBy, filterQaid, filterPage });
-            
             let filtered = window.allStudentsData.filter(s => {
-                // البحث في الاسم واللقب والقيد
-                const matchSearch = 
-                    (s.name || '').toLowerCase().includes(term) || 
-                    (s.surname || '').toLowerCase().includes(term) ||
-                    String(s.qaid).includes(term);
+                const matchSearch = (s.name || '').toLowerCase().includes(term) || 
+                                  (s.surname || '').toLowerCase().includes(term) ||
+                                  String(s.qaid).includes(term);
                 const matchQaid = filterQaid ? String(s.qaid) === filterQaid : true;
                 const matchPage = filterPage ? String(s.page).includes(filterPage) : true;
                 return matchSearch && matchQaid && matchPage;
             });
             
-            console.log("عدد الطلاب بعد التصفية:", filtered.length);
+            const sortMethods = {
+                "alpha": (a, b) => a.name.localeCompare(b.name, 'ar'),
+                "qaid": (a, b) => String(a.qaid).localeCompare(String(b.qaid)),
+                "page": (a, b) => String(a.page).localeCompare(String(b.page)),
+                "surname": (a, b) => (a.surname || '').localeCompare(b.surname || '', 'ar')
+            };
             
-            if (sortBy === "alpha") filtered.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-            else if (sortBy === "qaid") filtered.sort((a, b) => String(a.qaid).localeCompare(String(b.qaid)));
-            else if (sortBy === "page") filtered.sort((a, b) => String(a.page).localeCompare(String(b.page)));
-            else if (sortBy === "surname") filtered.sort((a, b) => (a.surname || '').localeCompare(b.surname || '', 'ar'));
+            if (sortBy !== "newest" && sortMethods[sortBy]) {
+                filtered.sort(sortMethods[sortBy]);
+            }
             
             window.filteredStudentsData = filtered;
             window.totalPages = Math.ceil(filtered.length / window.pageSize);
             window.currentPage = 1;
-            
             window.renderPage();
-            updatePaginationControls();
         };
-
-        // دالة لعرض الصفحة الحالية
-        window.renderPage = () => {
-            const startIndex = (window.currentPage - 1) * window.pageSize;
-            const endIndex = startIndex + window.pageSize;
-            const pageData = window.filteredStudentsData.slice(startIndex, endIndex);
-            
-            console.log("جاري عرض الصفحة", window.currentPage, "بيانات:", pageData.length);
-            window.render(pageData);
-            updatePaginationInfo();
-        };
-
-        // تحديث معلومات الصفحة
-        function updatePaginationInfo() {
+        
+        window.applyFilters = filterStudents;
+        
+        // Pagination
+        const updatePagination = () => {
             const totalStudents = window.filteredStudentsData.length;
             const startIndex = (window.currentPage - 1) * window.pageSize + 1;
             const endIndex = Math.min(window.currentPage * window.pageSize, totalStudents);
-            
-            const pageInfoText = `عرض ${startIndex}-${endIndex} من ${totalStudents} طالب`;
-            document.getElementById('pageInfo').innerText = pageInfoText;
-            document.getElementById('pageInfoBottom').innerText = pageInfoText;
-        }
-
-        // تحديث عناصر التحكم في التصفح
-        function updatePaginationControls() {
-            const prevBtn = document.getElementById('prevPage');
-            const nextBtn = document.getElementById('nextPage');
-            const prevBtnBottom = document.getElementById('prevPageBottom');
-            const nextBtnBottom = document.getElementById('nextPageBottom');
-            
-            const disabled = window.currentPage <= 1;
-            prevBtn.disabled = disabled;
-            prevBtnBottom.disabled = disabled;
-            
-            const nextDisabled = window.currentPage >= window.totalPages;
-            nextBtn.disabled = nextDisabled;
-            nextBtnBottom.disabled = nextDisabled;
-            
-            document.getElementById('pageNumber').innerText = window.currentPage;
-            document.getElementById('totalPages').innerText = window.totalPages;
-            document.getElementById('pageNumberBottom').innerText = window.currentPage;
-            document.getElementById('totalPagesBottom').innerText = window.totalPages;
-            
-            const totalStudents = window.filteredStudentsData.length;
-            const startIndex = (window.currentPage - 1) * window.pageSize + 1;
-            const endIndex = Math.min(window.currentPage * window.pageSize, totalStudents);
-            
             const pageInfo = `عرض ${startIndex}-${endIndex} من ${totalStudents} طالب`;
+            
             document.getElementById('pageInfo').innerText = pageInfo;
             document.getElementById('pageInfoBottom').innerText = pageInfo;
-        }
-
-        // التنقل بين الصفحات
+            
+            document.getElementById('pageNumber').innerText = window.currentPage;
+            document.getElementById('pageNumberBottom').innerText = window.currentPage;
+            document.getElementById('totalPages').innerText = window.totalPages;
+            document.getElementById('totalPagesBottom').innerText = window.totalPages;
+            
+            const prevBtns = document.querySelectorAll('.pagination-btn[id^="prevPage"]');
+            const nextBtns = document.querySelectorAll('.pagination-btn[id^="nextPage"]');
+            prevBtns.forEach(btn => btn.disabled = window.currentPage <= 1);
+            nextBtns.forEach(btn => btn.disabled = window.currentPage >= window.totalPages);
+        };
+        
         window.goToPage = (page) => {
             if (page < 1 || page > window.totalPages) return;
             window.currentPage = page;
             window.renderPage();
-            updatePaginationControls();
-            // التمرير إلى أعلى القائمة
-            document.getElementById('studentsList').scrollIntoView({ behavior: 'smooth', block: 'start' });
         };
-
+        
         window.prevPage = () => window.goToPage(window.currentPage - 1);
         window.nextPage = () => window.goToPage(window.currentPage + 1);
-
-        window.clearFilters = () => {
-            document.getElementById('searchInput').value = '';
-            document.getElementById('filterQaid').value = '';
-            document.getElementById('filterPage').value = '';
-            document.getElementById('sortSelect').value = 'newest';
-            window.applyFilters();
-            showToast("تم مسح جميع الفلاتر");
-        };
-
-        // دالة لتحميل نموذج Excel جاهز
-        window.downloadExcelTemplate = () => {
-            const templateData = [
-                ["الاسم", "اللقب", "القيد", "الصفحة", "ملاحظات"],
-                ["أحمد محمد علي", "الكبيسي", "12345", "25", "-"],
-                ["سارة خالد حسن", "العبيدي", "12346", "26", "طالبة متفوقة"],
-                ["علي محمود سعيد", "الجبوري", "12347", "27", "-"],
-                ["لمياء فارس عبدالله", "التميمي", "12348", "28", "-"],
-                ["محمد خالد إبراهيم", "الراوي", "12349", "29", "-"],
-                ["فاطمة عماد حسين", "الخالدي", "12350", "30", "-"]
-            ];
-            
-            const ws = XLSX.utils.aoa_to_sheet(templateData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
-            XLSX.writeFile(wb, "نموذج_اسماء_الطلاب.xlsx");
-            showToast("تم تحميل النموذج بنجاح");
-        };
-
-        // دالة للتحقق من التكرار الصارم: نفس القيد + نفس الصفحة
-        function isDuplicateQaidPage(qaid, page, existingStudents, excludeId = null) {
-            return existingStudents.some(student => 
+        
+        // CRUD Operations
+        const isDuplicate = (qaid, page, excludeId = null) => {
+            return window.allStudentsData.some(student => 
                 (excludeId ? student.id !== excludeId : true) &&
                 String(student.qaid).trim() === String(qaid).trim() &&
                 String(student.page).trim() === String(page).trim()
             );
-        }
-
-        window.importExcel = (event) => {
-            const file = event.target.files[0];
-            if(!file) return;
-            const reader = new FileReader();
-            document.getElementById('loader').style.display = 'flex';
-            reader.onload = async (e) => {
-                try {
-                    const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-                    const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                    
-                    const existingStudents = window.allStudentsData;
-                    const batch = writeBatch(db);
-                    let added = 0;
-                    let skipped = 0;
-                    
-                    json.forEach((row) => {
-                        const rName = String(row.name || row["الاسم"] || "").trim();
-                        const rQaid = String(row.qaid || row["القيد"] || "").trim();
-                        const rPage = String(row.page || row["الصفحة"] || "").trim();
-                        
-                        if (rName === "" || rQaid === "" || rPage === "") {
-                            skipped++;
-                            return;
-                        }
-                        
-                        // التحقق من التكرار الصارم: نفس القيد + نفس الصفحة
-                        if (isDuplicateQaidPage(rQaid, rPage, existingStudents)) {
-                            skipped++;
-                            return;
-                        }
-                        
-                        const newDoc = doc(collection(db, "students"));
-                        batch.set(newDoc, {
-                            name: rName, 
-                            surname: String(row.surname || row["اللقب"] || "").trim(),
-                            qaid: rQaid,
-                            page: rPage,
-                            note: String(row.note || row["ملاحظات"] || "").trim(),
-                            timestamp: Date.now()
-                        });
-                        added++;
-                    });
-                    
-                    if (added > 0) {
-                        await batch.commit();
-                        showToast(`تم استيراد ${added} طالب (تم تخطي ${skipped})`);
-                        updateTotalCount();
-                    } else {
-                        showToast("لم يتم استيراد أي بيانات جديدة", "error");
-                    }
-                    
-                } catch(err) { showToast("خطأ في الملف", "error"); }
-                document.getElementById('loader').style.display = 'none';
-            };
-            reader.readAsArrayBuffer(file);
         };
-
-        window.exportExcel = () => {
-            const ws = XLSX.utils.json_to_sheet(window.allStudentsData.map(({id, timestamp, ...rest}) => rest));
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
-            XLSX.writeFile(wb, "الارشيف.xlsx");
-        };
-
-        window.openMasterDelete = () => {
-            document.getElementById('masterDeleteInput').value = '';
-            document.getElementById('masterDeleteModal').style.display = 'flex';
-        };
-
-        window.confirmMasterDelete = async () => {
-            if(document.getElementById('masterDeleteInput').value !== 'حذف') return showToast("اكتب كلمة حذف", "error");
-            document.getElementById('loader').style.display = 'flex';
-            try {
-                const snapshot = await getDocs(studentsCol);
-                const batch = writeBatch(db);
-                snapshot.docs.forEach((doc) => batch.delete(doc.ref));
-                await batch.commit();
-                showToast("تم مسح السجل بنجاح", "error");
-                document.getElementById('masterDeleteModal').style.display = 'none';
-                updateTotalCount();
-            } catch(e) { showToast("خطأ في المسح", "error"); }
-            document.getElementById('loader').style.display = 'none';
-        };
-
-        window.showPrintOptions = () => {
-            const qSelect = document.getElementById('qaidSelect');
-            qSelect.innerHTML = '<option value="">-- اختر القيد --</option>';
-            [...new Set(window.allStudentsData.map(s => s.qaid))].sort().forEach(q => {
-                qSelect.innerHTML += `<option value="${q}">قيد رقم ${q}</option>`;
-            });
-            document.getElementById('printModal').style.display = 'flex';
-        };
-
-        window.printSelectedQaid = () => {
-            const q = document.getElementById('qaidSelect').value;
-            if(!q) return;
-            const data = window.allStudentsData.filter(s => String(s.qaid) === String(q)).sort((a,b)=>a.name.localeCompare(b.name,'ar'));
-            executePrint(data, `سجل القيد رقم (${q})`);
-        };
-
-        window.printAllAlpha = () => {
-            executePrint([...window.allStudentsData].sort((a,b)=>a.name.localeCompare(b.name,'ar')), "السجل العام");
-        };
-
-        function executePrint(data, title) {
-            document.getElementById('printTitle').innerText = title;
-            const container = document.getElementById('printTablesContainer');
-            container.innerHTML = '';
-            
-            const rowsPerColumn = 35;      // تم زيادة العدد إلى 35 سطر في كل جهة
-            const totalRowsPerPage = 70;   // المجموع أصبح 70 اسماً في الورقة الواحدة
-            
-            for (let pageNum = 0; pageNum < Math.ceil(data.length / totalRowsPerPage); pageNum++) {
-                const pageStartIndex = pageNum * totalRowsPerPage;
-                const pageData = data.slice(pageStartIndex, pageStartIndex + totalRowsPerPage);
-                
-                const pageDiv = document.createElement('div');
-                pageDiv.className = 'print-page';
-                
-                const rightData = pageData.slice(0, rowsPerColumn);
-                const leftData = pageData.slice(rowsPerColumn, totalRowsPerPage);
-
-                const createTable = (colData, startSeq) => {
-                    let html = '<table><thead><tr><th>ت</th><th>الاسم</th><th>اللقب</th><th>القيد</th><th>الصفحة</th></tr></thead><tbody>';
-                    for (let i = 0; i < rowsPerColumn; i++) {
-                        const student = colData[i];
-                        const currentSeq = startSeq + i;
-                        if (student) {
-                            // تم إضافة تنسيق عريض للأسماء
-                            html += `<tr>
-                                <td>${currentSeq}</td>
-                                <td style="text-align:right; padding-right:5px; font-weight: bold;">${student.name || ''}</td>
-                                <td>${student.surname || ''}</td>
-                                <td>${student.qaid || ''}</td>
-                                <td>${student.page || ''}</td>
-                            </tr>`;
-                        } else {
-                            html += `<tr><td>${currentSeq}</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
-                        }
-                    }
-                    html += '</tbody></table>';
-                    return html;
-                };
-
-                pageDiv.innerHTML = `
-                    <div class="print-grid">
-                        <div class="print-col print-col-right">${createTable(rightData, pageStartIndex + 1)}</div>
-                        <div class="print-col print-col-left">${createTable(leftData, pageStartIndex + rowsPerColumn + 1)}</div>
-                    </div>
-                `;
-                container.appendChild(pageDiv);
-            }
-            
-            document.getElementById('printDate').innerText = "تاريخ الاستخراج: " + new Date().toLocaleDateString('ar-EG');
-            document.getElementById('printModal').style.display = 'none';
-            setTimeout(() => { window.print(); }, 500);
-        }
-
+        
         window.saveData = async () => {
             const id = document.getElementById('editId').value;
             const name = document.getElementById('fName').value.trim();
@@ -445,50 +529,200 @@
             
             if(!name || !qaid || !page) return showToast("أكمل البيانات", "error");
             
-            // التحقق من التكرار الصارم: نفس القيد + نفس الصفحة
-            if (isDuplicateQaidPage(qaid, page, window.allStudentsData, id)) {
-                showToast("هذا القيد والصفحة مسجلين مسبقاً لطالب آخر", "error");
+            if (isDuplicate(qaid, page, id)) {
+                showToast("هذا القيد والصفحة مسجلين مسبقاً", "error");
                 return;
             }
             
+            const data = { 
+                name, 
+                surname: document.getElementById('surname').value, 
+                qaid, page, 
+                note: document.getElementById('note').value, 
+                timestamp: Date.now() 
+            };
+            
             try {
-                const data = { 
-                    name, 
-                    surname: document.getElementById('surname').value, 
-                    qaid, 
-                    page, 
-                    note: document.getElementById('note').value, 
-                    timestamp: Date.now() 
-                };
-                
                 if(id) {
                     await updateDoc(doc(db, "students", id), data);
+                    showToast("تم التحديث بنجاح");
                 } else {
                     await addDoc(studentsCol, data);
+                    showToast("تم الحفظ بنجاح");
                 }
-                
-                showToast("تم الحفظ بنجاح"); 
-                window.closeAddModal(); 
+                closeModal('entryModal');
                 window.resetForm();
-                unsavedChanges = false;
                 updateTotalCount();
             } catch(e) { 
-                showToast("خطأ شبكة", "error"); 
+                showToast("خطأ في الحفظ", "error"); 
             }
         };
-
-        window.del = (id) => { deleteTargetId = id; document.getElementById('deleteModal').style.display = 'flex'; };
-        window.confirmDel = async () => { if(deleteTargetId) { await deleteDoc(doc(db, "students", deleteTargetId)); showToast("تم الحذف", "error"); document.getElementById('deleteModal').style.display = 'none'; updateTotalCount(); } };
         
+        window.del = (id) => { 
+            deleteTargetId = id; 
+            document.getElementById('deleteModal').style.display = 'flex'; 
+        };
+        
+        window.confirmDel = async () => { 
+            if(deleteTargetId) { 
+                await deleteDoc(doc(db, "students", deleteTargetId)); 
+                showToast("تم الحذف", "error"); 
+                closeModal('deleteModal');
+                updateTotalCount();
+            } 
+        };
+        
+        // Import/Export
+        window.downloadExcelTemplate = () => {
+            const templateData = [
+                ["الاسم", "اللقب", "القيد", "الصفحة", "ملاحظات"],
+                ["أحمد محمد علي", "الكبيسي", "12345", "25", "-"]
+            ];
+            
+            const ws = XLSX.utils.aoa_to_sheet(templateData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
+            XLSX.writeFile(wb, "نموذج_اسماء_الطلاب.xlsx");
+            showToast("تم تحميل النموذج بنجاح");
+        };
+        
+        window.importExcel = async (event) => {
+            const file = event.target.files[0];
+            if(!file) return;
+            
+            document.getElementById('loader').style.display = 'flex';
+            
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                
+                const batch = writeBatch(db);
+                let added = 0, skipped = 0;
+                
+                json.forEach((row) => {
+                    const rName = String(row.name || row["الاسم"] || "").trim();
+                    const rQaid = String(row.qaid || row["القيد"] || "").trim();
+                    const rPage = String(row.page || row["الصفحة"] || "").trim();
+                    
+                    if (!rName || !rQaid || !rPage || isDuplicate(rQaid, rPage)) {
+                        skipped++;
+                        return;
+                    }
+                    
+                    const newDoc = doc(collection(db, "students"));
+                    batch.set(newDoc, {
+                        name: rName, 
+                        surname: String(row.surname || row["اللقب"] || "").trim(),
+                        qaid: rQaid,
+                        page: rPage,
+                        note: String(row.note || row["ملاحظات"] || "").trim(),
+                        timestamp: Date.now()
+                    });
+                    added++;
+                });
+                
+                if (added > 0) {
+                    await batch.commit();
+                    showToast(`تم استيراد ${added} طالب (تم تخطي ${skipped})`);
+                    updateTotalCount();
+                } else {
+                    showToast("لم يتم استيراد أي بيانات جديدة", "error");
+                }
+            } catch(err) { 
+                showToast("خطأ في الملف", "error"); 
+            }
+            
+            document.getElementById('loader').style.display = 'none';
+        };
+        
+        window.exportExcel = () => {
+            const data = window.allStudentsData.map(({id, timestamp, ...rest}) => rest);
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
+            XLSX.writeFile(wb, "الارشيف.xlsx");
+        };
+        
+        // Print Functions
+        window.showPrintOptions = () => {
+            const qSelect = document.getElementById('qaidSelect');
+            qSelect.innerHTML = '<option value="">-- اختر القيد --</option>';
+            [...new Set(window.allStudentsData.map(s => s.qaid))].sort().forEach(q => {
+                qSelect.innerHTML += `<option value="${q}">قيد رقم ${q}</option>`;
+            });
+            document.getElementById('printModal').style.display = 'flex';
+        };
+        
+        const executePrint = (data, title) => {
+            document.getElementById('printTitle').innerText = title;
+            const container = document.getElementById('printTablesContainer');
+            container.innerHTML = '';
+            
+            const rowsPerColumn = 35;
+            const totalRowsPerPage = 70;
+            
+            for (let pageNum = 0; pageNum < Math.ceil(data.length / totalRowsPerPage); pageNum++) {
+                const pageStartIndex = pageNum * totalRowsPerPage;
+                const pageData = data.slice(pageStartIndex, pageStartIndex + totalRowsPerPage);
+                
+                const pageDiv = document.createElement('div');
+                pageDiv.className = 'print-page';
+                
+                const createTable = (colData, startSeq) => {
+                    let html = '<table><thead><tr><th>ت</th><th>الاسم</th><th>اللقب</th><th>القيد</th><th>الصفحة</th></tr></thead><tbody>';
+                    for (let i = 0; i < rowsPerColumn; i++) {
+                        const student = colData[i];
+                        if (student) {
+                            html += `<tr>
+                                <td>${startSeq + i}</td>
+                                <td>${student.name || ''}</td>
+                                <td>${student.surname || ''}</td>
+                                <td>${student.qaid || ''}</td>
+                                <td>${student.page || ''}</td>
+                            </tr>`;
+                        } else {
+                            html += `<tr><td>${startSeq + i}</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
+                        }
+                    }
+                    return html + '</tbody></table>';
+                };
+        
+                pageDiv.innerHTML = `
+                    <div class="print-grid">
+                        <div class="print-col">${createTable(pageData.slice(0, rowsPerColumn), pageStartIndex + 1)}</div>
+                        <div class="print-col">${createTable(pageData.slice(rowsPerColumn, totalRowsPerPage), pageStartIndex + rowsPerColumn + 1)}</div>
+                    </div>
+                `;
+                container.appendChild(pageDiv);
+            }
+            
+            document.getElementById('printDate').innerText = "تاريخ الاستخراج: " + new Date().toLocaleDateString('ar-EG');
+            closeModal('printModal');
+            setTimeout(() => window.print(), 500);
+        };
+        
+        window.printAllAlpha = () => {
+            const data = [...window.allStudentsData].sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+            executePrint(data, "السجل العام");
+        };
+        
+        window.printSelectedQaid = () => {
+            const q = document.getElementById('qaidSelect').value;
+            if(!q) return;
+            const data = window.allStudentsData.filter(s => String(s.qaid) === String(q)).sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+            executePrint(data, `سجل القيد رقم (${q})`);
+        };
+        
+        // Student Operations
         window.copyStudentData = (id) => {
             const student = window.allStudentsData.find(s => s.id === id);
-            // تم حذف اسم الأم من البيانات المنقولة
             const text = `الاسم: ${student.name}\nاللقب: ${student.surname || ''}\nالقيد: ${student.qaid}\nالصفحة: ${student.page}`;
             navigator.clipboard.writeText(text).then(() => {
                 showToast("تم نسخ بيانات الطالب");
             });
         };
-
+        
         window.duplicateLastStudent = () => {
             if (window.allStudentsData.length > 0) {
                 const lastStudent = window.allStudentsData[0];
@@ -498,63 +732,42 @@
                 document.getElementById('pNum').value = lastStudent.page;
                 document.getElementById('note').value = lastStudent.note;
                 showToast("تم نسخ بيانات آخر طالب");
-                unsavedChanges = true;
-            } else {
-                showToast("لا توجد بيانات للنسخ", "error");
             }
         };
-
+        
         window.generateRandomData = () => {
-            const names = ["أحمد محمد علي", "سارة خالد حسن", "علي محمود سعيد", "لمياء فارس عبدالله", "محمد خالد إبراهيم"];
-            const surnames = ["الكبيسي", "العبيدي", "الجبوري", "التميمي", "الراوي"];
+            const names = ["أحمد محمد علي", "سارة خالد حسن", "علي محمود سعيد", "لمياء فارس عبدالله"];
+            const surnames = ["الكبيسي", "العبيدي", "الجبوري", "التميمي"];
             
-            const randomName = names[Math.floor(Math.random() * names.length)];
-            const randomSurname = surnames[Math.floor(Math.random() * surnames.length)];
-            const randomQaid = Math.floor(Math.random() * 90000) + 10000;
-            const randomPage = Math.floor(Math.random() * 50) + 1;
-            
-            document.getElementById('fName').value = randomName;
-            document.getElementById('surname').value = randomSurname;
-            document.getElementById('qNum').value = randomQaid;
-            document.getElementById('pNum').value = randomPage;
+            document.getElementById('fName').value = names[Math.floor(Math.random() * names.length)];
+            document.getElementById('surname').value = surnames[Math.floor(Math.random() * surnames.length)];
+            document.getElementById('qNum').value = Math.floor(Math.random() * 90000) + 10000;
+            document.getElementById('pNum').value = Math.floor(Math.random() * 50) + 1;
             document.getElementById('note').value = "بيانات تجريبية";
-            
             showToast("تم تعبئة بيانات تجريبية");
-            unsavedChanges = true;
         };
-
+        
+        // Render Students
         window.render = (data) => {
             const list = document.getElementById('studentsList');
-            if (!list) {
-                console.error("عنصر studentsList غير موجود!");
-                return;
-            }
-            
-            list.innerHTML = ''; 
+            if (!list) return;
             
             if (data.length === 0) {
                 list.innerHTML = `
                     <div class="empty-state">
-                        <i class="fas fa-search" style="font-size: 3rem; color: #94a3b8; margin-bottom: 15px;"></i>
-                        <h3 style="color: #64748b; margin-bottom: 10px;">لا توجد بيانات</h3>
-                        <p style="color: #94a3b8;">لم يتم العثور على طلاب مطابقين للبحث</p>
+                        <i class="fas fa-search"></i>
+                        <h3>لا توجد بيانات</h3>
+                        <p>لم يتم العثور على طلاب مطابقين للبحث</p>
                     </div>
                 `;
                 return;
             }
             
-            data.forEach((s, index) => {
+            list.innerHTML = data.map((s, index) => {
                 const globalIndex = (window.currentPage - 1) * window.pageSize + index + 1;
+                const formattedDate = formatDate(s.timestamp);
                 
-                // تنسيق التاريخ بشكل مختصر
-                const dateAdded = new Date(s.timestamp);
-                const formattedDate = dateAdded.toLocaleDateString('ar-EG', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric'
-                });
-                
-                list.innerHTML += `
+                return `
                     <div class="student-item card">
                         <div class="student-number">${globalIndex}</div>
                         <div class="card-body-wrapper">
@@ -565,33 +778,29 @@
                             <div class="student-details">
                                 <p class="student-name">${s.name} <span class="surname-badge">${s.surname || ''}</span></p>
                                 <div class="student-meta-row">
-                                    <span class="meta-item" title="رقم القيد">
-                                        <i class="fas fa-hashtag"></i> ${s.qaid || ''}
-                                    </span>
-                                    <span class="meta-item" title="رقم الصفحة">
-                                        <i class="fas fa-file-alt"></i> ${s.page || ''}
-                                    </span>
-                                    <span class="meta-item date-item" title="تاريخ الإضافة">
-                                        <i class="fas fa-calendar-alt"></i> ${formattedDate}
-                                    </span>
+                                    <span class="meta-item"><i class="fas fa-hashtag"></i> ${s.qaid || ''}</span>
+                                    <span class="meta-item"><i class="fas fa-file-alt"></i> ${s.page || ''}</span>
+                                    <span class="meta-item date-item"><i class="fas fa-calendar-alt"></i> ${formattedDate}</span>
                                 </div>
                             </div>
                         </div>
                         <div class="item-actions">
-                            <button onclick="copyStudentData('${s.id}')" class="copy-btn-small" title="نسخ البيانات">
-                                <i class="fas fa-copy"></i>
-                            </button>
-                            <button onclick="edit('${s.id}')" class="edit-btn-small" title="تعديل">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button onclick="del('${s.id}')" class="del-btn-small" title="حذف">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                            <button onclick="copyStudentData('${s.id}')" class="copy-btn-small" title="نسخ البيانات"><i class="fas fa-copy"></i></button>
+                            <button onclick="edit('${s.id}')" class="edit-btn-small" title="تعديل"><i class="fas fa-edit"></i></button>
+                            <button onclick="del('${s.id}')" class="del-btn-small" title="حذف"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>`;
-            });
+            }).join('');
         };
-
+        
+        window.renderPage = () => {
+            const startIndex = (window.currentPage - 1) * window.pageSize;
+            const endIndex = startIndex + window.pageSize;
+            window.render(window.filteredStudentsData.slice(startIndex, endIndex));
+            updatePagination();
+        };
+        
+        // Edit Student
         window.edit = (id) => {
             const s = window.allStudentsData.find(x => x.id === id);
             document.getElementById('editId').value = s.id;
@@ -602,74 +811,61 @@
             document.getElementById('note').value = s.note;
             document.getElementById('saveBtn').innerText = "تحديث";
             document.getElementById('entryModal').style.display = 'flex';
-            unsavedChanges = false;
-            
-            // إضافة مستمعات الأحداث للحقول
-            setupInputListeners();
         };
-
-        function setupInputListeners() {
-            document.querySelectorAll('#entryModal input, #entryModal textarea').forEach(input => {
-                input.addEventListener('input', () => {
-                    unsavedChanges = true;
-                });
-            });
-        }
-
+        
         window.openAddModal = () => { 
             window.resetForm(); 
             document.getElementById('entryModal').style.display = 'flex'; 
-            unsavedChanges = false;
-            setupInputListeners();
-        };
-        
-        window.closeAddModal = () => {
-            document.getElementById('entryModal').style.display = 'none';
-            unsavedChanges = false;
         };
         
         window.resetForm = () => { 
             document.getElementById('editId').value = ''; 
-            document.querySelectorAll('input, textarea').forEach(i => i.value = ''); 
+            document.querySelectorAll('#entryModal input, #entryModal textarea').forEach(i => i.value = ''); 
             document.getElementById('saveBtn').innerText = "حفظ"; 
-            const existingAlert = document.getElementById('duplicateStudentAlert');
-            if(existingAlert) existingAlert.remove();
-            unsavedChanges = false;
+            document.getElementById('duplicateStudentAlert')?.remove();
         };
+        
+        // Auth
+        onAuthStateChanged(auth, (user) => {
+            document.getElementById('loginPage').style.display = user ? 'none' : 'flex';
+            document.getElementById('appContent').style.display = user ? 'block' : 'none';
+            if(user) loadData();
+        });
         
         window.login = async () => { 
             try { 
-                await signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value, document.getElementById('loginPass').value); 
+                await signInWithEmailAndPassword(auth, 
+                    document.getElementById('loginEmail').value, 
+                    document.getElementById('loginPass').value
+                ); 
             } catch(e) { 
                 showToast("بيانات خاطئة", "error"); 
             } 
         };
         
         window.logout = () => signOut(auth);
-        window.toggleDarkMode = () => document.body.classList.toggle('dark-mode');
         
-        // دالة للتحقق من التكرار عند كتابة الاسم (أي جزء منه)
+        // UI Functions
+        window.clearFilters = () => {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('filterQaid').value = '';
+            document.getElementById('filterPage').value = '';
+            document.getElementById('sortSelect').value = 'newest';
+            filterStudents();
+            showToast("تم مسح جميع الفلاتر");
+        };
+        
         window.checkDuplicateStudent = () => {
             const nameInput = document.getElementById('fName');
             const nameValue = nameInput.value.trim();
             
-            // إزالة أي تنبيه سابق
-            const existingAlert = document.getElementById('duplicateStudentAlert');
-            if(existingAlert) existingAlert.remove();
+            document.getElementById('duplicateStudentAlert')?.remove();
             
             if(nameValue) {
-                // تقسيم الاسم المدخل إلى كلمات
                 const enteredWords = nameValue.toLowerCase().split(/\s+/).filter(word => word.length > 0);
-                
-                if (enteredWords.length === 0) return;
-                
-                // البحث عن طالب به أي كلمة من كلمات الاسم المدخل
                 const matchingStudents = window.allStudentsData.filter(student => {
                     if (!student.name) return false;
-                    
                     const studentWords = student.name.toLowerCase().split(/\s+/).filter(word => word.length > 0);
-                    
-                    // التحقق إذا كان هناك كلمة مشتركة بين الاسم المدخل واسم الطالب
                     return enteredWords.some(enteredWord => 
                         studentWords.some(studentWord => 
                             studentWord.includes(enteredWord) || enteredWord.includes(studentWord)
@@ -678,31 +874,23 @@
                 });
                 
                 if (matchingStudents.length > 0) {
-                    // إنشاء عنصر التنبيه
                     const alertDiv = document.createElement('div');
                     alertDiv.id = 'duplicateStudentAlert';
                     alertDiv.className = 'duplicate-alert';
                     alertDiv.style.cssText = `
-                        background: #fef3c7;
-                        border: 1px solid #f59e0b;
-                        color: #92400e;
-                        padding: 12px 15px;
-                        border-radius: 8px;
-                        margin-top: 10px;
-                        font-size: 0.9rem;
-                        animation: fadeIn 0.3s ease-in;
-                        border-right: 4px solid #f59e0b;
+                        background: #fef3c7; border: 1px solid #f59e0b; color: #92400e;
+                        padding: 12px 15px; border-radius: 8px; margin-top: 10px;
+                        font-size: 0.9rem; border-right: 4px solid #f59e0b;
                     `;
                     
                     let alertHTML = `
                         <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                            <i class="fas fa-exclamation-triangle" style="margin-left: 8px; font-size: 1.1rem;"></i>
+                            <i class="fas fa-exclamation-triangle" style="margin-left: 8px;"></i>
                             <strong>تنبيه: يوجد طلاب بأسماء مشابهة</strong>
                         </div>
                         <div style="max-height: 150px; overflow-y: auto; border-top: 1px solid rgba(245, 158, 11, 0.2); padding-top: 8px;">
                     `;
                     
-                    // عرض أول 3 طلاب فقط لتجنب الإطالة
                     matchingStudents.slice(0, 3).forEach((student, index) => {
                         alertHTML += `
                             <div style="padding: 6px 0; border-bottom: ${index < Math.min(3, matchingStudents.length) - 1 ? '1px dashed #ddd' : 'none'}">
@@ -720,11 +908,9 @@
                     });
                     
                     if (matchingStudents.length > 3) {
-                        alertHTML += `
-                            <div style="text-align: center; padding: 8px; color: #666; font-size: 0.85rem;">
-                                + ${matchingStudents.length - 3} طالب آخر
-                            </div>
-                        `;
+                        alertHTML += `<div style="text-align: center; padding: 8px; color: #666; font-size: 0.85rem;">
+                            + ${matchingStudents.length - 3} طالب آخر
+                        </div>`;
                     }
                     
                     alertHTML += `
@@ -736,1373 +922,208 @@
                     `;
                     
                     alertDiv.innerHTML = alertHTML;
-                    
-                    // إضافة التنبيه تحت حقل الاسم مباشرة
                     nameInput.parentNode.insertBefore(alertDiv, nameInput.nextSibling);
                 }
             }
         };
-
-        // التحكم في قائمة الإعدادات
+        
+        window.toggleDarkMode = () => document.body.classList.toggle('dark-mode');
+        
         window.toggleSettings = () => {
             const dropdown = document.getElementById('settingsDropdown');
             dropdown.classList.toggle('show');
-            
-            // إغلاق القائمة عند النقر خارجها
             document.addEventListener('click', (e) => {
                 if (!e.target.closest('.settings-container')) {
                     dropdown.classList.remove('show');
                 }
             }, { once: true });
         };
-
-        // التحكم في إظهار/إخفاء الإحصائيات
+        
         window.toggleStatsPopup = () => {
             const popup = document.getElementById('statsPopup');
             popup.classList.toggle('show');
-            
-            // إغلاق القائمة عند النقر خارجها
             document.addEventListener('click', (e) => {
                 if (!e.target.closest('.stats-toggle') && !e.target.closest('.stats-popup')) {
                     popup.classList.remove('show');
                 }
             }, { once: true });
         };
-
-        // تهيئة قائمة الإعدادات عند تحميل الصفحة
-        document.addEventListener('DOMContentLoaded', () => {
-            if (document.getElementById('settingsBtn')) {
-                document.getElementById('settingsBtn').addEventListener('click', window.toggleSettings);
+        
+        // Master Delete
+        window.openMasterDelete = () => {
+            document.getElementById('masterDeleteInput').value = '';
+            document.getElementById('masterDeleteModal').style.display = 'flex';
+        };
+        
+        window.confirmMasterDelete = async () => {
+            if(document.getElementById('masterDeleteInput').value !== 'حذف') {
+                showToast("اكتب كلمة حذف", "error");
+                return;
             }
             
-            if (document.getElementById('statsToggle')) {
-                document.getElementById('statsToggle').addEventListener('click', window.toggleStatsPopup);
+            document.getElementById('loader').style.display = 'flex';
+            try {
+                const snapshot = await getDocs(studentsCol);
+                const batch = writeBatch(db);
+                snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+                await batch.commit();
+                showToast("تم مسح السجل بنجاح", "error");
+                closeModal('masterDeleteModal');
+                updateTotalCount();
+            } catch(e) { 
+                showToast("خطأ في المسح", "error"); 
             }
-        });
-
-        // إغلاق القائمة عند النقر على أحد خياراتها
-        document.addEventListener('click', (e) => {
-            if (e.target.closest('.settings-dropdown button')) {
-                document.getElementById('settingsDropdown').classList.remove('show');
-            }
+            document.getElementById('loader').style.display = 'none';
+        };
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('settingsBtn')?.addEventListener('click', window.toggleSettings);
+            document.getElementById('statsToggle')?.addEventListener('click', window.toggleStatsPopup);
         });
     </script>
-    
-    <style>
-        :root { 
-            --main: #1e293b; 
-            --blue: #0ea5e9; 
-            --bg: #f8fafc; 
-            --card: #ffffff; 
-            --text: #334155; 
-            --accent: #6366f1; 
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --surname: #7c3aed; /* لون جديد للقب */
-        }
-        
-        body.dark-mode { 
-            --bg: #0f172a; 
-            --card: #1e293b; 
-            --text: #f8fafc; 
-            --success: #34d399;
-            --warning: #fbbf24;
-            --danger: #f87171;
-            --surname: #a78bfa; /* لون القب في الوضع الداكن */
-        }
-        
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: var(--bg); 
-            color: var(--text); 
-            direction: rtl; 
-            margin: 0; 
-            padding: 0; 
-            transition: background 0.3s, color 0.3s;
-            min-height: 100vh;
-        }
-        
-        /* التعديلات الرئيسية للشاشات الكبيرة والصغيرة */
-        .container { 
-            max-width: 1200px;
-            margin: auto;
-            padding: 15px;
-        }
-        
-        /* تصميم متجاوب للشاشات الكبيرة */
-        @media (min-width: 768px) {
-            .container {
-                padding: 20px;
-            }
-            
-            .action-bar {
-                grid-template-columns: 1fr 1fr;
-                gap: 12px;
-                margin-bottom: 15px;
-            }
-            
-            .advanced-filters {
-                display: flex;
-                gap: 12px;
-                margin: 15px 0;
-                padding: 15px;
-            }
-            
-            .advanced-filters select,
-            .advanced-filters input {
-                flex: 1;
-                min-width: 150px;
-            }
-            
-            .student-item {
-                padding: 15px 20px 15px 10px;
-            }
-            
-            .card-body-wrapper {
-                gap: 20px;
-            }
-            
-            .student-name {
-                font-size: 1.1rem;
-            }
-            
-            .student-meta-row {
-                font-size: 0.9rem;
-                gap: 15px;
-            }
-            
-            .modal-content {
-                max-width: 450px;
-                padding: 30px;
-            }
-        }
-        
-        /* تصميم للشاشات الصغيرة (هواتف) */
-        @media (max-width: 767px) {
-            .container {
-                padding: 10px;
-            }
-            
-            .action-bar {
-                grid-template-columns: 1fr 1fr;
-                gap: 8px;
-                margin-bottom: 10px;
-            }
-            
-            .advanced-filters {
-                flex-direction: column;
-                gap: 10px;
-                margin: 10px 0;
-                padding: 12px;
-            }
-            
-            .advanced-filters select,
-            .advanced-filters input {
-                width: 100%;
-            }
-            
-            .student-item {
-                padding: 12px 15px 12px 5px;
-                flex-direction: row;
-                align-items: center;
-                position: relative;
-            }
-            
-            .card-body-wrapper {
-                margin-bottom: 0;
-            }
-            
-            .item-actions {
-                justify-content: flex-end;
-            }
-            
-            .student-meta-row {
-                flex-direction: row;
-                flex-wrap: wrap;
-                gap: 8px;
-            }
-            
-            .meta-item {
-                font-size: 0.8rem;
-            }
-        }
-        
-        .card { 
-            background: var(--card); 
-            padding: 12px 15px 12px 10px; 
-            border-radius: 12px; 
-            margin-bottom: 10px; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            transition: transform 0.2s, box-shadow 0.2s;
-            border: 1px solid rgba(0,0,0,0.05);
-            position: relative;
-        }
-        
-        .card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 16px rgba(0,0,0,0.12);
-        }
-        
-        .student-item { 
-            display: flex; 
-            align-items: center; 
-            justify-content: space-between; 
-            border-right: 4px solid var(--blue);
-            position: relative;
-        }
-        
-        /* تسلسل الطلاب */
-        .student-number {
-            position: absolute;
-            right: -20px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: var(--blue);
-            color: white;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 0.9rem;
-            z-index: 1;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-        
-        @media (max-width: 767px) {
-            .student-number {
-                right: -15px;
-                width: 25px;
-                height: 25px;
-                font-size: 0.8rem;
-            }
-        }
-        
-        .student-name { 
-            margin: 0 0 8px 0; 
-            font-weight: 700; 
-            font-size: 1rem; 
-            line-height: 1.3; 
-            color: var(--text);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        
-        /* تمييز اللقب بشكل أجمل */
-        .surname-badge { 
-            background: var(--surname); 
-            color: white; 
-            padding: 3px 10px;
-            border-radius: 20px; 
-            font-size: 0.85rem; 
-            font-weight: 600;
-            display: inline-block;
-            box-shadow: 0 2px 4px rgba(124, 58, 237, 0.2);
-            transition: all 0.2s;
-            margin-right: 5px;
-        }
-        
-        .surname-badge:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(124, 58, 237, 0.3);
-        }
-        
-        /* سطر المعلومات في سطر واحد */
-        .student-meta-row { 
-            font-size: 0.85rem; 
-            color: #64748b; 
-            margin-top: 3px; 
-            display: flex; 
-            gap: 15px; 
-            align-items: center;
-            flex-wrap: nowrap;
-        }
-        
-        .meta-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            background: #f8fafc;
-            padding: 4px 10px;
-            border-radius: 15px;
-            border: 1px solid #e2e8f0;
-        }
-        
-        .meta-item i {
-            color: var(--blue);
-            font-size: 0.8rem;
-        }
-        
-        .date-item {
-            background: #f0f9ff;
-            border-color: #bae6fd;
-            color: #0369a1;
-        }
-        
-        .date-item i {
-            color: #0369a1;
-        }
-        
-        .user-icon { 
-            width: 42px; 
-            height: 42px; 
-            background: linear-gradient(135deg, #e0f2fe, #bae6fd); 
-            border-radius: 50%; 
-            display: flex; 
-            flex-direction: column;
-            align-items: center; 
-            justify-content: center; 
-            color: var(--blue); 
-            font-size: 1rem;
-            position: relative;
-            box-shadow: 0 2px 5px rgba(14, 165, 233, 0.2);
-        }
-        
-        .user-icon .qaid-end {
-            font-size: 0.6rem;
-            font-weight: bold;
-            color: #0369a1;
-            margin-top: 2px;
-        }
-        
-        .card-body-wrapper { 
-            display: flex; 
-            align-items: center; 
-            gap: 15px; 
-            flex: 1;
-            margin-right: 10px;
-        }
-        
-        .item-actions { 
-            display: flex; 
-            gap: 8px; 
-        }
-        
-        .edit-btn-small, .del-btn-small, .copy-btn-small { 
-            background: none; 
-            border: 1px solid #e2e8f0; 
-            border-radius: 8px; 
-            padding: 6px 12px; 
-            cursor: pointer; 
-            color: #64748b; 
-            font-size: 0.9rem;
-            transition: all 0.2s;
-        }
-        
-        .edit-btn-small:hover { 
-            background: #dbeafe; 
-            color: #1d4ed8; 
-            border-color: #93c5fd;
-        }
-        
-        .del-btn-small:hover { 
-            background: #fee2e2; 
-            color: #dc2626; 
-            border-color: #fca5a5;
-        }
-        
-        .copy-btn-small:hover { 
-            background: #f0f9ff; 
-            color: #0ea5e9; 
-            border-color: #7dd3fc;
-        }
-        
-        .btn { 
-            border: none; 
-            border-radius: 10px; 
-            cursor: pointer; 
-            padding: 12px 15px; 
-            font-weight: 600; 
-            color: white; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            gap: 8px; 
-            font-size: 0.95rem;
-            transition: all 0.2s;
-            min-height: 48px;
-        }
-        
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-        
-        .btn:active {
-            transform: translateY(0);
-        }
-        
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-        
-        /* بطاقة العدد الإجمالي للطلاب */
-        .total-students-card {
-            background: linear-gradient(135deg, var(--blue), #3b82f6);
-            color: white;
-            padding: 20px;
-            border-radius: 12px;
-            text-align: center;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            position: relative;
-            min-height: 100px;
-        }
-        
-        .total-students-card i {
-            font-size: 2rem;
-            opacity: 0.9;
-        }
-        
-        .total-students-count {
-            font-size: 2.5rem;
-            font-weight: 800;
-            line-height: 1;
-        }
-        
-        .total-students-label {
-            font-size: 1rem;
-            opacity: 0.9;
-        }
-        
-        .stats-toggle {
-            position: absolute;
-            left: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s;
-            z-index: 10;
-        }
-        
-        .stats-toggle:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateY(-50%) scale(1.1);
-        }
-        
-        /* القائمة المنبثقة للإحصائيات */
-        .stats-popup {
-            position: absolute;
-            left: 20px;
-            bottom: calc(100% + 10px);
-            background: var(--card);
-            border-radius: 12px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-            min-width: 250px;
-            z-index: 1000;
-            display: none;
-            padding: 15px;
-            border: 1px solid rgba(0, 0, 0, 0.1);
-            animation: fadeIn 0.2s ease-out;
-        }
-        
-        .stats-popup.show {
-            display: block;
-        }
-        
-        .stats-popup-item {
-            padding: 10px 0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-        }
-        
-        .stats-popup-item:last-child {
-            border-bottom: none;
-        }
-        
-        .stats-popup-item i {
-            color: var(--blue);
-            font-size: 1.1rem;
-            width: 24px;
-        }
-        
-        .stats-popup-item span {
-            flex: 1;
-            font-size: 0.9rem;
-        }
-        
-        .stats-popup-item strong {
-            color: var(--blue);
-            font-size: 1rem;
-        }
-        
-        .dark-mode .stats-popup {
-            background: var(--card);
-            border-color: rgba(255, 255, 255, 0.1);
-        }
-        
-        .dark-mode .stats-popup-item {
-            border-bottom-color: rgba(255, 255, 255, 0.1);
-        }
-        
-        /* حالة فارغة */
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: #64748b;
-        }
-        
-        /* التصفح بين الصفحات */
-        .pagination-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin: 20px 0;
-            padding: 15px;
-            background: var(--card);
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-        
-        .pagination-info {
-            font-size: 0.9rem;
-            color: var(--text);
-            font-weight: 500;
-            flex: 1;
-            text-align: center;
-        }
-        
-        .pagination-controls {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .pagination-btn {
-            background: var(--main);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 8px 16px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        
-        .pagination-btn:hover:not(:disabled) {
-            background: var(--blue);
-            transform: translateY(-2px);
-        }
-        
-        .pagination-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        .page-numbers {
-            display: flex;
-            gap: 5px;
-            align-items: center;
-        }
-        
-        .page-number {
-            padding: 8px 12px;
-            border-radius: 6px;
-            background: var(--bg);
-            color: var(--text);
-            font-weight: 600;
-            min-width: 40px;
-            text-align: center;
-        }
-        
-        @media (max-width: 767px) {
-            .pagination-container {
-                flex-direction: column;
-                text-align: center;
-            }
-            
-            .pagination-controls {
-                width: 100%;
-                justify-content: center;
-            }
-        }
-        
-        .search-wrapper { 
-            display: flex; 
-            align-items: center; 
-            gap: 10px; 
-            background: var(--card); 
-            padding: 12px 20px; 
-            border-radius: 50px; 
-            border: 2px solid var(--blue); 
-            margin-bottom: 15px;
-            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.1);
-        }
-        
-        .search-wrapper input { 
-            border: none; 
-            padding: 8px; 
-            font-size: 1rem; 
-            width: 100%; 
-            outline: none; 
-            background: transparent; 
-            color: inherit; 
-        }
-        
-        .search-wrapper::before {
-            content: "🔍";
-            font-size: 1.2rem;
-            color: var(--blue);
-        }
-        
-        .search-wrapper input::placeholder {
-            color: #94a3b8;
-        }
-        
-        .modal { 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            background: rgba(0,0,0,0.5); 
-            display: none; 
-            align-items: center; 
-            justify-content: center; 
-            z-index: 5000;
-            backdrop-filter: blur(3px);
-        }
-        
-        .modal-content { 
-            background: var(--card); 
-            padding: 25px; 
-            border-radius: 16px; 
-            width: 90%; 
-            max-width: 400px; 
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            animation: modalFade 0.3s ease-out;
-        }
-        
-        @keyframes modalFade {
-            from {
-                opacity: 0;
-                transform: translate(-50%, -60%);
-            }
-            to {
-                opacity: 1;
-                transform: translate(-50%, -50%);
-            }
-        }
-        
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        input, select, textarea { 
-            width: 100%; 
-            padding: 12px; 
-            margin-top: 8px; 
-            border: 1px solid #e2e8f0; 
-            border-radius: 10px; 
-            background: var(--card); 
-            color: var(--text); 
-            box-sizing: border-box;
-            font-size: 0.95rem;
-            transition: border 0.2s;
-        }
-        
-        input:focus, select:focus, textarea:focus {
-            outline: none;
-            border-color: var(--blue);
-            box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
-        }
-        
-        .toast { 
-            position: fixed; 
-            bottom: 20px; 
-            left: 20px; 
-            padding: 14px 22px; 
-            border-radius: 10px; 
-            color: white; 
-            z-index: 9999; 
-            font-weight: 600; 
-            box-shadow: 0 6px 16px rgba(0,0,0,0.15); 
-            transition: 0.5s; 
-            opacity: 1;
-            animation: toastSlide 0.3s ease-out;
-            max-width: 350px;
-        }
-        
-        @keyframes toastSlide {
-            from {
-                transform: translateX(-20px);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-        
-        .toast.success { 
-            background: var(--success); 
-            border-right: 5px solid #065f46; 
-        }
-        
-        .toast.error { 
-            background: var(--danger); 
-            border-right: 5px solid #991b1b; 
-        }
-
-        .loader { 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            background: rgba(255,255,255,0.9); 
-            z-index: 10000; 
-            display: none; 
-            align-items: center; 
-            justify-content: center;
-            flex-direction: column;
-            gap: 15px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text);
-            backdrop-filter: blur(5px);
-        }
-        
-        .loader.dark-mode {
-            background: rgba(15, 23, 42, 0.9);
-        }
-        
-        /* تحسينات الطباعة - لاستيعاب 70 سطر في الصفحة */
-        @media print { 
-            .no-print { display: none !important; }
-            .print-area { 
-                display: block !important; 
-                font-family: 'Arial', 'Segoe UI', sans-serif;
-            } 
-            .print-page { 
-                page-break-after: always; 
-                padding: 0.5cm; /* تقليل الحواف لاستيعاب أسطر أكثر */
-                direction: rtl; 
-                height: 100%;
-                position: relative;
-            }
-            .print-grid { 
-                display: flex; 
-                gap: 15px;
-                height: 100%;
-                justify-content: space-between;
-            }
-            .print-col { 
-                width: 50%;
-                height: 100%;
-            }
-            .print-col-left {
-                padding-left: 10px;
-            }
-            .print-col-right {
-                padding-right: 10px;
-            }
-            table { 
-                width: 100%; 
-                border-collapse: collapse; 
-                font-size: 12px; /* تعديل حجم الخط إلى 12px */
-                line-height: 1.3;
-            } 
-            th, td { 
-                border: 1px solid #000; 
-                padding: 4px;
-                text-align: center; 
-                font-size: 12px; /* تعديل حجم الخط إلى 12px */
-                font-weight: normal;
-            }
-            th { 
-                background: #f0f0f0 !important; 
-                font-weight: bold;
-                padding: 5px !important;
-                font-size: 13px !important;
-            }
-            #printTitle {
-                font-size: 18px !important;
-                margin-bottom: 10px;
-                text-align: center;
-                font-weight: bold;
-            }
-            #printDate {
-                font-size: 14px !important;
-                text-align: center;
-                margin-bottom: 15px;
-                display: block;
-                font-weight: bold;
-            }
-            
-            /* تنسيق خاص للأرقام التسلسلية */
-            td:first-child {
-                font-weight: bold;
-                background-color: #f8fafc;
-                width: 30px;
-                min-width: 30px;
-            }
-            
-            /* تحسين عرض الأسماء - أصبحت عريضة */
-            td:nth-child(2) {
-                text-align: right;
-                padding-right: 5px !important;
-                font-weight: bold; /* إضافة تنسيق عريض للأسماء */
-            }
-            
-            /* تحسين عرض الألقاب */
-            td:nth-child(3) {
-                text-align: right;
-                font-style: italic;
-                color: #555;
-            }
-            
-            /* جعل الصفحة تأخذ المساحة الكاملة */
-            @page {
-                margin: 0.5cm;
-                size: A4 portrait;
-            }
-            
-            body {
-                margin: 0;
-                padding: 0;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            
-            /* إضافة ترقيم الصفحات */
-            .print-page::after {
-                content: "الصفحة " counter(page);
-                position: absolute;
-                bottom: 5px;
-                left: 50%;
-                transform: translateX(-50%);
-                font-size: 11px;
-                color: #666;
-            }
-            
-            /* بدء ترقيم الصفحات */
-            body {
-                counter-reset: page;
-            }
-            .print-page {
-                counter-increment: page;
-            }
-        }
-        
-        .print-area { 
-            display: none; 
-            font-family: 'Arial', sans-serif;
-        }
-        
-        .theme-toggle {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            background: var(--main);
-            color: white;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            z-index: 100;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            transition: all 0.3s;
-        }
-        
-        .theme-toggle:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 16px rgba(0,0,0,0.2);
-        }
-        
-        /* تخصيص شريط التمرير */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: #f1f5f9;
-            border-radius: 4px;
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 4px;
-        }
-        
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
-        
-        .dark-mode ::-webkit-scrollbar-track {
-            background: #1e293b;
-        }
-        
-        .dark-mode ::-webkit-scrollbar-thumb {
-            background: #475569;
-        }
-        
-        .dark-mode ::-webkit-scrollbar-thumb:hover {
-            background: #64748b;
-        }
-        
-        /* تصميم العنوان الرئيسي مع الشعار */
-        .header-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px 0;
-            margin-bottom: 15px;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        
-        .logo-container {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        
-        /* تنسيق الشعار */
-        .header-logo {
-            height: 60px;
-            width: auto;
-            border-radius: 8px;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            cursor: pointer;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            object-fit: contain;
-            background: white;
-            padding: 5px;
-        }
-        
-        .header-logo:hover {
-            transform: scale(1.05);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-        }
-        
-        .header-title {
-            margin: 0;
-            color: var(--blue);
-            font-size: 1.5rem;
-        }
-        
-        /* تصميم قائمة الإعدادات */
-        .settings-container {
-            position: relative;
-            display: inline-block;
-        }
-
-        .settings-btn {
-            background: none;
-            border: none;
-            color: var(--text);
-            font-size: 1.2rem;
-            cursor: pointer;
-            padding: 8px 12px;
-            border-radius: 8px;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .settings-btn:hover {
-            background: rgba(0, 0, 0, 0.05);
-            color: var(--blue);
-            transform: rotate(45deg);
-        }
-
-        .dark-mode .settings-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .settings-dropdown {
-            position: absolute;
-            left: 0;
-            top: 100%;
-            background: var(--card);
-            border-radius: 12px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-            min-width: 200px;
-            z-index: 1000;
-            display: none;
-            padding: 8px 0;
-            margin-top: 5px;
-            border: 1px solid rgba(0, 0, 0, 0.1);
-            animation: fadeIn 0.2s ease-out;
-        }
-
-        .settings-dropdown.show {
-            display: block;
-        }
-
-        .settings-dropdown button {
-            width: 100%;
-            padding: 12px 16px;
-            background: none;
-            border: none;
-            text-align: right;
-            color: var(--text);
-            font-size: 0.9rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            transition: all 0.2s;
-        }
-
-        .settings-dropdown button:hover {
-            background: rgba(14, 165, 233, 0.1);
-            color: var(--blue);
-        }
-
-        .settings-dropdown button.delete-btn:hover {
-            background: rgba(239, 68, 68, 0.1);
-            color: var(--danger);
-        }
-
-        .dropdown-divider {
-            height: 1px;
-            background: rgba(0, 0, 0, 0.1);
-            margin: 8px 0;
-        }
-
-        .dark-mode .settings-dropdown {
-            background: var(--card);
-            border-color: rgba(255, 255, 255, 0.1);
-        }
-
-        .dark-mode .settings-dropdown button:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .dark-mode .dropdown-divider {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        /* إخفاء صف الأزرار القديم */
-        .action-buttons-row {
-            display: none !important;
-        }
-
-        /* إظهار صف الأزرار الرئيسية فقط */
-        .main-actions {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 15px;
-        }
-
-        /* تنسيق أزرار الإجراءات */
-        .action-buttons-container {
-            margin-bottom: 20px;
-        }
-
-        /* تحسين عرض الفلاتر المتقدمة */
-        .advanced-filters {
-            background: var(--card);
-            padding: 15px;
-            border-radius: 12px;
-            margin: 15px 0;
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        /* تنسيق تنبيه الأسماء المشابهة */
-        .duplicate-alert {
-            animation: fadeIn 0.3s ease-in;
-        }
-
-        .duplicate-alert::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .duplicate-alert::-webkit-scrollbar-track {
-            background: rgba(245, 158, 11, 0.1);
-            border-radius: 3px;
-        }
-
-        .duplicate-alert::-webkit-scrollbar-thumb {
-            background: rgba(245, 158, 11, 0.3);
-            border-radius: 3px;
-        }
-
-        .duplicate-alert::-webkit-scrollbar-thumb:hover {
-            background: rgba(245, 158, 11, 0.5);
-        }
-
-        @media (max-width: 767px) {
-            .advanced-filters {
-                flex-direction: column;
-            }
-            
-            .advanced-filters select,
-            .advanced-filters input {
-                width: 100%;
-            }
-            
-            /* تعديلات الشعار في الجوال */
-            .header-logo {
-                height: 50px;
-            }
-            
-            .logo-container {
-                gap: 10px;
-            }
-            
-            .header-title {
-                font-size: 1.3rem;
-            }
-        }
-    </style>
 </head>
 <body>
 
 <div id="loader" class="loader">
-    <div class="spinner" style="width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top: 4px solid var(--blue); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+    <div class="spinner"></div>
     جاري المعالجة...
 </div>
 
-<style>
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-</style>
-
 <div id="toastContainer"></div>
 
+<!-- Modals -->
 <div id="masterDeleteModal" class="modal">
     <div class="modal-content">
-        <h3 style="text-align:center; color:var(--danger); margin-bottom: 15px;">
-            <i class="fas fa-exclamation-triangle"></i> حذف الفهرس كاملاً؟
-        </h3>
-        <p style="text-align:center; font-size:0.9rem; margin-bottom: 20px;">اكتب كلمة <b style="color:var(--danger);">حذف</b> للتأكيد:</p>
-        <input type="text" id="masterDeleteInput" style="text-align:center; font-size: 1rem;">
-        <div style="display:flex; gap:12px; margin-top:20px;">
-            <button class="btn" style="background:var(--danger); flex:1;" onclick="confirmMasterDelete()">
-                <i class="fas fa-check"></i> تأكيد
-            </button>
-            <button class="btn" style="background:#64748b; flex:1;" onclick="document.getElementById('masterDeleteModal').style.display='none'">
-                <i class="fas fa-times"></i> إلغاء
-            </button>
+        <h3><i class="fas fa-exclamation-triangle"></i> حذف الفهرس كاملاً؟</h3>
+        <p>اكتب كلمة <b>حذف</b> للتأكيد:</p>
+        <input type="text" id="masterDeleteInput">
+        <div class="modal-buttons">
+            <button class="btn btn-danger" onclick="confirmMasterDelete()"><i class="fas fa-check"></i> تأكيد</button>
+            <button class="btn btn-secondary" onclick="closeModal('masterDeleteModal')"><i class="fas fa-times"></i> إلغاء</button>
         </div>
     </div>
 </div>
 
 <div id="deleteModal" class="modal">
     <div class="modal-content">
-        <h4 style="text-align:center; color:var(--danger); margin-bottom: 20px;">
-            <i class="fas fa-trash-alt"></i> حذف الطالب؟
-        </h4>
-        <div style="display:flex; gap:12px; margin-top:15px;">
-            <button class="btn" style="background:var(--danger); flex:1;" onclick="confirmDel()">
-                <i class="fas fa-check"></i> نعم
-            </button>
-            <button class="btn" style="background:#64748b; flex:1;" onclick="document.getElementById('deleteModal').style.display='none'">
-                <i class="fas fa-times"></i> لا
-            </button>
+        <h4><i class="fas fa-trash-alt"></i> حذف الطالب؟</h4>
+        <div class="modal-buttons">
+            <button class="btn btn-danger" onclick="confirmDel()"><i class="fas fa-check"></i> نعم</button>
+            <button class="btn btn-secondary" onclick="closeModal('deleteModal')"><i class="fas fa-times"></i> لا</button>
         </div>
     </div>
 </div>
 
 <div id="entryModal" class="modal">
     <div class="modal-content">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h3 style="margin:0; color:var(--blue); font-size:1.2rem;">
-                <i class="fas fa-user-graduate"></i> بيانات الطالب
-            </h3>
-            <div style="display:flex; gap:8px;">
-                <button onclick="generateRandomData()" style="background:#f1f5f9; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; color:var(--text);" title="تعبئة تلقائية">
-                    <i class="fas fa-magic"></i>
-                </button>
-                <button onclick="duplicateLastStudent()" style="background:#f0f9ff; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; color:#0ea5e9;" title="نسخ آخر طالب">
-                    <i class="fas fa-copy"></i>
-                </button>
+        <div class="modal-header">
+            <h3><i class="fas fa-user-graduate"></i> بيانات الطالب</h3>
+            <div class="header-actions">
+                <button onclick="generateRandomData()" title="تعبئة تلقائية"><i class="fas fa-magic"></i></button>
+                <button onclick="duplicateLastStudent()" title="نسخ آخر طالب"><i class="fas fa-copy"></i></button>
             </div>
         </div>
         
         <input type="hidden" id="editId">
         <input type="text" id="fName" placeholder="الاسم الرباعي" oninput="checkDuplicateStudent()">
         <input type="text" id="surname" placeholder="اللقب">
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin:12px 0;">
+        <div class="form-row">
             <input type="text" id="qNum" placeholder="القيد">
             <input type="number" id="pNum" placeholder="الصفحة">
         </div>
-        <textarea id="note" placeholder="ملاحظات..." rows="3" style="margin-bottom: 15px;"></textarea>
+        <textarea id="note" placeholder="ملاحظات..." rows="3"></textarea>
         
-        <div style="display:flex; gap:12px; margin-top:20px;">
-            <button id="saveBtn" class="btn" style="background:var(--main); flex:2;" onclick="saveData()">
-                <i class="fas fa-save"></i> حفظ
-            </button>
-            <button class="btn" style="background:#64748b; flex:1;" onclick="closeAddModal()">
-                <i class="fas fa-times"></i> إلغاء
-            </button>
+        <div class="modal-buttons">
+            <button id="saveBtn" class="btn btn-primary" onclick="saveData()"><i class="fas fa-save"></i> حفظ</button>
+            <button class="btn btn-secondary" onclick="closeModal('entryModal')"><i class="fas fa-times"></i> إلغاء</button>
         </div>
     </div>
 </div>
 
 <div id="printModal" class="modal">
     <div class="modal-content">
-        <h3 style="margin-bottom: 20px;">
-            <i class="fas fa-print"></i> طباعة
-        </h3>
-        <button class="btn" style="background:var(--accent); width:100%; margin-bottom:12px" onclick="printAllAlpha()">
-            <i class="fas fa-print"></i> السجل العام
-        </button>
-        <select id="qaidSelect" style="margin-bottom: 12px;"></select>
-        <button class="btn" style="background:var(--blue); width:100%; margin-bottom:12px" onclick="printSelectedQaid()">
-            <i class="fas fa-print"></i> طباعة القيد
-        </button>
-        <button class="btn" style="background:#64748b; width:100%;" onclick="document.getElementById('printModal').style.display='none'">
-            <i class="fas fa-times"></i> إلغاء
-            </button>
+        <h3><i class="fas fa-print"></i> طباعة</h3>
+        <button class="btn btn-accent" onclick="printAllAlpha()"><i class="fas fa-print"></i> السجل العام</button>
+        <select id="qaidSelect"></select>
+        <button class="btn btn-primary" onclick="printSelectedQaid()"><i class="fas fa-print"></i> طباعة القيد</button>
+        <button class="btn btn-secondary" onclick="closeModal('printModal')"><i class="fas fa-times"></i> إلغاء</button>
     </div>
 </div>
 
-<div id="loginPage" style="height: 100vh; flex-direction: column; align-items: center; justify-content: center; display: none;">
-    <div class="card" style="width: 90%; max-width: 400px; text-align: center; padding: 30px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
-        <h2 style="margin-bottom: 25px; color: var(--blue);">
-            <i class="fas fa-lock"></i> دخول النظام
-        </h2>
-        <input type="email" id="loginEmail" placeholder="البريد الإلكتروني" style="margin-bottom: 15px;">
-        <input type="password" id="loginPass" placeholder="كلمة المرور" style="margin-bottom: 20px;">
-        <button class="btn" style="background:var(--main); width:100%; padding: 14px;" onclick="login()">
-            <i class="fas fa-sign-in-alt"></i> دخول
-        </button>
+<!-- Login Page -->
+<div id="loginPage">
+    <div class="login-card">
+        <h2><i class="fas fa-lock"></i> دخول النظام</h2>
+        <input type="email" id="loginEmail" placeholder="البريد الإلكتروني">
+        <input type="password" id="loginPass" placeholder="كلمة المرور">
+        <button class="btn btn-primary" onclick="login()"><i class="fas fa-sign-in-alt"></i> دخول</button>
     </div>
 </div>
 
-<div id="appContent" class="container" style="display: none;">
+<!-- Main App -->
+<div id="appContent" class="container">
+    <!-- Print Area -->
     <div class="print-area">
-        <div style="text-align:center; border-bottom: 2px solid #000; margin-bottom: 15px; padding-bottom: 10px;">
-            <h2 id="printTitle" style="margin: 10px 0; font-size: 18px; font-weight: bold;"></h2>
-            <span id="printDate" style="font-size: 14px; color: #666; font-weight: bold;"></span>
+        <div class="print-header">
+            <h2 id="printTitle"></h2>
+            <span id="printDate"></span>
         </div>
         <div id="printTablesContainer"></div>
     </div>
 
+    <!-- App Content -->
     <div class="no-print">
-        <!-- الهيدر مع الشعار -->
         <div class="header-container">
             <div class="logo-container">
                 <a href="#" onclick="window.location.reload(); return false;" title="الرئيسية">
-                    <img src="https://i.imgur.com/05ANc5p.png" 
-                         alt="شعار فهرس القيد - الجامعة الوطنية للعلوم والتكنولوجيا" 
-                         class="header-logo">
+                    <img src="https://i.imgur.com/05ANc5p.png" alt="شعار فهرس القيد" class="header-logo">
                 </a>
-                <h4 class="header-title">
-                    <i class="fas fa-book"></i> فهرس القيد
-                </h4>
+                <h4 class="header-title"><i class="fas fa-book"></i> فهرس القيد</h4>
             </div>
             <div class="header-actions">
-                <!-- إضافة أيقونة الإعدادات -->
                 <div class="settings-container">
-                    <button class="settings-btn" id="settingsBtn" title="الإعدادات">
-                        <i class="fas fa-cog"></i>
-                    </button>
+                    <button class="settings-btn" id="settingsBtn" title="الإعدادات"><i class="fas fa-cog"></i></button>
                     <div class="settings-dropdown" id="settingsDropdown">
-                        <button onclick="document.getElementById('fileInput').click()">
-                            <i class="fas fa-file-import"></i> استيراد من Excel
-                        </button>
-                        <button onclick="downloadExcelTemplate()">
-                            <i class="fas fa-file-excel"></i> تحميل نموذج Excel
-                        </button>
-                        <button onclick="exportExcel()">
-                            <i class="fas fa-file-export"></i> تصدير إلى Excel
-                        </button>
-                        <button onclick="showPrintOptions()">
-                            <i class="fas fa-print"></i> طباعة
-                        </button>
+                        <button onclick="document.getElementById('fileInput').click()"><i class="fas fa-file-import"></i> استيراد من Excel</button>
+                        <button onclick="downloadExcelTemplate()"><i class="fas fa-file-excel"></i> تحميل نموذج Excel</button>
+                        <button onclick="exportExcel()"><i class="fas fa-file-export"></i> تصدير إلى Excel</button>
+                        <button onclick="showPrintOptions()"><i class="fas fa-print"></i> طباعة</button>
                         <div class="dropdown-divider"></div>
-                        <button onclick="openMasterDelete()" class="delete-btn">
-                            <i class="fas fa-trash-alt"></i> مسح السجل
-                        </button>
+                        <button onclick="openMasterDelete()" class="delete-btn"><i class="fas fa-trash-alt"></i> مسح السجل</button>
                     </div>
                 </div>
-                
-                <button onclick="logout()" style="background:none; border:none; color:var(--danger); font-size:0.9rem; cursor:pointer; padding: 8px 12px; border-radius: 8px; transition: background 0.2s;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='none'">
-                    <i class="fas fa-sign-out-alt"></i> خروج
-                </button>
+                <button onclick="logout()" class="logout-btn"><i class="fas fa-sign-out-alt"></i> خروج</button>
             </div>
         </div>
 
-        <!-- بطاقة العدد الإجمالي للطلاب مع زر الإحصائيات -->
+        <!-- Stats Card -->
         <div class="total-students-card">
-            <button class="stats-toggle" id="statsToggle" title="إظهار الإحصائيات">
-                <i class="fas fa-chart-bar"></i>
-            </button>
+            <button class="stats-toggle" id="statsToggle" title="إظهار الإحصائيات"><i class="fas fa-chart-bar"></i></button>
             <i class="fas fa-users"></i>
             <div>
                 <div class="total-students-count" id="totalStudentsCard">0</div>
                 <div class="total-students-label">إجمالي الطلاب</div>
             </div>
-            
-            <!-- القائمة المنبثقة للإحصائيات -->
             <div class="stats-popup" id="statsPopup">
-                <div id="statsPopupContent">
-                    <!-- سيتم ملؤها ديناميكياً -->
-                </div>
+                <div id="statsPopupContent"></div>
             </div>
         </div>
 
+        <!-- Main Actions -->
         <div class="action-buttons-container">
             <div class="main-actions">
-                <button class="btn" style="background:var(--main)" onclick="openAddModal()">
-                    <i class="fas fa-plus"></i> إضافة طالب
-                </button>
-                <button class="btn" onclick="clearFilters()" style="background:#64748b;" title="مسح الفلاتر">
-                    <i class="fas fa-filter"></i> مسح الفلاتر
-                </button>
+                <button class="btn btn-primary" onclick="openAddModal()"><i class="fas fa-plus"></i> إضافة طالب</button>
+                <button class="btn btn-secondary" onclick="clearFilters()" title="مسح الفلاتر"><i class="fas fa-filter"></i> مسح الفلاتر</button>
             </div>
         </div>
         
+        <!-- File Input -->
         <input type="file" id="fileInput" hidden onchange="importExcel(event)" accept=".xlsx, .xls">
 
+        <!-- Filters -->
         <div class="advanced-filters">
-            <select id="filterQaid" onchange="applyFilters()">
-                <option value="">جميع القيود</option>
-            </select>
+            <select id="filterQaid" onchange="applyFilters()"><option value="">جميع القيود</option></select>
             <input type="number" id="filterPage" placeholder="رقم الصفحة" oninput="applyFilters()">
             <select id="sortSelect" onchange="applyFilters()">
                 <option value="newest">الأحدث أولاً</option>
@@ -2113,53 +1134,42 @@
             </select>
         </div>
 
+        <!-- Search -->
         <div class="search-wrapper">
             <input type="text" id="searchInput" placeholder="ابحث عن اسم أو لقب أو قيد..." onkeyup="applyFilters()">
         </div>
 
-        <!-- عناصر التصفح بين الصفحات -->
+        <!-- Pagination Top -->
         <div class="pagination-container">
             <div class="pagination-info" id="pageInfo">عرض 1-100 من 0 طالب</div>
             <div class="pagination-controls">
-                <button class="pagination-btn" id="prevPage" onclick="prevPage()" title="الصفحة السابقة">
-                    <i class="fas fa-chevron-right"></i> السابق
-                </button>
+                <button class="pagination-btn" id="prevPage" onclick="prevPage()" title="الصفحة السابقة"><i class="fas fa-chevron-right"></i> السابق</button>
                 <div class="page-numbers">
-                    <span class="page-number" id="pageNumber">1</span>
-                    <span style="color: var(--text);">من</span>
-                    <span class="page-number" id="totalPages">1</span>
+                    <span class="page-number" id="pageNumber">1</span><span>من</span><span class="page-number" id="totalPages">1</span>
                 </div>
-                <button class="pagination-btn" id="nextPage" onclick="nextPage()" title="الصفحة التالية">
-                    التالي <i class="fas fa-chevron-left"></i>
-                </button>
+                <button class="pagination-btn" id="nextPage" onclick="nextPage()" title="الصفحة التالية">التالي <i class="fas fa-chevron-left"></i></button>
             </div>
         </div>
 
+        <!-- Students List -->
         <div id="studentsList"></div>
 
-        <!-- عناصر التصفح بين الصفحات في الأسفل أيضًا -->
+        <!-- Pagination Bottom -->
         <div class="pagination-container">
             <div class="pagination-info" id="pageInfoBottom">عرض 1-100 من 0 طالب</div>
             <div class="pagination-controls">
-                <button class="pagination-btn" id="prevPageBottom" onclick="prevPage()" title="الصفحة السابقة">
-                    <i class="fas fa-chevron-right"></i> السابق
-                </button>
+                <button class="pagination-btn" id="prevPageBottom" onclick="prevPage()" title="الصفحة السابقة"><i class="fas fa-chevron-right"></i> السابق</button>
                 <div class="page-numbers">
-                    <span class="page-number" id="pageNumberBottom">1</span>
-                    <span style="color: var(--text);">من</span>
-                    <span class="page-number" id="totalPagesBottom">1</span>
+                    <span class="page-number" id="pageNumberBottom">1</span><span>من</span><span class="page-number" id="totalPagesBottom">1</span>
                 </div>
-                <button class="pagination-btn" id="nextPageBottom" onclick="nextPage()" title="الصفحة التالية">
-                    التالي <i class="fas fa-chevron-left"></i>
-                </button>
+                <button class="pagination-btn" id="nextPageBottom" onclick="nextPage()" title="الصفحة التالية">التالي <i class="fas fa-chevron-left"></i></button>
             </div>
         </div>
     </div>
 </div>
 
-<div class="theme-toggle no-print" onclick="toggleDarkMode()" title="تبديل الوضع الليلي">
-    <i class="fas fa-moon"></i>
-</div>
+<!-- Theme Toggle -->
+<div class="theme-toggle no-print" onclick="toggleDarkMode()" title="تبديل الوضع الليلي"><i class="fas fa-moon"></i></div>
 
 </body>
 </html>
