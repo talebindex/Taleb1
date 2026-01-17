@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام الأرشيف الذكي - النسخة المتطورة</title>
+    <title>فهرس القيد</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     
@@ -64,8 +64,12 @@
                 const snapshot = await getCountFromServer(studentsCol);
                 const totalCount = snapshot.data().count;
                 document.getElementById('statTotal').innerText = totalCount;
+                // تحديث بطاقة العدد الإجمالي
+                document.getElementById('totalStudentsCard').innerText = totalCount;
             } catch (error) {
                 console.error("Error getting total count:", error);
+                // في حالة الخطأ، نعرض عدد الطلاب المحلي
+                document.getElementById('totalStudentsCard').innerText = window.allStudentsData.length;
             }
         }
 
@@ -75,14 +79,36 @@
                 updateQuickStats();
                 updateQaidFilter();
                 window.applyFilters(); 
+                // تحديث بطاقة العدد الإجمالي
+                document.getElementById('totalStudentsCard').innerText = window.allStudentsData.length;
             });
         }
 
         function updateQuickStats() {
             const startOfDay = new Date().setHours(0,0,0,0);
             const todayCount = window.allStudentsData.filter(s => s.timestamp >= startOfDay).length;
+            const qaidsCount = new Set(window.allStudentsData.map(s => s.qaid)).size;
+            
+            // تحديث الإحصائيات المخفية
             document.getElementById('statToday').innerText = todayCount;
-            document.getElementById('statQaids').innerText = new Set(window.allStudentsData.map(s => s.qaid)).size;
+            document.getElementById('statQaids').innerText = qaidsCount;
+            document.getElementById('statTotal').innerText = window.allStudentsData.length;
+            
+            // تحديث محتوى القائمة المنبثقة
+            document.getElementById('statsPopupContent').innerHTML = `
+                <div class="stats-popup-item">
+                    <i class="fas fa-users"></i>
+                    <span>إجمالي الطلاب: <strong>${window.allStudentsData.length}</strong></span>
+                </div>
+                <div class="stats-popup-item">
+                    <i class="fas fa-calendar-day"></i>
+                    <span>الطلاب المضافون اليوم: <strong>${todayCount}</strong></span>
+                </div>
+                <div class="stats-popup-item">
+                    <i class="fas fa-folder"></i>
+                    <span>عدد القيود: <strong>${qaidsCount}</strong></span>
+                </div>
+            `;
         }
 
         function updateQaidFilter() {
@@ -455,6 +481,19 @@
             list.innerHTML = ''; 
             data.forEach((s, index) => {
                 const globalIndex = (window.currentPage - 1) * window.pageSize + index + 1;
+                
+                // تنسيق التاريخ
+                const dateAdded = new Date(s.timestamp);
+                const formattedDate = dateAdded.toLocaleDateString('ar-EG', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                const timeAdded = dateAdded.toLocaleTimeString('ar-EG', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
                 list.innerHTML += `
                     <div class="student-item card">
                         <div class="student-number">${globalIndex}</div>
@@ -471,6 +510,9 @@
                                     </span>
                                     <span class="highlight-badge page-badge" title="رقم الصفحة">
                                         <i class="fas fa-file-alt"></i> ${s.page}
+                                    </span>
+                                    <span class="highlight-badge date-badge" title="تاريخ الإضافة">
+                                        <i class="fas fa-calendar-alt"></i> ${formattedDate}
                                     </span>
                                 </div>
                             </div>
@@ -661,9 +703,23 @@
             }, { once: true });
         };
 
+        // التحكم في إظهار/إخفاء الإحصائيات
+        window.toggleStatsPopup = () => {
+            const popup = document.getElementById('statsPopup');
+            popup.classList.toggle('show');
+            
+            // إغلاق القائمة عند النقر خارجها
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.stats-toggle') && !e.target.closest('.stats-popup')) {
+                    popup.classList.remove('show');
+                }
+            }, { once: true });
+        };
+
         // تهيئة قائمة الإعدادات عند تحميل الصفحة
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('settingsBtn').addEventListener('click', window.toggleSettings);
+            document.getElementById('statsToggle').addEventListener('click', window.toggleStatsPopup);
         });
 
         // إغلاق القائمة عند النقر على أحد خياراتها
@@ -722,11 +778,6 @@
                 padding: 20px;
             }
             
-            .stats-bar {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 15px;
-            }
-            
             .action-bar {
                 grid-template-columns: 1fr 1fr;
                 gap: 12px;
@@ -775,11 +826,6 @@
                 padding: 10px;
             }
             
-            .stats-bar {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 8px;
-            }
-            
             .action-bar {
                 grid-template-columns: 1fr 1fr;
                 gap: 8px;
@@ -811,6 +857,12 @@
             
             .item-actions {
                 justify-content: flex-end;
+            }
+            
+            .student-meta {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
             }
         }
         
@@ -988,6 +1040,13 @@
             border: 1px solid #fef08a;
         }
         
+        .date-badge { 
+            background: #f0f9ff; 
+            color: #0c4a6e; 
+            border: 1px solid #bae6fd;
+            font-size: 0.75rem;
+        }
+        
         .item-actions { 
             display: flex; 
             gap: 8px; 
@@ -1054,44 +1113,116 @@
             box-shadow: none;
         }
         
-        .stats-bar { 
-            display: grid; 
-            gap: 10px; 
-            margin-bottom: 15px; 
+        /* بطاقة العدد الإجمالي للطلاب */
+        .total-students-card {
+            background: linear-gradient(135deg, var(--blue), #3b82f6);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            position: relative;
         }
         
-        .stat-item { 
-            background: var(--card); 
-            padding: 15px; 
-            border-radius: 12px; 
-            text-align: center; 
-            border: 1px solid rgba(0,0,0,0.05);
-            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-            transition: transform 0.2s;
+        .total-students-card i {
+            font-size: 2rem;
+            opacity: 0.9;
         }
         
-        .stat-item:hover {
-            transform: translateY(-5px);
+        .total-students-count {
+            font-size: 2.5rem;
+            font-weight: 800;
+            line-height: 1;
         }
         
-        .stat-item i {
+        .total-students-label {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+        
+        .stats-toggle {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+        
+        .stats-toggle:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-50%) scale(1.1);
+        }
+        
+        /* القائمة المنبثقة للإحصائيات */
+        .stats-popup {
+            position: absolute;
+            left: 20px;
+            bottom: calc(100% + 10px);
+            background: var(--card);
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            min-width: 250px;
+            z-index: 1000;
+            display: none;
+            padding: 15px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            animation: fadeIn 0.2s ease-out;
+        }
+        
+        .stats-popup.show {
             display: block;
-            margin-bottom: 5px;
-            font-size: 1.8rem;
         }
         
-        .stat-val { 
-            display: block; 
-            font-size: 1.8rem; 
-            font-weight: 800; 
-            color: var(--blue); 
-            margin: 8px 0;
+        .stats-popup-item {
+            padding: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         }
         
-        .stat-label { 
-            font-size: 0.9rem; 
-            color: #64748b; 
-            font-weight: 500;
+        .stats-popup-item:last-child {
+            border-bottom: none;
+        }
+        
+        .stats-popup-item i {
+            color: var(--blue);
+            font-size: 1.1rem;
+            width: 24px;
+        }
+        
+        .stats-popup-item span {
+            flex: 1;
+            font-size: 0.9rem;
+        }
+        
+        .stats-popup-item strong {
+            color: var(--blue);
+            font-size: 1rem;
+        }
+        
+        .dark-mode .stats-popup {
+            background: var(--card);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .dark-mode .stats-popup-item {
+            border-bottom-color: rgba(255, 255, 255, 0.1);
         }
         
         /* التصفح بين الصفحات */
@@ -1744,7 +1875,7 @@
 <div id="masterDeleteModal" class="modal">
     <div class="modal-content">
         <h3 style="text-align:center; color:var(--danger); margin-bottom: 15px;">
-            <i class="fas fa-exclamation-triangle"></i> حذف الأرشيف كاملاً؟
+            <i class="fas fa-exclamation-triangle"></i> حذف الفهرس كاملاً؟
         </h3>
         <p style="text-align:center; font-size:0.9rem; margin-bottom: 20px;">اكتب كلمة <b style="color:var(--danger);">حذف</b> للتأكيد:</p>
         <input type="text" id="masterDeleteInput" style="text-align:center; font-size: 1rem;">
@@ -1852,21 +1983,20 @@
     </div>
 
     <div class="no-print">
-        <!-- الهيدر مع الشعار - التعديل الرئيسي هنا -->
+        <!-- الهيدر مع الشعار -->
         <div class="header-container">
             <div class="logo-container">
-                <!-- تم إضافة الشعار هنا -->
                 <a href="#" onclick="window.location.reload(); return false;" title="الرئيسية">
                     <img src="https://i.imgur.com/05ANc5p.png" 
-                         alt="شعار نظام الأرشيف الذكي - الجامعة الوطنية للعلوم والتكنولوجيا" 
+                         alt="شعار فهرس القيد - الجامعة الوطنية للعلوم والتكنولوجيا" 
                          class="header-logo">
                 </a>
                 <h4 class="header-title">
-                    <i class="fas fa-archive"></i> نظام الأرشيف الذكي
+                    <i class="fas fa-book"></i> فهرس القيد
                 </h4>
             </div>
             <div class="header-actions">
-                <!-- إضافة أيقونة الإعدادات هنا -->
+                <!-- إضافة أيقونة الإعدادات -->
                 <div class="settings-container">
                     <button class="settings-btn" id="settingsBtn" title="الإعدادات">
                         <i class="fas fa-cog"></i>
@@ -1897,21 +2027,22 @@
             </div>
         </div>
 
-        <div class="stats-bar">
-            <div class="stat-item">
-                <i class="fas fa-users" style="color:var(--blue);"></i>
-                <span class="stat-val" id="statTotal">0</span>
-                <span class="stat-label">طلاب</span>
+        <!-- بطاقة العدد الإجمالي للطلاب مع زر الإحصائيات -->
+        <div class="total-students-card">
+            <button class="stats-toggle" id="statsToggle" title="إظهار الإحصائيات">
+                <i class="fas fa-chart-bar"></i>
+            </button>
+            <i class="fas fa-users"></i>
+            <div>
+                <div class="total-students-count" id="totalStudentsCard">0</div>
+                <div class="total-students-label">إجمالي الطلاب</div>
             </div>
-            <div class="stat-item">
-                <i class="fas fa-calendar-day" style="color:var(--success);"></i>
-                <span class="stat-val" style="color:var(--success)" id="statToday">0</span>
-                <span class="stat-label">اليوم</span>
-            </div>
-            <div class="stat-item">
-                <i class="fas fa-folder" style="color:var(--accent);"></i>
-                <span class="stat-val" style="color:var(--accent)" id="statQaids">0</span>
-                <span class="stat-label">قيود</span>
+            
+            <!-- القائمة المنبثقة للإحصائيات -->
+            <div class="stats-popup" id="statsPopup">
+                <div id="statsPopupContent">
+                    <!-- سيتم ملؤها ديناميكياً -->
+                </div>
             </div>
         </div>
 
