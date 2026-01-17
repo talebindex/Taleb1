@@ -36,10 +36,10 @@
         
         // متغيرات التقسيم إلى صفحات
         window.currentPage = 1;
-        window.pageSize = 100; // عرض 100 سجل في كل صفحة
+        window.pageSize = 100;
         window.totalPages = 1;
 
-        // نظام الإشعارات الملون وغير الشفاف
+        // نظام الإشعارات
         window.showToast = (msg, type = 'success') => {
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
@@ -66,7 +66,7 @@
         function loadData() {
             onSnapshot(query(studentsCol, orderBy("timestamp", "desc")), (snapshot) => {
                 window.allStudentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                updateTotalCount(); // تحديث العدد الإجمالي
+                updateTotalCount();
                 updateQuickStats();
                 updateQaidFilter();
                 window.applyFilters(); 
@@ -96,7 +96,6 @@
             const filterPage = document.getElementById('filterPage').value;
             
             let filtered = window.allStudentsData.filter(s => {
-                // البحث في الاسم واللقب والقيد
                 const matchSearch = 
                     (s.name || '').toLowerCase().includes(term) || 
                     (s.surname || '').toLowerCase().includes(term) ||
@@ -119,7 +118,6 @@
             updatePaginationControls();
         };
 
-        // دالة لعرض الصفحة الحالية
         window.renderPage = () => {
             const startIndex = (window.currentPage - 1) * window.pageSize;
             const endIndex = startIndex + window.pageSize;
@@ -129,17 +127,16 @@
             updatePaginationInfo();
         };
 
-        // تحديث معلومات الصفحة
         function updatePaginationInfo() {
             const totalStudents = window.filteredStudentsData.length;
             const startIndex = (window.currentPage - 1) * window.pageSize + 1;
             const endIndex = Math.min(window.currentPage * window.pageSize, totalStudents);
             
-            document.getElementById('pageInfo').innerText = 
-                `عرض ${startIndex}-${endIndex} من ${totalStudents} طالب`;
+            const pageInfo = `عرض ${startIndex}-${endIndex} من ${totalStudents} طالب`;
+            document.getElementById('pageInfo').innerText = pageInfo;
+            document.getElementById('pageInfoBottom').innerText = pageInfo;
         }
 
-        // تحديث عناصر التحكم في التصفح
         function updatePaginationControls() {
             const prevBtn = document.getElementById('prevPage');
             const nextBtn = document.getElementById('nextPage');
@@ -158,23 +155,13 @@
             document.getElementById('totalPages').innerText = window.totalPages;
             document.getElementById('pageNumberBottom').innerText = window.currentPage;
             document.getElementById('totalPagesBottom').innerText = window.totalPages;
-            
-            const totalStudents = window.filteredStudentsData.length;
-            const startIndex = (window.currentPage - 1) * window.pageSize + 1;
-            const endIndex = Math.min(window.currentPage * window.pageSize, totalStudents);
-            
-            const pageInfo = `عرض ${startIndex}-${endIndex} من ${totalStudents} طالب`;
-            document.getElementById('pageInfo').innerText = pageInfo;
-            document.getElementById('pageInfoBottom').innerText = pageInfo;
         }
 
-        // التنقل بين الصفحات
         window.goToPage = (page) => {
             if (page < 1 || page > window.totalPages) return;
             window.currentPage = page;
             window.renderPage();
             updatePaginationControls();
-            // التمرير إلى أعلى القائمة
             document.getElementById('studentsList').scrollIntoView({ behavior: 'smooth', block: 'start' });
         };
 
@@ -190,16 +177,11 @@
             showToast("تم مسح جميع الفلاتر");
         };
 
-        // دالة لتحميل نموذج Excel جاهز
         window.downloadExcelTemplate = () => {
             const templateData = [
                 ["الاسم", "اللقب", "القيد", "الصفحة", "ملاحظات"],
                 ["أحمد محمد علي", "الكبيسي", "12345", "25", "-"],
-                ["سارة خالد حسن", "العبيدي", "12346", "26", "طالبة متفوقة"],
-                ["علي محمود سعيد", "الجبوري", "12347", "27", "-"],
-                ["لمياء فارس عبدالله", "التميمي", "12348", "28", "-"],
-                ["محمد خالد إبراهيم", "الراوي", "12349", "29", "-"],
-                ["فاطمة عماد حسين", "الخالدي", "12350", "30", "-"]
+                ["سارة خالد حسن", "العبيدي", "12346", "26", "طالبة متفوقة"]
             ];
             
             const ws = XLSX.utils.aoa_to_sheet(templateData);
@@ -209,7 +191,6 @@
             showToast("تم تحميل النموذج بنجاح");
         };
 
-        // دالة للتحقق من التكرار الصارم: نفس القيد + نفس الصفحة
         function isDuplicateQaidPage(qaid, page, existingStudents, excludeId = null) {
             return existingStudents.some(student => 
                 (excludeId ? student.id !== excludeId : true) &&
@@ -243,7 +224,6 @@
                             return;
                         }
                         
-                        // التحقق من التكرار الصارم: نفس القيد + نفس الصفحة
                         if (isDuplicateQaidPage(rQaid, rPage, existingStudents)) {
                             skipped++;
                             return;
@@ -325,8 +305,8 @@
             const container = document.getElementById('printTablesContainer');
             container.innerHTML = '';
             
-            const rowsPerColumn = 35;      // تم زيادة العدد إلى 35 سطر في كل جهة
-            const totalRowsPerPage = 70;   // المجموع أصبح 70 اسماً في الورقة الواحدة
+            const rowsPerColumn = 35;
+            const totalRowsPerPage = 70;
             
             for (let pageNum = 0; pageNum < Math.ceil(data.length / totalRowsPerPage); pageNum++) {
                 const pageStartIndex = pageNum * totalRowsPerPage;
@@ -344,7 +324,6 @@
                         const student = colData[i];
                         const currentSeq = startSeq + i;
                         if (student) {
-                            // تم إضافة تنسيق عريض للأسماء
                             html += `<tr>
                                 <td>${currentSeq}</td>
                                 <td style="text-align:right; padding-right:5px; font-weight: bold;">${student.name || ''}</td>
@@ -382,7 +361,6 @@
             
             if(!name || !qaid || !page) return showToast("أكمل البيانات", "error");
             
-            // التحقق من التكرار الصارم: نفس القيد + نفس الصفحة
             if (isDuplicateQaidPage(qaid, page, window.allStudentsData, id)) {
                 showToast("هذا القيد والصفحة مسجلين مسبقاً لطالب آخر", "error");
                 return;
@@ -414,11 +392,16 @@
         };
 
         window.del = (id) => { deleteTargetId = id; document.getElementById('deleteModal').style.display = 'flex'; };
-        window.confirmDel = async () => { if(deleteTargetId) { await deleteDoc(doc(db, "students", deleteTargetId)); showToast("تم الحذف", "error"); document.getElementById('deleteModal').style.display = 'none'; } };
+        window.confirmDel = async () => { 
+            if(deleteTargetId) { 
+                await deleteDoc(doc(db, "students", deleteTargetId)); 
+                showToast("تم الحذف", "error"); 
+                document.getElementById('deleteModal').style.display = 'none'; 
+            } 
+        };
         
         window.copyStudentData = (id) => {
             const student = window.allStudentsData.find(s => s.id === id);
-            // تم حذف اسم الأم من البيانات المنقولة
             const text = `الاسم: ${student.name}\nاللقب: ${student.surname || ''}\nالقيد: ${student.qaid}\nالصفحة: ${student.page}`;
             navigator.clipboard.writeText(text).then(() => {
                 showToast("تم نسخ بيانات الطالب");
@@ -498,7 +481,6 @@
                     </div>`;
             });
             
-            // إضافة عنصر فارغ إذا كانت البيانات أقل من الحد الأدنى للحفاظ على التنسيق
             if (data.length < 5) {
                 for (let i = data.length; i < 5; i++) {
                     list.innerHTML += `<div class="student-item card empty-card" style="opacity: 0.3; min-height: 70px;"></div>`;
@@ -518,7 +500,6 @@
             document.getElementById('entryModal').style.display = 'flex';
             unsavedChanges = false;
             
-            // إضافة مستمعات الأحداث للحقول
             setupInputListeners();
         };
 
@@ -562,23 +543,88 @@
         window.logout = () => signOut(auth);
         window.toggleDarkMode = () => document.body.classList.toggle('dark-mode');
         
-        // دالة للتحقق من التكرار عند كتابة الاسم الرباعي
         window.checkDuplicateStudent = () => {
             const nameInput = document.getElementById('fName');
             const nameValue = nameInput.value.trim();
             
-            // إزالة أي تنبيه سابق
             const existingAlert = document.getElementById('duplicateStudentAlert');
             if(existingAlert) existingAlert.remove();
             
             if(nameValue) {
-                // البحث عن طالب بنفس الاسم في قاعدة البيانات
                 const existingStudent = window.allStudentsData.find(student => 
                     student.name.trim().toLowerCase() === nameValue.toLowerCase()
                 );
                 
                 if(existingStudent) {
-                    // إنشاء عنصر التنبيه
                     const alertDiv = document.createElement('div');
                     alertDiv.id = 'duplicateStudentAlert';
-                    alertDiv.className = 'duplicate-
+                    alertDiv.className = 'duplicate-alert';
+                    alertDiv.style.cssText = `
+                        background: #fef3c7;
+                        border: 1px solid #f59e0b;
+                        color: #92400e;
+                        padding: 8px 12px;
+                        border-radius: 6px;
+                        margin-top: 8px;
+                        font-size: 0.85rem;
+                        text-align: center;
+                        animation: fadeIn 0.3s ease-in;
+                    `;
+                    
+                    alertDiv.innerHTML = `
+                        <i class="fas fa-exclamation-triangle" style="margin-left: 5px;"></i>
+                        هذا الطالب مسجل مسبقاً: 
+                        <br>
+                        <strong>رقم القيد: ${existingStudent.qaid}</strong> | 
+                        <strong>رقم الصفحة: ${existingStudent.page}</strong>
+                        <br>
+                        <small style="color: #666; font-size: 0.75rem;">
+                            يمكنك إضافة طالب جديد بنفس الاسم ولكن بقيد أو صفحة مختلفين
+                        </small>
+                    `;
+                    
+                    nameInput.parentNode.insertBefore(alertDiv, nameInput.nextSibling);
+                }
+            }
+        };
+
+        window.toggleSettings = () => {
+            const dropdown = document.getElementById('settingsDropdown');
+            dropdown.classList.toggle('show');
+            
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.settings-container')) {
+                    dropdown.classList.remove('show');
+                }
+            }, { once: true });
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const settingsBtn = document.getElementById('settingsBtn');
+            if(settingsBtn) {
+                settingsBtn.addEventListener('click', window.toggleSettings);
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.settings-dropdown button')) {
+                document.getElementById('settingsDropdown').classList.remove('show');
+            }
+        });
+    </script>
+    
+    <style>
+        :root { 
+            --main: #1e293b; 
+            --blue: #0ea5e9; 
+            --bg: #f8fafc; 
+            --card: #ffffff; 
+            --text: #334155; 
+            --accent: #6366f1; 
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --surname: #7c3aed;
+        }
+        
+        body
