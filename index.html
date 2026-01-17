@@ -553,7 +553,7 @@
         window.logout = () => signOut(auth);
         window.toggleDarkMode = () => document.body.classList.toggle('dark-mode');
         
-        // دالة للتحقق من التكرار عند كتابة الاسم الرباعي
+        // دالة للتحقق من التكرار عند كتابة الاسم (أي جزء منه)
         window.checkDuplicateStudent = () => {
             const nameInput = document.getElementById('fName');
             const nameValue = nameInput.value.trim();
@@ -563,12 +563,26 @@
             if(existingAlert) existingAlert.remove();
             
             if(nameValue) {
-                // البحث عن طالب بنفس الاسم في قاعدة البيانات
-                const existingStudent = window.allStudentsData.find(student => 
-                    student.name.trim().toLowerCase() === nameValue.toLowerCase()
-                );
+                // تقسيم الاسم المدخل إلى كلمات
+                const enteredWords = nameValue.toLowerCase().split(/\s+/).filter(word => word.length > 0);
                 
-                if(existingStudent) {
+                if (enteredWords.length === 0) return;
+                
+                // البحث عن طالب به أي كلمة من كلمات الاسم المدخل
+                const matchingStudents = window.allStudentsData.filter(student => {
+                    if (!student.name) return false;
+                    
+                    const studentWords = student.name.toLowerCase().split(/\s+/).filter(word => word.length > 0);
+                    
+                    // التحقق إذا كان هناك كلمة مشتركة بين الاسم المدخل واسم الطالب
+                    return enteredWords.some(enteredWord => 
+                        studentWords.some(studentWord => 
+                            studentWord.includes(enteredWord) || enteredWord.includes(studentWord)
+                        )
+                    );
+                });
+                
+                if (matchingStudents.length > 0) {
                     // إنشاء عنصر التنبيه
                     const alertDiv = document.createElement('div');
                     alertDiv.id = 'duplicateStudentAlert';
@@ -577,25 +591,56 @@
                         background: #fef3c7;
                         border: 1px solid #f59e0b;
                         color: #92400e;
-                        padding: 8px 12px;
-                        border-radius: 6px;
-                        margin-top: 8px;
-                        font-size: 0.85rem;
-                        text-align: center;
+                        padding: 12px 15px;
+                        border-radius: 8px;
+                        margin-top: 10px;
+                        font-size: 0.9rem;
                         animation: fadeIn 0.3s ease-in;
+                        border-right: 4px solid #f59e0b;
                     `;
                     
-                    alertDiv.innerHTML = `
-                        <i class="fas fa-exclamation-triangle" style="margin-left: 5px;"></i>
-                        هذا الطالب مسجل مسبقاً: 
-                        <br>
-                        <strong>رقم القيد: ${existingStudent.qaid}</strong> | 
-                        <strong>رقم الصفحة: ${existingStudent.page}</strong>
-                        <br>
-                        <small style="color: #666; font-size: 0.75rem;">
-                            يمكنك إضافة طالب جديد بنفس الاسم ولكن بقيد أو صفحة مختلفين
-                        </small>
+                    let alertHTML = `
+                        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                            <i class="fas fa-exclamation-triangle" style="margin-left: 8px; font-size: 1.1rem;"></i>
+                            <strong>تنبيه: يوجد طلاب بأسماء مشابهة</strong>
+                        </div>
+                        <div style="max-height: 150px; overflow-y: auto; border-top: 1px solid rgba(245, 158, 11, 0.2); padding-top: 8px;">
                     `;
+                    
+                    // عرض أول 3 طلاب فقط لتجنب الإطالة
+                    matchingStudents.slice(0, 3).forEach((student, index) => {
+                        alertHTML += `
+                            <div style="padding: 6px 0; border-bottom: ${index < Math.min(3, matchingStudents.length) - 1 ? '1px dashed #ddd' : 'none'}">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-weight: 500;">${student.name}</span>
+                                    <span style="font-size: 0.85rem; background: #e5e7eb; padding: 2px 8px; border-radius: 4px;">
+                                        القيد: ${student.qaid}
+                                    </span>
+                                </div>
+                                <div style="font-size: 0.85rem; color: #666; margin-top: 3px;">
+                                    الصفحة: ${student.page} | اللقب: ${student.surname || '-'}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    if (matchingStudents.length > 3) {
+                        alertHTML += `
+                            <div style="text-align: center; padding: 8px; color: #666; font-size: 0.85rem;">
+                                + ${matchingStudents.length - 3} طالب آخر
+                            </div>
+                        `;
+                    }
+                    
+                    alertHTML += `
+                        </div>
+                        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(245, 158, 11, 0.2); font-size: 0.85rem; color: #666; text-align: center;">
+                            <i class="fas fa-info-circle" style="margin-left: 5px;"></i>
+                            يمكنك الاستمرار إذا كان هذا طالباً مختلفاً
+                        </div>
+                    `;
+                    
+                    alertDiv.innerHTML = alertHTML;
                     
                     // إضافة التنبيه تحت حقل الاسم مباشرة
                     nameInput.parentNode.insertBefore(alertDiv, nameInput.nextSibling);
@@ -1630,6 +1675,29 @@
             gap: 12px;
             align-items: center;
             flex-wrap: wrap;
+        }
+
+        /* تنسيق تنبيه الأسماء المشابهة */
+        .duplicate-alert {
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .duplicate-alert::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .duplicate-alert::-webkit-scrollbar-track {
+            background: rgba(245, 158, 11, 0.1);
+            border-radius: 3px;
+        }
+
+        .duplicate-alert::-webkit-scrollbar-thumb {
+            background: rgba(245, 158, 11, 0.3);
+            border-radius: 3px;
+        }
+
+        .duplicate-alert::-webkit-scrollbar-thumb:hover {
+            background: rgba(245, 158, 11, 0.5);
         }
 
         @media (max-width: 767px) {
