@@ -64,8 +64,7 @@
                 const snapshot = await getCountFromServer(studentsCol);
                 const totalCount = snapshot.data().count;
                 document.getElementById('statTotal').innerText = totalCount;
-                // تحديث البطاقة الصغيرة للعدد
-                document.getElementById('miniTotalCount').innerText = totalCount;
+                document.getElementById('statTotalNumber').innerText = totalCount;
             } catch (error) {
                 console.error("Error getting total count:", error);
             }
@@ -73,7 +72,11 @@
 
         function loadData() {
             onSnapshot(query(studentsCol, orderBy("timestamp", "desc")), (snapshot) => {
-                window.allStudentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                window.allStudentsData = snapshot.docs.map(doc => ({ 
+                    id: doc.id, 
+                    ...doc.data(),
+                    addedDate: new Date(doc.data().timestamp).toLocaleDateString('ar-EG')
+                }));
                 updateQuickStats();
                 updateQaidFilter();
                 window.applyFilters(); 
@@ -97,47 +100,56 @@
         }
 
         window.applyFilters = () => {
-            const term = document.getElementById('searchInput').value.trim().toLowerCase();
+            const term = document.getElementById('searchInput').value.toLowerCase().trim();
             const sortBy = document.getElementById('sortSelect').value;
             const filterQaid = document.getElementById('filterQaid').value;
             const filterPage = document.getElementById('filterPage').value;
             
-            let filtered = window.allStudentsData.filter(s => {
-                // البحث الذكي: البحث في أي جزء من الاسم الرباعي
-                const nameParts = (s.name || '').toLowerCase().split(' ');
-                const matchSearch = term === '' ? true : 
-                    nameParts.some(part => part.startsWith(term)) ||
-                    (s.surname || '').toLowerCase().includes(term) ||
-                    String(s.qaid).includes(term);
+            let filtered = window.allStudentsData;
+            
+            // البحث الذكي - يبحث في جميع أجزاء الاسم الرباعي
+            if (term) {
+                const searchTerms = term.split(' ').filter(t => t.length > 0);
+                filtered = filtered.filter(s => {
+                    const fullName = s.name.toLowerCase();
+                    // التحقق إذا كان أي جزء من أجزاء البحث موجود في الاسم
+                    return searchTerms.some(searchTerm => {
+                        // البحث في بداية كل جزء من أجزاء الاسم
+                        const nameParts = fullName.split(' ');
+                        return nameParts.some(part => part.startsWith(searchTerm));
+                    });
+                });
                 
+                // عند البحث، ترتيب النتائج أبجدياً حسب الاسم
+                if (filtered.length > 0) {
+                    filtered.sort((a, b) => {
+                        // أولاً: المطابقة التامة للكلمة الأولى
+                        const aFirstWord = a.name.toLowerCase().split(' ')[0];
+                        const bFirstWord = b.name.toLowerCase().split(' ')[0];
+                        
+                        if (aFirstWord.startsWith(term) && !bFirstWord.startsWith(term)) return -1;
+                        if (!aFirstWord.startsWith(term) && bFirstWord.startsWith(term)) return 1;
+                        
+                        // ثانياً: ترتيب أبجدي
+                        return a.name.localeCompare(b.name, 'ar');
+                    });
+                }
+            }
+            
+            // تطبيق الفلاتر الأخرى
+            filtered = filtered.filter(s => {
                 const matchQaid = filterQaid ? String(s.qaid) === filterQaid : true;
                 const matchPage = filterPage ? String(s.page).includes(filterPage) : true;
-                return matchSearch && matchQaid && matchPage;
+                return matchQaid && matchPage;
             });
             
-            // عند البحث، ترتيب أبجدي تلقائي للأسماء التي تبدأ بنفس الحروف
-            if (term !== '') {
-                filtered.sort((a, b) => {
-                    const aName = a.name.toLowerCase();
-                    const bName = b.name.toLowerCase();
-                    
-                    // إذا بدأ الاسم بنفس الحروف المدخلة، يظهر أولاً
-                    if (aName.startsWith(term) && !bName.startsWith(term)) return -1;
-                    if (!aName.startsWith(term) && bName.startsWith(term)) return 1;
-                    
-                    // ثم ترتيب أبجدي
-                    return aName.localeCompare(bName, 'ar');
-                });
-            } else if (sortBy === "alpha") {
-                filtered.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-            } else if (sortBy === "qaid") {
-                filtered.sort((a, b) => String(a.qaid).localeCompare(String(b.qaid)));
-            } else if (sortBy === "page") {
-                filtered.sort((a, b) => String(a.page).localeCompare(String(b.page)));
-            } else if (sortBy === "surname") {
-                filtered.sort((a, b) => (a.surname || '').localeCompare(b.surname || '', 'ar'));
-            } else if (sortBy === "newest") {
-                filtered.sort((a, b) => b.timestamp - a.timestamp);
+            // الترتيب إذا لم يكن هناك بحث
+            if (!term) {
+                if (sortBy === "alpha") filtered.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+                else if (sortBy === "qaid") filtered.sort((a, b) => String(a.qaid).localeCompare(String(b.qaid)));
+                else if (sortBy === "page") filtered.sort((a, b) => String(a.page).localeCompare(String(b.page)));
+                else if (sortBy === "surname") filtered.sort((a, b) => (a.surname || '').localeCompare(b.surname || '', 'ar'));
+                else if (sortBy === "newest") filtered.sort((a, b) => b.timestamp - a.timestamp);
             }
             
             window.filteredStudentsData = filtered;
@@ -172,29 +184,12 @@
         function updatePaginationControls() {
             const prevBtn = document.getElementById('prevPage');
             const nextBtn = document.getElementById('nextPage');
-            const prevBtnBottom = document.getElementById('prevPageBottom');
-            const nextBtnBottom = document.getElementById('nextPageBottom');
             
-            const disabled = window.currentPage <= 1;
-            prevBtn.disabled = disabled;
-            prevBtnBottom.disabled = disabled;
-            
-            const nextDisabled = window.currentPage >= window.totalPages;
-            nextBtn.disabled = nextDisabled;
-            nextBtnBottom.disabled = nextDisabled;
+            prevBtn.disabled = window.currentPage <= 1;
+            nextBtn.disabled = window.currentPage >= window.totalPages;
             
             document.getElementById('pageNumber').innerText = window.currentPage;
             document.getElementById('totalPages').innerText = window.totalPages;
-            document.getElementById('pageNumberBottom').innerText = window.currentPage;
-            document.getElementById('totalPagesBottom').innerText = window.totalPages;
-            
-            const totalStudents = window.filteredStudentsData.length;
-            const startIndex = (window.currentPage - 1) * window.pageSize + 1;
-            const endIndex = Math.min(window.currentPage * window.pageSize, totalStudents);
-            
-            const pageInfo = `عرض ${startIndex}-${endIndex} من ${totalStudents} طالب`;
-            document.getElementById('pageInfo').innerText = pageInfo;
-            document.getElementById('pageInfoBottom').innerText = pageInfo;
         }
 
         // التنقل بين الصفحات
@@ -451,7 +446,7 @@
         window.copyStudentData = (id) => {
             const student = window.allStudentsData.find(s => s.id === id);
             // تم حذف اسم الأم من البيانات المنقولة
-            const text = `الاسم: ${student.name}\nاللقب: ${student.surname || ''}\nالقيد: ${student.qaid}\nالصفحة: ${student.page}`;
+            const text = `الاسم: ${student.name}\nاللقب: ${student.surname || ''}\nالقيد: ${student.qaid}\nالصفحة: ${student.page}\nتاريخ الإضافة: ${student.addedDate}`;
             navigator.clipboard.writeText(text).then(() => {
                 showToast("تم نسخ بيانات الطالب");
             });
@@ -496,12 +491,6 @@
             list.innerHTML = ''; 
             data.forEach((s, index) => {
                 const globalIndex = (window.currentPage - 1) * window.pageSize + index + 1;
-                const date = new Date(s.timestamp);
-                const formattedDate = date.toLocaleDateString('ar-EG', {
-                    day: 'numeric',
-                    month: 'short'
-                });
-                
                 list.innerHTML += `
                     <div class="student-item card">
                         <div class="student-number">${globalIndex}</div>
@@ -511,16 +500,16 @@
                                 <small class="qaid-end">${String(s.qaid).slice(-2)}</small>
                             </div>
                             <div class="student-details">
-                                <div class="student-name-row">
+                                <div class="student-name-header">
                                     <p class="student-name">${s.name} <span class="surname-badge">${s.surname || ''}</span></p>
-                                    <span class="student-date">${formattedDate}</span>
+                                    <span class="added-date">${s.addedDate || ''}</span>
                                 </div>
                                 <div class="student-meta">
-                                    <span class="highlight-badge qaid-badge-bold" title="رقم القيد">
-                                        <i class="fas fa-hashtag"></i> ${s.qaid}
+                                    <span class="highlight-badge qaid-badge" title="رقم القيد">
+                                        <i class="fas fa-hashtag"></i> <span class="important-number">${s.qaid}</span>
                                     </span>
-                                    <span class="highlight-badge page-badge-bold" title="رقم الصفحة">
-                                        <i class="fas fa-file-alt"></i> ${s.page}
+                                    <span class="highlight-badge page-badge" title="رقم الصفحة">
+                                        <i class="fas fa-file-alt"></i> <span class="important-number">${s.page}</span>
                                     </span>
                                 </div>
                             </div>
@@ -603,10 +592,10 @@
         window.logout = () => signOut(auth);
         window.toggleDarkMode = () => document.body.classList.toggle('dark-mode');
         
-        // دالة للتحقق من التكرار عند كتابة الاسم الرباعي
+        // دالة للتحقق من التكرار عند كتابة الاسم الرباعي (محسنة للبحث في أجزاء الاسم)
         window.checkDuplicateStudent = () => {
             const nameInput = document.getElementById('fName');
-            const nameValue = nameInput.value.trim();
+            const nameValue = nameInput.value.trim().toLowerCase();
             
             // إزالة أي تنبيه سابق
             const existingAlert = document.getElementById('duplicateStudentAlert');
@@ -614,28 +603,19 @@
             
             if(nameValue) {
                 // تقسيم الاسم المدخل إلى أجزاء
-                const nameParts = nameValue.split(' ');
-                let matches = [];
+                const inputParts = nameValue.split(' ').filter(part => part.length > 0);
                 
-                // البحث عن أي طالب يبدأ اسمه بأي جزء من الأجزاء المدخلة
-                window.allStudentsData.forEach(student => {
-                    const studentNameParts = student.name.split(' ');
-                    for (let part of nameParts) {
-                        if (part.length < 2) continue; // تجاهل الأحرف الفردية
-                        for (let studentPart of studentNameParts) {
-                            if (studentPart.startsWith(part)) {
-                                matches.push(student);
-                                break;
-                            }
-                        }
-                        if (matches.includes(student)) break;
-                    }
+                // البحث عن طلاب لديهم أسماء مشابهة
+                const similarStudents = window.allStudentsData.filter(student => {
+                    const studentName = student.name.trim().toLowerCase();
+                    // التحقق إذا كان أي جزء من أجزاء الاسم المدخل موجود في اسم الطالب
+                    return inputParts.some(part => {
+                        const studentParts = studentName.split(' ');
+                        return studentParts.some(studentPart => studentPart.startsWith(part));
+                    });
                 });
                 
-                // إزالة التكرارات
-                matches = [...new Set(matches)];
-                
-                if (matches.length > 0) {
+                if(similarStudents.length > 0) {
                     // إنشاء عنصر التنبيه
                     const alertDiv = document.createElement('div');
                     alertDiv.id = 'duplicateStudentAlert';
@@ -644,32 +624,34 @@
                         background: #fef3c7;
                         border: 1px solid #f59e0b;
                         color: #92400e;
-                        padding: 10px 15px;
-                        border-radius: 8px;
-                        margin-top: 10px;
+                        padding: 8px 12px;
+                        border-radius: 6px;
+                        margin-top: 8px;
                         font-size: 0.85rem;
                         text-align: right;
                         animation: fadeIn 0.3s ease-in;
+                        max-height: 200px;
+                        overflow-y: auto;
                     `;
                     
                     let alertHTML = `
-                        <div style="display: flex; align-items: center; margin-bottom: 5px;">
-                            <i class="fas fa-exclamation-triangle" style="margin-left: 8px;"></i>
-                            <strong>الأسماء المشابهة:</strong>
-                        </div>`;
+                        <i class="fas fa-exclamation-triangle" style="margin-left: 5px;"></i>
+                        <strong>أسماء طلاب مشابهة موجودة:</strong>
+                        <br><br>
+                    `;
                     
-                    // عرض أول 3 أسماء فقط
-                    matches.slice(0, 3).forEach((student, idx) => {
+                    // عرض أول 5 طلاب فقط لتجنب الإطالة
+                    similarStudents.slice(0, 5).forEach((student, idx) => {
                         alertHTML += `
-                            <div style="margin-bottom: 3px; padding-right: 5px;">
-                                ${student.name} (قيد: ${student.qaid} | صفحة: ${student.page})
-                            </div>`;
+                            <div style="margin-bottom: 5px; border-bottom: 1px dashed #fbbf24; padding-bottom: 5px;">
+                                <strong>${student.name}</strong><br>
+                                <small>القيد: ${student.qaid} | الصفحة: ${student.page} | اللقب: ${student.surname || '-'}</small>
+                            </div>
+                        `;
                     });
                     
-                    if (matches.length > 3) {
-                        alertHTML += `<div style="color: #666; font-size: 0.8rem; margin-top: 5px;">
-                            وهناك ${matches.length - 3} اسم مشابه آخر
-                        </div>`;
+                    if(similarStudents.length > 5) {
+                        alertHTML += `<small style="color: #666;">... و ${similarStudents.length - 5} طالب آخر</small>`;
                     }
                     
                     alertDiv.innerHTML = alertHTML;
@@ -718,7 +700,6 @@
             --warning: #f59e0b;
             --danger: #ef4444;
             --surname: #7c3aed; /* لون جديد للقب */
-            --date-color: #6b7280; /* لون التاريخ */
         }
         
         body.dark-mode { 
@@ -729,7 +710,6 @@
             --warning: #fbbf24;
             --danger: #f87171;
             --surname: #a78bfa; /* لون القب في الوضع الداكن */
-            --date-color: #9ca3af; /* لون التاريخ في الوضع الداكن */
         }
         
         body { 
@@ -757,7 +737,7 @@
             }
             
             .stats-bar {
-                grid-template-columns: repeat(3, 1fr);
+                grid-template-columns: repeat(4, 1fr);
                 gap: 15px;
             }
             
@@ -810,7 +790,7 @@
             }
             
             .stats-bar {
-                grid-template-columns: repeat(3, 1fr);
+                grid-template-columns: repeat(4, 1fr);
                 gap: 8px;
             }
             
@@ -923,13 +903,12 @@
             }
         }
         
-        /* صف الاسم والتاريخ */
-        .student-name-row {
+        .student-name-header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             margin-bottom: 5px;
-            flex-wrap: wrap;
+            width: 100%;
         }
         
         .student-name { 
@@ -944,28 +923,23 @@
             flex-wrap: wrap;
         }
         
-        /* تاريخ الإضافة */
-        .student-date {
+        .added-date {
             font-size: 0.75rem;
-            color: var(--date-color);
-            background: rgba(0,0,0,0.03);
+            color: #64748b;
+            background: #f1f5f9;
             padding: 2px 8px;
-            border-radius: 10px;
-            font-weight: 500;
+            border-radius: 12px;
             white-space: nowrap;
-        }
-        
-        .dark-mode .student-date {
-            background: rgba(255,255,255,0.05);
+            margin-right: 5px;
         }
         
         /* تمييز اللقب بشكل أجمل */
         .surname-badge { 
             background: var(--surname); 
             color: white; 
-            padding: 2px 8px;
+            padding: 3px 10px;
             border-radius: 20px; 
-            font-size: 0.8rem; 
+            font-size: 0.85rem; 
             font-weight: 600;
             display: inline-block;
             box-shadow: 0 2px 4px rgba(124, 58, 237, 0.2);
@@ -981,7 +955,6 @@
         .student-meta { 
             font-size: 0.85rem; 
             color: #64748b; 
-            margin-top: 3px; 
             display: flex; 
             gap: 12px; 
             align-items: center;
@@ -994,45 +967,15 @@
             gap: 5px;
         }
         
-        /* تمييز القيد والصفحة بشكل بارز */
-        .qaid-badge-bold { 
-            background: #dbeafe; 
-            color: #1e40af; 
-            border: 1px solid #93c5fd;
-            font-weight: bold;
-            font-size: 0.85rem;
-            padding: 3px 12px;
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            box-shadow: 0 2px 4px rgba(37, 99, 235, 0.1);
+        .important-number {
+            font-weight: 900;
+            font-size: 1rem;
+            color: #1e293b;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
         
-        .page-badge-bold { 
-            background: #fef3c7; 
-            color: #92400e; 
-            border: 1px solid #fde68a;
-            font-weight: bold;
-            font-size: 0.85rem;
-            padding: 3px 12px;
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            box-shadow: 0 2px 4px rgba(245, 158, 11, 0.1);
-        }
-        
-        .dark-mode .qaid-badge-bold {
-            background: #1e3a8a;
-            color: #dbeafe;
-            border-color: #3b82f6;
-        }
-        
-        .dark-mode .page-badge-bold {
-            background: #78350f;
-            color: #fef3c7;
-            border-color: #f59e0b;
+        .dark-mode .important-number {
+            color: #f8fafc;
         }
         
         .user-icon { 
@@ -1063,6 +1006,28 @@
             gap: 15px; 
             flex: 1;
             margin-right: 10px;
+        }
+        
+        .highlight-badge { 
+            padding: 6px 12px; 
+            border-radius: 20px; 
+            font-weight: 600; 
+            font-size: 0.85rem; 
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .qaid-badge { 
+            background: #e0f2fe; 
+            color: #0369a1; 
+            border: 1px solid #bae6fd;
+        }
+        
+        .page-badge { 
+            background: #fef9c3; 
+            color: #854d0e; 
+            border: 1px solid #fef08a;
         }
         
         .item-actions { 
@@ -1131,42 +1096,6 @@
             box-shadow: none;
         }
         
-        /* بطاقة العدد الصغيرة */
-        .mini-count-card {
-            position: fixed;
-            bottom: 80px;
-            left: 20px;
-            background: var(--blue);
-            color: white;
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 99;
-            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
-            font-weight: bold;
-            font-size: 1.2rem;
-            transition: all 0.3s;
-            cursor: pointer;
-            border: 3px solid white;
-        }
-        
-        .dark-mode .mini-count-card {
-            border-color: var(--card);
-        }
-        
-        .mini-count-card:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 20px rgba(14, 165, 233, 0.4);
-        }
-        
-        .mini-count-card .count-number {
-            font-size: 1.4rem;
-            font-weight: 800;
-        }
-        
         .stats-bar { 
             display: grid; 
             gap: 10px; 
@@ -1181,6 +1110,8 @@
             border: 1px solid rgba(0,0,0,0.05);
             box-shadow: 0 2px 6px rgba(0,0,0,0.05);
             transition: transform 0.2s;
+            position: relative;
+            overflow: hidden;
         }
         
         .stat-item:hover {
@@ -1188,9 +1119,11 @@
         }
         
         .stat-item i {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 1.8rem;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 1.2rem;
+            opacity: 0.2;
         }
         
         .stat-val { 
@@ -1205,6 +1138,43 @@
             font-size: 0.9rem; 
             color: #64748b; 
             font-weight: 500;
+        }
+        
+        /* بطاقة العدد الإجمالي المحسنة */
+        .total-count-card {
+            background: linear-gradient(135deg, #0ea5e9, #3b82f6);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .total-count-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+            opacity: 0.3;
+        }
+        
+        .total-count-number {
+            font-size: 2.5rem;
+            font-weight: 900;
+            margin: 10px 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .total-count-label {
+            font-size: 0.85rem;
+            opacity: 0.9;
+            letter-spacing: 1px;
         }
         
         /* التصفح بين الصفحات */
@@ -1284,18 +1254,6 @@
             .pagination-controls {
                 width: 100%;
                 justify-content: center;
-            }
-            
-            .mini-count-card {
-                bottom: 70px;
-                left: 15px;
-                width: 55px;
-                height: 55px;
-                font-size: 1.1rem;
-            }
-            
-            .mini-count-card .count-number {
-                font-size: 1.3rem;
             }
         }
         
@@ -1841,11 +1799,6 @@
     }
 </style>
 
-<!-- بطاقة العدد الصغيرة -->
-<div class="mini-count-card no-print" id="miniTotalCountContainer" title="إجمالي عدد الطلاب">
-    <span class="count-number" id="miniTotalCount">0</span>
-</div>
-
 <div id="toastContainer"></div>
 
 <div id="masterDeleteModal" class="modal">
@@ -1932,7 +1885,7 @@
         </button>
         <button class="btn" style="background:#64748b; width:100%;" onclick="document.getElementById('printModal').style.display='none'">
             <i class="fas fa-times"></i> إلغاء
-            </button>
+        </button>
     </div>
 </div>
 
@@ -2005,10 +1958,9 @@
         </div>
 
         <div class="stats-bar">
-            <div class="stat-item">
-                <i class="fas fa-users" style="color:var(--blue);"></i>
-                <span class="stat-val" id="statTotal">0</span>
-                <span class="stat-label">طلاب</span>
+            <div class="total-count-card">
+                <div class="total-count-number" id="statTotalNumber">0</div>
+                <div class="total-count-label">إجمالي الطلاب</div>
             </div>
             <div class="stat-item">
                 <i class="fas fa-calendar-day" style="color:var(--success);"></i>
@@ -2096,6 +2048,37 @@
 <div class="theme-toggle no-print" onclick="toggleDarkMode()" title="تبديل الوضع الليلي">
     <i class="fas fa-moon"></i>
 </div>
+
+<script>
+    // تحديث عناصر التصفح السفلية أيضاً
+    function updatePaginationControls() {
+        const prevBtn = document.getElementById('prevPage');
+        const nextBtn = document.getElementById('nextPage');
+        const prevBtnBottom = document.getElementById('prevPageBottom');
+        const nextBtnBottom = document.getElementById('nextPageBottom');
+        
+        const disabled = window.currentPage <= 1;
+        prevBtn.disabled = disabled;
+        prevBtnBottom.disabled = disabled;
+        
+        const nextDisabled = window.currentPage >= window.totalPages;
+        nextBtn.disabled = nextDisabled;
+        nextBtnBottom.disabled = nextDisabled;
+        
+        document.getElementById('pageNumber').innerText = window.currentPage;
+        document.getElementById('totalPages').innerText = window.totalPages;
+        document.getElementById('pageNumberBottom').innerText = window.currentPage;
+        document.getElementById('totalPagesBottom').innerText = window.totalPages;
+        
+        const totalStudents = window.filteredStudentsData.length;
+        const startIndex = (window.currentPage - 1) * window.pageSize + 1;
+        const endIndex = Math.min(window.currentPage * window.pageSize, totalStudents);
+        
+        const pageInfo = `عرض ${startIndex}-${endIndex} من ${totalStudents} طالب`;
+        document.getElementById('pageInfo').innerText = pageInfo;
+        document.getElementById('pageInfoBottom').innerText = pageInfo;
+    }
+</script>
 
 </body>
 </html>
