@@ -56,10 +56,13 @@
                 page-break-after: auto;
             }
             
-            /* UPDATED: Increased base font size and padding for better readability */
-            table { font-size: 12px; width: 100%; border-collapse: collapse; }
-            th, td { border: 1px solid #000; padding: 4px 6px; vertical-align: middle; }
-            th { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; padding: 6px; font-weight: 800; font-size: 13px; }
+            /* UPDATED: Optimized for 35 rows per column on A4 */
+            table { font-size: 11px; width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; }
+            th { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; padding: 4px; font-weight: 800; font-size: 12px; }
+            
+            /* Explicit row height control for print */
+            tr { height: 28px !important; page-break-inside: avoid; }
 
             /* Single Slip Print Style */
             .single-slip {
@@ -667,7 +670,7 @@
                             {filledData.map((s, idx) => {
                                 if (s.isEmpty) {
                                     return (
-                                        <tr key={`empty-${idx}`} className="h-[34px]">
+                                        <tr key={`empty-${idx}`} className="h-[28px]">
                                             <td className="border border-black">&nbsp;</td>
                                             <td className="border border-black">&nbsp;</td>
                                             <td className="border border-black">&nbsp;</td>
@@ -679,13 +682,13 @@
                                 const rawName = `${s.name} ${s.surname}`;
                                 const fullName = rawName.replace(/\s+/g, ' ').trim();
                                 
-                                // Font size logic: UPDATED to keep text larger
-                                let nameStyle = { fontSize: '12px', fontWeight: '700' };
-                                if (fullName.length > 25) nameStyle = { fontSize: '11px', fontWeight: '600', lineHeight: '1.2' };
-                                if (fullName.length > 38) nameStyle = { fontSize: '10px', fontWeight: '600', lineHeight: '1.1' };
+                                // Font size logic: UPDATED to keep text larger but safe for 28px height
+                                let nameStyle = { fontSize: '11px', fontWeight: '700' };
+                                if (fullName.length > 25) nameStyle = { fontSize: '10px', fontWeight: '600', lineHeight: '1.2' };
+                                if (fullName.length > 38) nameStyle = { fontSize: '9px', fontWeight: '600', lineHeight: '1.1' };
 
                                 return (
-                                    <tr key={s.id || idx} className="h-[34px]">
+                                    <tr key={s.id || idx} className="h-[28px]">
                                         <td className="border border-black px-1 font-bold whitespace-normal leading-tight" style={nameStyle}>
                                             <span className="ml-1 font-normal text-gray-500 text-[9px] mr-1 inline-block min-w-[15px]">{startIndex + idx + 1}.</span>
                                             {fullName}
