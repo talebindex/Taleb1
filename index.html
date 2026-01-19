@@ -39,30 +39,7 @@
             font-family: 'Tajawal', sans-serif;
         }
 
-        /* --- Unified Table Styles for Screen (Preview) and Print --- */
-        .print-unified-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 11px;
-            direction: rtl;
-        }
-        .print-unified-table th, .print-unified-table td {
-            border: 1px solid #000;
-            padding: 2px 4px;
-            vertical-align: middle;
-        }
-        .print-unified-table th {
-            background-color: #f3f4f6 !important;
-            padding: 4px;
-            font-weight: 800;
-            font-size: 12px;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-        }
-        .print-unified-row {
-            height: 28px !important; /* Strict height */
-        }
-        
+        /* --- Print Styles --- */
         @media print {
             /* HIDE EVERYTHING NOT RELATED TO PRINT */
             .no-print, 
@@ -87,7 +64,7 @@
                 background-color: white !important;
             }
 
-            /* Fix Modal Container for Printing using Custom Class */
+            /* Fix Modal Container for Printing */
             .print-modal-container {
                 position: absolute !important;
                 top: 0 !important;
@@ -100,7 +77,6 @@
                 background: white !important;
             }
 
-            /* Fix the scrollable content wrapper inside the modal */
             .flex-grow.bg-white.text-black.overflow-auto {
                 overflow: visible !important;
                 height: auto !important;
@@ -110,29 +86,67 @@
                 padding: 0 !important;
             }
             
-            /* Ensure text color is black */
             body, * { 
                 color: black !important; 
                 border-color: black !important; 
             }
             
-            /* Page Setup */
             @page { 
-                margin: 5mm; 
+                margin: 10mm; 
                 size: A4 portrait; 
             }
             
-            .print-page {
-                page-break-after: always;
+            /* AUTOMATIC COLUMN LAYOUT STYLE */
+            .print-col-layout {
+                column-count: 2;
+                column-gap: 15px;
+                direction: rtl;
+                width: 100%;
+            }
+            
+            .print-row-card {
+                display: flex;
+                width: 100%;
+                border: 1px solid #000;
+                margin-top: -1px; /* Overlap borders to look like table */
+                break-inside: avoid;
+                page-break-inside: avoid;
+                background: #fff;
+                height: 28px;
+                align-items: center;
+                font-size: 11px;
+            }
+
+            .print-header-row {
+                display: flex;
+                width: 100%;
+                border: 1px solid #000;
+                background: #f3f4f6 !important;
+                font-weight: 800;
+                font-size: 12px;
+                margin-bottom: -1px;
+                break-inside: avoid;
+                page-break-inside: avoid;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .print-cell {
+                padding: 0 4px;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                border-left: 1px solid #000;
+            }
+            .print-cell:last-child {
+                border-left: none;
+            }
+
+            .print-page-continuous {
                 width: 100%;
                 height: auto;
                 overflow: visible;
-                display: block;
                 padding-bottom: 20px;
-            }
-            
-            .print-page:last-child {
-                page-break-after: auto;
             }
 
             /* Single Slip Print Style */
@@ -222,7 +236,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         
-        // Enable Offline Persistence
         enableIndexedDbPersistence(db).catch((err) => {
              // suppress errors
         });
@@ -264,7 +277,7 @@
             const [printMode, setPrintMode] = useState('menu'); // 'menu' | 'full' | 'single' | 'qaid'
             const [singlePrintSearchTerm, setSinglePrintSearchTerm] = useState('');
             const [singlePrintStudent, setSinglePrintStudent] = useState(null);
-            const [targetQaid, setTargetQaid] = useState(''); // For Qaid batch print
+            const [targetQaid, setTargetQaid] = useState(''); 
 
             const [settingsOpen, setSettingsOpen] = useState(false);
             const [deleteId, setDeleteId] = useState(null);
@@ -682,47 +695,6 @@
                 );
             }
 
-            // Print Table Component Helper - UPDATED: Removed empty row filling
-            const PrintTable = ({ data, startIndex }) => {
-                // If data is empty, don't render table at all
-                if (!data || data.length === 0) return null;
-
-                return (
-                    <table className="print-unified-table">
-                        <thead>
-                            <tr className="bg-gray-100">
-                                <th className="text-right w-full">الاسم الكامل</th>
-                                <th className="text-center whitespace-nowrap w-min">ق</th>
-                                <th className="text-center whitespace-nowrap w-min">ص</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {data.map((s, idx) => {
-                                // Clean Name: Remove extra internal spaces and combine
-                                const rawName = `${s.name} ${s.surname}`;
-                                const fullName = rawName.replace(/\s+/g, ' ').trim();
-                                
-                                // Font size logic: Optimized for 11px base
-                                let nameStyle = { fontSize: '11px', fontWeight: '700' };
-                                if (fullName.length > 25) nameStyle = { fontSize: '10px', fontWeight: '600', lineHeight: '1.2' };
-                                if (fullName.length > 38) nameStyle = { fontSize: '9px', fontWeight: '600', lineHeight: '1.1' };
-
-                                return (
-                                    <tr key={s.id || idx} className="print-unified-row">
-                                        <td className="px-1 font-bold whitespace-normal leading-tight" style={nameStyle}>
-                                            <span className="ml-1 font-normal text-gray-500 text-[9px] mr-1 inline-block min-w-[15px]">{startIndex + idx + 1}.</span>
-                                            {fullName}
-                                        </td>
-                                        <td className="text-center font-mono font-bold whitespace-nowrap px-1 text-[11px]">{s.qaid}</td>
-                                        <td className="text-center font-mono font-bold whitespace-nowrap px-1 text-[11px]">{s.page}</td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                );
-            };
-
             return (
                 <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 flex flex-col transition-colors duration-300">
                     
@@ -741,9 +713,7 @@
                                     </div>
                                     <div className="flex items-center gap-2 sm:gap-4">
                                         
-                                        {/* Settings and Print Buttons - Kept here */}
                                         <div className="flex items-center gap-1 sm:gap-2">
-                                            
                                             <button 
                                                 onClick={() => { 
                                                     setPrintMode('menu'); 
@@ -789,7 +759,6 @@
                         <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
                             {/* Stats Cards */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 stats-cards">
-                                {/* Card 1: Total */}
                                 <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                                     <div className="bg-primary text-white text-xl font-bold px-4 py-2 rounded-lg shadow-sm min-w-[60px] text-center">
                                         {students.length}
@@ -799,7 +768,6 @@
                                     </div>
                                 </div>
 
-                                {/* Card 2: Unique Qaids */}
                                 <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                                     <div>
                                         <p className="text-xs text-slate-500 font-bold mb-1">القيود</p>
@@ -810,7 +778,6 @@
                                     </div>
                                 </div>
 
-                                {/* Card 3: Unique Pages */}
                                 <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                                     <div>
                                         <p className="text-xs text-slate-500 font-bold mb-1">الصفحات</p>
@@ -821,7 +788,6 @@
                                     </div>
                                 </div>
 
-                                {/* Card 4: Latest */}
                                 <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                                     <div className="overflow-hidden">
                                         <p className="text-xs text-slate-500 font-bold mb-1">الأحدث</p>
@@ -878,7 +844,6 @@
                                 <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg border border-slate-300 dark:border-slate-600 p-1 shadow-sm">
                                     <Filter size={16} className="mx-2 text-slate-400" />
                                     
-                                    {/* Sort By Dropdown */}
                                     <div className="flex items-center gap-1 border-l border-slate-300 dark:border-slate-600 pl-2 ml-1">
                                         <ArrowUpDown size={14} className="text-slate-400" />
                                         <select 
@@ -893,7 +858,6 @@
                                     </div>
                                     <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
 
-                                    {/* Year Filter */}
                                     <select 
                                         value={selectedYear}
                                         onChange={(e) => setSelectedYear(e.target.value)}
@@ -906,7 +870,6 @@
                                     </select>
                                     <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
                                     
-                                    {/* Month Filter */}
                                     <select 
                                         value={selectedMonth}
                                         onChange={(e) => setSelectedMonth(e.target.value)}
@@ -919,7 +882,6 @@
                                     </select>
                                 </div>
 
-                                {/* Qaid & Page Filter */}
                                 <div className="flex gap-2 flex-grow md:flex-grow-0">
                                     <select 
                                         value={selectedQaidFilter}
@@ -932,7 +894,6 @@
                                         ))}
                                     </select>
                                     
-                                    {/* NEW Page Filter Input */}
                                     <input
                                         type="text"
                                         placeholder="ص.."
@@ -942,7 +903,6 @@
                                     />
                                 </div>
                                 
-                                {/* Clear Filters */}
                                 {(selectedYear || selectedMonth || selectedQaidFilter || selectedPageFilter) && (
                                     <button 
                                         onClick={() => {
@@ -968,7 +928,7 @@
                                 </div>
                             )}
 
-                            {/* Data List (Reverted to Avatar Style) */}
+                            {/* Data List */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-12">
                                 {paginatedStudents.length === 0 ? (
                                     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-12 text-center text-slate-500 dark:text-slate-400 col-span-1 lg:col-span-2">
@@ -984,20 +944,17 @@
                                         return (
                                             <div 
                                                 key={student.id} 
-                                                // UPDATED: Added z-index logic to show popup over other cards
                                                 className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 hover:shadow-md transition-shadow relative group ${activeRowId === student.id ? 'z-20' : 'z-0'}`}
                                                 style={{ zIndex: activeRowId === student.id ? 20 : 'auto' }}
                                                 onClick={() => setActiveRowId(activeRowId === student.id ? null : student.id)}
                                             >
                                                 <div className="flex items-start justify-between">
                                                     <div className="flex items-start gap-4">
-                                                        {/* Avatar */}
                                                         <div className="hidden sm:flex h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white items-center justify-center text-lg font-bold shadow-md shrink-0 border-2 border-white dark:border-slate-700 ring-1 ring-blue-200 dark:ring-blue-900 mt-1">
                                                             {student.name.charAt(0)}
                                                         </div>
 
                                                         <div className="flex flex-col gap-1">
-                                                            {/* Line 1: Full Name */}
                                                             <div className="flex items-center gap-2">
                                                                 <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 text-[10px] font-mono px-1.5 rounded">{globalIndex}</span>
                                                                 <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">
@@ -1005,16 +962,13 @@
                                                                 </h3>
                                                             </div>
 
-                                                            {/* Line 2: Details Row */}
                                                             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-600 dark:text-slate-300 mt-2">
-                                                                {/* Qaid Badge - Specific Color */}
                                                                 <div className="flex items-center gap-2 px-4 py-1 rounded-full shadow-sm transition-transform hover:scale-105" style={{ backgroundColor: '#893BFF' }}>
                                                                     <span className="font-bold text-white text-sm">ق</span>
                                                                     <div className="w-px h-4 bg-white/30"></div>
                                                                     <span className="font-mono font-bold text-white text-lg tracking-wider">{student.qaid}</span>
                                                                 </div>
                                                                 
-                                                                {/* Page Badge - Specific Color */}
                                                                 <div className="flex items-center gap-2 px-4 py-1 rounded-full shadow-sm transition-transform hover:scale-105" style={{ backgroundColor: '#FFE87C' }}>
                                                                     <span className="font-bold text-slate-800 text-sm">ص</span>
                                                                     <div className="w-px h-4 bg-slate-800/20"></div>
@@ -1027,7 +981,6 @@
                                                                 </div>
                                                             </div>
                                                             
-                                                            {/* Notes if exist */}
                                                             {student.note && (
                                                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 border-t border-slate-100 dark:border-slate-700 pt-2 flex items-center gap-1">
                                                                     <Info size={12} />
@@ -1037,7 +990,6 @@
                                                         </div>
                                                     </div>
 
-                                                    {/* Action Trigger Icon (Visible on Desktop) */}
                                                     <button 
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -1050,7 +1002,6 @@
                                                     </button>
                                                 </div>
 
-                                                {/* Actions Floating Popup */}
                                                 {activeRowId === student.id && (
                                                     <div className="absolute left-4 top-12 flex items-center gap-1 animate-in fade-in slide-in-from-top-2 duration-200 z-50 bg-slate-800 text-white p-1.5 rounded-lg shadow-xl border border-slate-700">
                                                         <button 
@@ -1117,7 +1068,6 @@
                                             <ChevronRight size={20} />
                                         </button>
                                         
-                                        {/* Page Selector */}
                                         <select
                                             value={currentPage}
                                             onChange={(e) => setCurrentPage(Number(e.target.value))}
@@ -1143,7 +1093,6 @@
                     </div>
 
                     {/* Modals */}
-                    {/* Add/Edit Student Modal */}
                     {modalOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm add-modal">
                             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -1169,7 +1118,6 @@
                                                 className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 focus:ring-2 focus:ring-primary outline-none transition-all"
                                                 placeholder="اسم الطالب"
                                             />
-                                            {/* Similar Students Warning */}
                                             {similarStudents.length > 0 && (
                                                 <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg animate-in slide-in-from-top-2">
                                                     <p className="text-xs text-yellow-700 dark:text-yellow-400 font-bold mb-1 flex items-center gap-1">
@@ -1268,7 +1216,6 @@
                         </div>
                     )}
 
-                    {/* Settings Modal */}
                     {settingsOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm settings-modal">
                             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md p-6">
@@ -1281,7 +1228,6 @@
                                 </div>
                                 
                                 <div className="space-y-6">
-                                    {/* Appearance Section */}
                                     <div className="space-y-3">
                                         <h3 className="font-bold text-sm text-slate-500 uppercase">المظهر العام</h3>
                                         <button 
@@ -1298,7 +1244,6 @@
                                         </button>
                                     </div>
 
-                                    {/* Data Management Section */}
                                     <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-700">
                                         <h3 className="font-bold text-sm text-slate-500 uppercase">إدارة البيانات</h3>
                                         
@@ -1329,7 +1274,6 @@
                                         </div>
                                     </div>
 
-                                    {/* Danger Zone */}
                                     <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
                                         <h3 className="font-bold text-sm text-red-500 uppercase mb-3">منطقة الخطر</h3>
                                         <button 
@@ -1345,7 +1289,6 @@
                         </div>
                     )}
 
-                    {/* Master Delete Confirmation */}
                     {masterDeleteOpen && (
                         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
                             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-2xl max-w-md w-full">
@@ -1381,10 +1324,8 @@
                         </div>
                     )}
 
-                    {/* Print View Modal */}
                     {printModalOpen && (
                         <div className="fixed inset-0 z-50 bg-white flex flex-col print-modal-container">
-                            {/* Toolbar (No Print) */}
                             <div className="no-print p-4 border-b flex justify-between items-center bg-slate-100">
                                 <h2 className="text-lg font-bold">
                                     {printMode === 'menu' ? 'خيارات الطباعة' : 
@@ -1404,9 +1345,7 @@
                                 </div>
                             </div>
                             
-                            {/* Printable Content */}
                             <div className="flex-grow bg-white text-black overflow-auto relative">
-                                {/* Mode Selection Menu */}
                                 {printMode === 'menu' && (
                                     <div className="absolute inset-0 flex items-center justify-center bg-slate-50 overflow-y-auto p-4">
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl w-full">
@@ -1446,7 +1385,6 @@
                                     </div>
                                 )}
 
-                                {/* Single Print Search Mode */}
                                 {printMode === 'single' && !singlePrintStudent && (
                                     <div className="absolute inset-0 flex flex-col items-center justify-start pt-20 bg-slate-50">
                                         <h3 className="text-2xl font-bold mb-6 text-slate-800">ابحث عن الطالب للطباعة</h3>
@@ -1488,7 +1426,6 @@
                                     </div>
                                 )}
 
-                                {/* Qaid Batch Selection Mode */}
                                 {printMode === 'qaid' && !targetQaid && (
                                     <div className="absolute inset-0 flex flex-col items-center justify-start pt-20 bg-slate-50">
                                         <h3 className="text-2xl font-bold mb-6 text-slate-800">اختر رقم القيد للطباعة</h3>
@@ -1539,7 +1476,6 @@
 
                                 <div className="print-area">
                                     {printMode === 'single' && singlePrintStudent ? (
-                                        // Single Student Print View
                                         <div className="single-slip flex flex-col items-center justify-center p-8 border-2 border-black m-8 max-w-2xl mx-auto rounded-xl">
                                             <div className="text-center mb-8 border-b-2 border-black w-full pb-4">
                                                 <h1 className="text-2xl font-extrabold mb-2">ث. ش. محمد عبدالعزيز الكنعان للبنين</h1>
@@ -1592,12 +1528,8 @@
                                             </div>
                                         </div>
                                     ) : (printMode === 'full' || (printMode === 'qaid' && targetQaid)) ? (
-                                        // List Print View (Used for both Full and Batch Qaid)
                                         (() => {
-                                            const ROWS_PER_COL = 35;
-                                            const ROWS_PER_PAGE = ROWS_PER_COL * 2;
-                                            
-                                            // Determine which dataset to print
+                                            // -- UPDATED: FULL AUTOMATIC COLUMN LOGIC --
                                             let dataToPrint = [];
                                             let title = "";
                                             
@@ -1605,47 +1537,47 @@
                                                 dataToPrint = students.filter(s => s.qaid === targetQaid);
                                                 title = `قائمة طلاب القيد رقم: ${targetQaid}`;
                                             } else {
-                                                // Force Alphabetical Sort for Full Record Print
                                                 dataToPrint = [...filteredStudents].sort((a, b) => a.name.localeCompare(b.name, 'ar'));
                                                 title = "فهرس القيد الشامل";
                                             }
 
-                                            const pages = [];
-                                            
-                                            // Chunking data into pages
-                                            for(let i = 0; i < dataToPrint.length; i += ROWS_PER_PAGE) {
-                                                pages.push(dataToPrint.slice(i, i + ROWS_PER_PAGE));
-                                            }
+                                            if (dataToPrint.length === 0) return <div className="p-10 text-center">لا توجد بيانات للطباعة</div>;
 
-                                            if (pages.length === 0) return <div className="p-10 text-center">لا توجد بيانات للطباعة</div>;
-
-                                            return pages.map((pageData, pageIdx) => (
-                                                <div key={pageIdx} className="print-page flex flex-col p-4 box-border">
-                                                    {/* Header per page */}
-                                                    <div className="text-center mb-4 border-b-2 border-black pb-2">
+                                            return (
+                                                <div className="print-page-continuous p-8" dir="rtl">
+                                                    <div className="text-center mb-6 pb-2 border-b-2 border-black">
                                                         <h1 className="text-xl font-extrabold">{title}</h1>
-                                                        <p className="text-xs">تاريخ: {new Date().toLocaleDateString('ar-EG')} - صفحة {pageIdx + 1}</p>
+                                                        <p className="text-xs">تاريخ: {new Date().toLocaleDateString('ar-EG')} - العدد الكلي: {dataToPrint.length}</p>
                                                     </div>
+                                                    
+                                                    <div className="print-col-layout">
+                                                        <div className="print-header-row mb-0">
+                                                            <div className="print-cell w-8 justify-center bg-gray-100">#</div>
+                                                            <div className="print-cell flex-grow justify-start">الاسم الكامل</div>
+                                                            <div className="print-cell w-12 justify-center font-mono">ق</div>
+                                                            <div className="print-cell w-12 justify-center font-mono">ص</div>
+                                                        </div>
 
-                                                    <div className="flex justify-between gap-4 flex-grow items-start h-full">
-                                                        {/* Right Column (First half of page data) */}
-                                                        <div className="w-[49%]">
-                                                            <PrintTable 
-                                                                data={pageData.slice(0, ROWS_PER_COL)} 
-                                                                startIndex={pageIdx * ROWS_PER_PAGE} 
-                                                            />
-                                                        </div>
-                                                        
-                                                        {/* Left Column (Second half of page data) */}
-                                                        <div className="w-[49%]">
-                                                            <PrintTable 
-                                                                data={pageData.slice(ROWS_PER_COL, ROWS_PER_PAGE)} 
-                                                                startIndex={pageIdx * ROWS_PER_PAGE + ROWS_PER_COL} 
-                                                            />
-                                                        </div>
+                                                        {dataToPrint.map((s, idx) => {
+                                                             const rawName = `${s.name} ${s.surname}`;
+                                                             const fullName = rawName.replace(/\s+/g, ' ').trim();
+                                                             
+                                                             let nameStyle = { fontSize: '11px', fontWeight: '700' };
+                                                             if (fullName.length > 25) nameStyle = { fontSize: '10px', fontWeight: '600', lineHeight: '1.2' };
+                                                             if (fullName.length > 38) nameStyle = { fontSize: '9px', fontWeight: '600', lineHeight: '1.1' };
+
+                                                             return (
+                                                                 <div key={s.id || idx} className="print-row-card">
+                                                                     <div className="print-cell w-8 justify-center bg-gray-50 text-[9px] text-gray-500 font-bold">{idx + 1}</div>
+                                                                     <div className="print-cell flex-grow justify-start font-bold leading-tight" style={nameStyle}>{fullName}</div>
+                                                                     <div className="print-cell w-12 justify-center font-mono font-bold">{s.qaid}</div>
+                                                                     <div className="print-cell w-12 justify-center font-mono font-bold">{s.page}</div>
+                                                                 </div>
+                                                             )
+                                                        })}
                                                     </div>
                                                 </div>
-                                            ));
+                                            );
                                         })()
                                     ) : null}
                                 </div>
@@ -1653,7 +1585,6 @@
                         </div>
                     )}
 
-                    {/* Toast Notification */}
                     {toast && (
                         <div className={`fixed bottom-6 left-6 z-[100] px-6 py-4 rounded-xl shadow-2xl text-white font-medium flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
                             {toast.type === 'success' ? <Check size={20} /> : <AlertTriangle size={20} />}
@@ -1674,4 +1605,4 @@
     /* ]]> */
     </script>
 </body>
-</html>
+</html> حط
