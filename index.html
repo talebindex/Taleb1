@@ -66,15 +66,54 @@
         @media print {
             .no-print { display: none !important; }
             .print-area { display: block !important; }
-            /* Force black text for everything in print mode to fix Dark Mode issue */
-            body, * { background-color: white !important; color: black !important; border-color: black !important; }
+            
+            /* GLOBAL RESET FOR PRINT - CRITICAL FIX */
+            body, html, #root {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+                overflow: visible !important;
+            }
+
+            /* Hide all main app UI elements that are siblings of the print modal */
+            nav, main, .stats-cards, .search-bar { 
+                display: none !important; 
+            }
+
+            /* Fix Modal Container for Printing: Remove fixed positioning to allow flow */
+            .fixed.inset-0.z-50.bg-white {
+                position: static !important;
+                overflow: visible !important;
+                display: block !important;
+                height: auto !important;
+                width: 100% !important;
+                z-index: auto !important;
+            }
+
+            /* Fix the scrollable content wrapper inside the modal */
+            .flex-grow.bg-white.text-black.overflow-auto {
+                overflow: visible !important;
+                height: auto !important;
+                position: static !important;
+                display: block !important;
+            }
+            
+            /* Ensure text color is black */
+            body, * { 
+                background-color: white !important; 
+                color: black !important; 
+                border-color: black !important; 
+            }
             
             @page { margin: 0.3cm; size: A4 portrait; }
             
             .print-page {
                 page-break-after: always;
-                height: 290mm; /* A4 height approx */
-                overflow: hidden;
+                min-height: 290mm; /* Ensure full page height */
+                height: auto;
+                overflow: visible;
+                display: block;
             }
             .print-page:last-child {
                 page-break-after: auto;
@@ -1696,4 +1735,4 @@
     /* ]]> */
     </script>
 </body>
-    </html>
+</html>
