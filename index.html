@@ -1,3 +1,4 @@
+<!doctype html>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ar" lang="ar" dir="rtl">
 <head>
@@ -103,6 +104,7 @@
         }
         /* ]]> */
     </style>
+<link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-300">
     <div id="root"></div>
@@ -409,14 +411,14 @@
                         note: lastSavedStudent.note
                     }));
                     showToast('تم نسخ بيانات القيد والصفحة من آخر إضافة');
-                } eeeelselselselse {
+                } else {
                     showToast('لا توجد بيانات سابقة للنسخ', 'error');
                 }
             };
 
             // Excel Actions
             const handleExport = () => {
-                conssetLoadingport = students.map(({id, timestamp, ...rest}) => ({
+                const dataToExport = students.map(({id, timestamp, ...rest}) => ({
                     "الاسم": rest.name,
                     "اللقب": rest.surname,
                     "القيد": rest.qaid,
@@ -434,13 +436,13 @@
                 const file = e.target.files?.[0];
                 if (!file) return;
 
-                setLoadingsetLoading(true);
-                const reader = newnew FileReader();
-                readernewload = async (evt) => {
+                setLoading(true);
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
                     try {
                         const bstr = evt.target?.result;
                         const wb = XLSX.read(bstr, { type: 'array' });
-                        coconstsname = wb.SheetNames[0];
+                        const wsname = wb.SheetNames[0];
                         const ws = wb.Sheets[wsname];
                         const data = XLSX.utils.sheet_to_json(ws);
 
@@ -1618,5 +1620,6 @@
         );
     /* ]]> */
     </script>
+<script type="module" src="/index.tsx"></script>
 </body>
-</html>
+</html>--- START OF FILE index.html ---
