@@ -674,19 +674,19 @@
                                     );
                                 }
 
-                                // Calculate font size based on length
-                                const fullName = `${s.name} ${s.surname}`.trim();
+                                // Clean Name: Remove extra internal spaces and combine
+                                const rawName = `${s.name} ${s.surname}`;
+                                const fullName = rawName.replace(/\s+/g, ' ').trim();
+                                
+                                // Font size logic: Allow wrapping but shrink very long names slightly
                                 let nameStyle = { fontSize: '10px' };
-                                // Better scaling for long names in print
-                                if (fullName.length > 35) nameStyle = { fontSize: '6px', lineHeight: '1.2' };
-                                else if (fullName.length > 30) nameStyle = { fontSize: '7px', lineHeight: '1.2' };
-                                else if (fullName.length > 25) nameStyle = { fontSize: '8px' };
-                                else if (fullName.length > 20) nameStyle = { fontSize: '9px' };
+                                if (fullName.length > 25) nameStyle = { fontSize: '9px', lineHeight: '1.1' };
+                                if (fullName.length > 35) nameStyle = { fontSize: '8px', lineHeight: '1' };
 
                                 return (
                                     <tr key={s.id || idx} className="h-[28px]">
-                                        <td className="border border-black px-1 font-bold whitespace-nowrap overflow-hidden" style={nameStyle}>
-                                            <span className="ml-2 font-normal text-gray-500 text-[8px]">{startIndex + idx + 1}.</span>
+                                        <td className="border border-black px-1 font-bold whitespace-normal leading-tight" style={nameStyle}>
+                                            <span className="ml-1 font-normal text-gray-500 text-[8px]">{startIndex + idx + 1}.</span>
                                             {fullName}
                                         </td>
                                         <td className="border border-black text-center font-mono whitespace-nowrap px-1">{s.qaid}</td>
