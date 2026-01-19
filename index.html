@@ -1,4 +1,3 @@
-<!doctype html>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ar" lang="ar" dir="rtl">
 <head>
@@ -43,7 +42,9 @@
         @media print {
             .no-print { display: none !important; }
             .print-area { display: block !important; }
-            body { background-color: white !important; color: black !important; }
+            /* Force black text for everything in print mode to fix Dark Mode issue */
+            body, * { background-color: white !important; color: black !important; border-color: black !important; }
+            
             @page { margin: 0.3cm; size: A4 portrait; }
             
             .print-page {
@@ -104,7 +105,6 @@
         }
         /* ]]> */
     </style>
-<link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-300">
     <div id="root"></div>
@@ -121,7 +121,7 @@
             FileSpreadsheet, Printer, FileDown, Upload, Database, Calendar, Users,
             AlertTriangle, Loader2, Settings, X, Check, ChevronLeft, ChevronRight,
             Hash, FileText, Info, Eye, CreditCard, Filter, FolderOpen, Layers, Clock,
-            ArrowUpDown
+            ArrowUpDown, MoreVertical, PlusCircle
         } from 'https://esm.sh/lucide-react@0.263.1';
 
         // Firebase Imports
@@ -221,6 +221,7 @@
             const [selectedYear, setSelectedYear] = useState('');
             const [selectedMonth, setSelectedMonth] = useState('');
             const [selectedQaidFilter, setSelectedQaidFilter] = useState('');
+            const [selectedPageFilter, setSelectedPageFilter] = useState('');
 
             // Form State
             const [formData, setFormData] = useState({
@@ -497,6 +498,7 @@
             // Filter & Pagination Logic
             const filteredStudents = useMemo(() => {
                 const term = searchTerm.toLowerCase().trim();
+                const pageFilter = selectedPageFilter.trim();
                 
                 let result = students.filter(s => {
                     // Search Logic
@@ -518,7 +520,10 @@
                     // Qaid Filter
                     const matchesQaid = !selectedQaidFilter || s.qaid === selectedQaidFilter;
 
-                    return matchesSearch && matchesYear && matchesMonth && matchesQaid;
+                    // Page Filter
+                    const matchesPage = !pageFilter || s.page.includes(pageFilter);
+
+                    return matchesSearch && matchesYear && matchesMonth && matchesQaid && matchesPage;
                 });
 
                 // Custom sorting logic based on search
@@ -544,7 +549,7 @@
                 });
 
                 return result;
-            }, [students, searchTerm, sortBy, selectedYear, selectedMonth, selectedQaidFilter]);
+            }, [students, searchTerm, sortBy, selectedYear, selectedMonth, selectedQaidFilter, selectedPageFilter]);
 
             const totalPages = Math.ceil(filteredStudents.length / PAGE_SIZE);
             const paginatedStudents = useMemo(() => {
@@ -574,7 +579,7 @@
 
             useEffect(() => {
                 setCurrentPage(1);
-            }, [searchTerm, sortBy, selectedYear, selectedMonth, selectedQaidFilter]);
+            }, [searchTerm, sortBy, selectedYear, selectedMonth, selectedQaidFilter, selectedPageFilter]);
 
             // UI Render
             if (authLoading) {
@@ -597,7 +602,7 @@
                                     <Database size={32} />
                                 </div>
                                 <h1 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white leading-relaxed px-4">
-                                    فهرس القيد. <br/> ث. ش . محمد عبدالعزيز الكنعان للبنين
+                                    فهرس القيد. <br/> ث. ش. محمد عبدالعزيز الكنعان للبنين
                                 </h1>
                                 <p className="text-slate-500 dark:text-slate-400 mt-2">يرجى تسجيل الدخول للمتابعة</p>
                             </div>
@@ -639,7 +644,7 @@
                 );
             }
 
-            // Print Table Component Helper
+            // Print Table Component Helper - UPDATED: Auto layout for dynamic width
             const PrintTable = ({ data, startIndex, rowsPerCol }) => {
                 // Fill data to ensure equal height
                 const filledData = [...(Array.isArray(data) ? data : [])];
@@ -649,17 +654,12 @@
                 }
 
                 return (
-                    <table className="w-full text-right border-collapse border border-black text-[10px] table-fixed" dir="rtl">
-                        <colgroup>
-                            <col className="w-[75%]" /> {/* Full Name (Name + Surname merged) */}
-                            <col className="w-[10%]" /> {/* Qaid - Reduced Width */}
-                            <col className="w-[15%]" /> {/* Page */}
-                        </colgroup>
+                    <table className="w-full text-right border-collapse border border-black text-[10px] table-auto" dir="rtl">
                         <thead>
                             <tr className="bg-gray-100">
-                                <th className="border border-black px-2 text-right">الاسم الكامل</th>
-                                <th className="border border-black px-1 text-center">ق</th>
-                                <th className="border border-black px-1 text-center">ص</th>
+                                <th className="border border-black px-2 text-right w-full">الاسم الكامل</th>
+                                <th className="border border-black px-1 text-center whitespace-nowrap w-min">ق</th>
+                                <th className="border border-black px-1 text-center whitespace-nowrap w-min">ص</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -689,8 +689,8 @@
                                             <span className="ml-2 font-normal text-gray-500 text-[8px]">{startIndex + idx + 1}.</span>
                                             {fullName}
                                         </td>
-                                        <td className="border border-black text-center font-mono">{s.qaid}</td>
-                                        <td className="border border-black text-center font-mono">{s.page}</td>
+                                        <td className="border border-black text-center font-mono whitespace-nowrap px-1">{s.qaid}</td>
+                                        <td className="border border-black text-center font-mono whitespace-nowrap px-1">{s.page}</td>
                                     </tr>
                                 );
                             })}
@@ -707,22 +707,47 @@
                             <div className="flex justify-between h-16">
                                 <div className="flex items-center gap-3">
                                     <img src="https://i.imgur.com/05ANc5p.png" alt="شعار" className="h-10 w-auto object-contain" />
-                                    <span className="font-bold text-xl hidden sm:inline-block">فهرس القيد الذكي</span>
+                                    <div className="flex flex-col justify-center">
+                                        <span className="font-bold text-base md:text-lg leading-tight text-slate-800 dark:text-white">فهرس القيد الذكي</span>
+                                        <span className="text-xs md:text-sm text-slate-500 dark:text-slate-400">ث. ش. محمد عبدالعزيز الكنعان</span>
+                                    </div>
                                 </div>
                                 <div className="flex items-center gap-2 sm:gap-4">
-                                    <button 
-                                        onClick={toggleDarkMode}
-                                        className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
-                                        title="تغيير النمط"
-                                    >
-                                        {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-                                    </button>
+                                    
+                                    {/* Settings and Print Buttons - Kept here */}
+                                    <div className="flex items-center gap-1 sm:gap-2">
+                                        
+                                        <button 
+                                            onClick={() => { 
+                                                setPrintMode('menu'); 
+                                                setSinglePrintStudent(null); 
+                                                setSinglePrintSearchTerm('');
+                                                setTargetQaid('');
+                                                setPrintModalOpen(true); 
+                                            }}
+                                            className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 p-2 sm:px-3 sm:py-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors border border-slate-200 dark:border-slate-600 flex items-center gap-1 sm:gap-2"
+                                            title="طباعة"
+                                        >
+                                            <Printer size={18} />
+                                            <span className="hidden sm:inline text-sm">طباعة</span>
+                                        </button>
+
+                                        <button 
+                                            onClick={() => setSettingsOpen(true)}
+                                            className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors border border-slate-200 dark:border-slate-600"
+                                            title="الإعدادات"
+                                        >
+                                            <Settings size={18} />
+                                        </button>
+                                    </div>
+
                                     <div className="h-6 w-px bg-slate-300 dark:bg-slate-600 mx-1"></div>
                                     <div className="flex items-center gap-3">
-                                        <span className="text-sm font-medium hidden md:block">{user.email}</span>
+                                        <span className="text-sm font-medium hidden lg:block">{user.email}</span>
                                         <button 
                                             onClick={handleLogout}
                                             className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-3 py-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-sm font-bold"
+                                            title="خروج"
                                         >
                                             <LogOut size={18} />
                                             <span className="hidden sm:inline">خروج</span>
@@ -735,9 +760,9 @@
 
                     {/* Main Content */}
                     <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full print-area">
-                        {/* Stats Cards - Updated Design */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 no-print">
-                            {/* Card 1: Total - Number Only Professional Card */}
+                        {/* Stats Cards */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 no-print">
+                            {/* Card 1: Total */}
                             <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                                 <div className="bg-primary text-white text-xl font-bold px-4 py-2 rounded-lg shadow-sm min-w-[60px] text-center">
                                     {students.length}
@@ -783,138 +808,127 @@
                             </div>
                         </div>
 
-                        {/* Actions Toolbar (Scrollable / Not Sticky) */}
-                        <div className="flex flex-wrap gap-2 mb-4 justify-end no-print">
-                            <button 
-                                onClick={() => { resetForm(); setModalOpen(true); }}
-                                className="bg-primary hover:bg-sky-600 text-white px-4 py-2.5 rounded-lg flex items-center gap-2 font-medium shadow-lg shadow-primary/20 transition-all"
-                            >
-                                <Plus size={20} />
-                                <span className="hidden sm:inline">إضافة طالب</span>
-                            </button>
-                            
-                            <button 
-                                onClick={() => setSettingsOpen(true)}
-                                className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-2.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors shadow-sm border border-slate-200 dark:border-slate-600"
-                                title="الإعدادات"
-                            >
-                                <Settings size={20} />
-                            </button>
-
-                            <button 
-                                onClick={() => { 
-                                    setPrintMode('menu'); 
-                                    setSinglePrintStudent(null); 
-                                    setSinglePrintSearchTerm('');
-                                    setTargetQaid('');
-                                    setPrintModalOpen(true); 
-                                }}
-                                className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-2.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center gap-2 shadow-sm border border-slate-200 dark:border-slate-600"
-                                title="طباعة"
-                            >
-                                <Printer size={20} />
-                                <span className="hidden sm:inline">طباعة</span>
-                            </button>
-                            
-                            <button 
-                                onClick={handleExport}
-                                className="bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 px-3 py-2.5 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors border border-green-200 dark:border-green-800 shadow-sm"
-                                title="تصدير Excel"
-                            >
-                                <FileDown size={20} />
-                            </button>
+                        {/* Beautiful Add Student Card Button */}
+                        <div 
+                            onClick={() => { resetForm(); setModalOpen(true); }}
+                            className="mb-6 cursor-pointer group no-print"
+                        >
+                            <div className="bg-gradient-to-r from-sky-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-2xl hover:shadow-indigo-500/20 transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-white/20 transition-all"></div>
+                                <div className="relative flex items-center justify-between">
+                                    <div className="flex items-center gap-6">
+                                        <div className="bg-white/20 p-4 rounded-full backdrop-blur-sm group-hover:scale-110 transition-transform duration-300">
+                                            <Plus size={32} className="text-white" />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-2xl font-bold mb-1">إضافة طالب جديد</h2>
+                                            <p className="text-indigo-100 text-sm opacity-90">انقر هنا لفتح نموذج تسجيل طالب جديد في الأرشيف</p>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm hidden sm:block group-hover:bg-white/30 transition-colors">
+                                        <ChevronLeft size={24} />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Search Toolbar (Sticky) */}
-                        <div className="sticky top-16 z-20 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-sm py-4 -mx-4 px-4 border-b border-slate-200 dark:border-slate-800 transition-colors duration-300 mb-6 no-print shadow-sm">
-                            <div className="flex flex-col lg:flex-row gap-3 w-full items-start lg:items-center">
-                                {/* Search Row */}
-                                <div className="relative w-full lg:flex-1">
-                                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                                    <input
-                                        type="text"
-                                        placeholder="بحث شامل (الاسم، الملاحظات)..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="w-full pl-4 pr-10 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary focus:border-transparent outline-none shadow-sm"
-                                    />
-                                </div>
-
-                                {/* Filters Row */}
-                                <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:justify-end">
-                                    <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg border border-slate-300 dark:border-slate-600 p-1 shadow-sm">
-                                        <Filter size={16} className="mx-2 text-slate-400" />
-                                        
-                                        {/* Sort By Dropdown - NEW */}
-                                        <div className="flex items-center gap-1 border-l border-slate-300 dark:border-slate-600 pl-2 ml-1">
-                                            <ArrowUpDown size={14} className="text-slate-400" />
-                                            <select 
-                                                value={sortBy}
-                                                onChange={(e) => setSortBy(e.target.value)}
-                                                className="bg-transparent border-none text-sm focus:ring-0 p-1.5 text-slate-700 dark:text-slate-200 outline-none cursor-pointer font-medium"
-                                            >
-                                                <option value="newest">الأحدث أولاً</option>
-                                                <option value="alpha">أبجدي (أ-ي)</option>
-                                                <option value="qaid">حسب القيد</option>
-                                            </select>
-                                        </div>
-                                        <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-
-                                        {/* Year Filter */}
-                                        <select 
-                                            value={selectedYear}
-                                            onChange={(e) => setSelectedYear(e.target.value)}
-                                            className="bg-transparent border-none text-sm focus:ring-0 p-1.5 text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
-                                        >
-                                            <option value="">السنة (الكل)</option>
-                                            {availableYears.map(year => (
-                                                <option key={year} value={year}>{year}</option>
-                                            ))}
-                                        </select>
-                                        <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-                                        
-                                        {/* Month Filter */}
-                                        <select 
-                                            value={selectedMonth}
-                                            onChange={(e) => setSelectedMonth(e.target.value)}
-                                            className="bg-transparent border-none text-sm focus:ring-0 p-1.5 text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
-                                        >
-                                            <option value="">الشهر (الكل)</option>
-                                            {Array.from({length: 12}, (_, i) => i + 1).map(m => (
-                                                <option key={m} value={m}>{m}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    {/* Qaid Filter */}
-                                    <div className="flex-grow md:flex-grow-0">
-                                        <select 
-                                            value={selectedQaidFilter}
-                                            onChange={(e) => setSelectedQaidFilter(e.target.value)}
-                                            className="w-full md:w-48 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-sm rounded-lg p-2.5 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-primary shadow-sm cursor-pointer"
-                                        >
-                                            <option value="">فلتر القيد (الكل)</option>
-                                            {availableQaids.map(qaid => (
-                                                <option key={qaid} value={qaid}>{qaid}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    
-                                    {/* Clear Filters */}
-                                    {(selectedYear || selectedMonth || selectedQaidFilter) && (
-                                        <button 
-                                            onClick={() => {
-                                                setSelectedYear('');
-                                                setSelectedMonth('');
-                                                setSelectedQaidFilter('');
-                                            }}
-                                            className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-lg text-sm font-medium transition-colors"
-                                        >
-                                            مسح الفلاتر
-                                        </button>
-                                    )}
-                                </div>
+                        <div className="sticky top-16 z-20 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-sm py-4 -mx-4 px-4 border-b border-slate-200 dark:border-slate-800 transition-colors duration-300 mb-4 no-print shadow-sm">
+                            <div className="relative w-full">
+                                <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                                <input
+                                    type="text"
+                                    placeholder="بحث شامل (الاسم، الملاحظات)..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pl-4 pr-10 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary focus:border-transparent outline-none shadow-sm"
+                                />
                             </div>
+                        </div>
+
+                        {/* Filters Row */}
+                        <div className="flex flex-wrap items-center gap-2 w-full justify-end mb-6 no-print">
+                            <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg border border-slate-300 dark:border-slate-600 p-1 shadow-sm">
+                                <Filter size={16} className="mx-2 text-slate-400" />
+                                
+                                {/* Sort By Dropdown */}
+                                <div className="flex items-center gap-1 border-l border-slate-300 dark:border-slate-600 pl-2 ml-1">
+                                    <ArrowUpDown size={14} className="text-slate-400" />
+                                    <select 
+                                        value={sortBy}
+                                        onChange={(e) => setSortBy(e.target.value)}
+                                        className="bg-transparent border-none text-sm focus:ring-0 p-1.5 text-slate-700 dark:text-slate-200 outline-none cursor-pointer font-medium"
+                                    >
+                                        <option value="newest">الأحدث أولاً</option>
+                                        <option value="alpha">أبجدي (أ-ي)</option>
+                                        <option value="qaid">حسب القيد</option>
+                                    </select>
+                                </div>
+                                <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+
+                                {/* Year Filter */}
+                                <select 
+                                    value={selectedYear}
+                                    onChange={(e) => setSelectedYear(e.target.value)}
+                                    className="bg-transparent border-none text-sm focus:ring-0 p-1.5 text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
+                                >
+                                    <option value="">السنة (الكل)</option>
+                                    {availableYears.map(year => (
+                                        <option key={year} value={year}>{year}</option>
+                                    ))}
+                                </select>
+                                <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                                
+                                {/* Month Filter */}
+                                <select 
+                                    value={selectedMonth}
+                                    onChange={(e) => setSelectedMonth(e.target.value)}
+                                    className="bg-transparent border-none text-sm focus:ring-0 p-1.5 text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
+                                >
+                                    <option value="">الشهر (الكل)</option>
+                                    {Array.from({length: 12}, (_, i) => i + 1).map(m => (
+                                        <option key={m} value={m}>{m}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Qaid & Page Filter */}
+                            <div className="flex gap-2 flex-grow md:flex-grow-0">
+                                <select 
+                                    value={selectedQaidFilter}
+                                    onChange={(e) => setSelectedQaidFilter(e.target.value)}
+                                    className="flex-grow md:w-40 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-sm rounded-lg p-2.5 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-primary shadow-sm cursor-pointer"
+                                >
+                                    <option value="">فلتر القيد (الكل)</option>
+                                    {availableQaids.map(qaid => (
+                                        <option key={qaid} value={qaid}>{qaid}</option>
+                                    ))}
+                                </select>
+                                
+                                {/* NEW Page Filter Input */}
+                                <input
+                                    type="text"
+                                    placeholder="ص.."
+                                    value={selectedPageFilter}
+                                    onChange={(e) => setSelectedPageFilter(e.target.value)}
+                                    className="w-16 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-sm rounded-lg p-2.5 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-primary shadow-sm text-center"
+                                />
+                            </div>
+                            
+                            {/* Clear Filters */}
+                            {(selectedYear || selectedMonth || selectedQaidFilter || selectedPageFilter) && (
+                                <button 
+                                    onClick={() => {
+                                        setSelectedYear('');
+                                        setSelectedMonth('');
+                                        setSelectedQaidFilter('');
+                                        setSelectedPageFilter('');
+                                    }}
+                                    className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-lg text-sm font-medium transition-colors"
+                                >
+                                    مسح الفلاتر
+                                </button>
+                            )}
                         </div>
 
                         {/* Loading Overlay */}
@@ -927,7 +941,7 @@
                             </div>
                         )}
 
-                        {/* Data List (Cards View) */}
+                        {/* Data List (Reverted to Avatar Style) */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-12">
                             {paginatedStudents.length === 0 ? (
                                 <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-12 text-center text-slate-500 dark:text-slate-400 col-span-1 lg:col-span-2">
@@ -943,7 +957,9 @@
                                     return (
                                         <div 
                                             key={student.id} 
-                                            className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 hover:shadow-md transition-shadow relative group"
+                                            // UPDATED: Added z-index logic to show popup over other cards
+                                            className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 hover:shadow-md transition-shadow relative group ${activeRowId === student.id ? 'z-20' : 'z-0'}`}
+                                            style={{ zIndex: activeRowId === student.id ? 20 : 'auto' }}
                                             onClick={() => setActiveRowId(activeRowId === student.id ? null : student.id)}
                                         >
                                             <div className="flex items-start justify-between">
@@ -964,17 +980,17 @@
 
                                                         {/* Line 2: Details Row */}
                                                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-600 dark:text-slate-300 mt-2">
-                                                            {/* Qaid Badge - Modified */}
-                                                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg shadow-sm transition-transform hover:scale-105" style={{ backgroundColor: '#893BFF' }}>
-                                                                <Hash size={18} className="text-white/90" />
-                                                                <span className="font-bold text-white text-sm">القيد:</span>
-                                                                <span className="font-mono font-bold text-white text-xl tracking-wider">{student.qaid}</span>
+                                                            {/* Qaid Badge - Specific Color */}
+                                                            <div className="flex items-center gap-2 px-4 py-1 rounded-full shadow-sm transition-transform hover:scale-105" style={{ backgroundColor: '#893BFF' }}>
+                                                                <span className="font-bold text-white text-sm">ق</span>
+                                                                <div className="w-px h-4 bg-white/30"></div>
+                                                                <span className="font-mono font-bold text-white text-lg tracking-wider">{student.qaid}</span>
                                                             </div>
                                                             
-                                                            {/* Page Badge - Modified */}
-                                                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg shadow-sm transition-transform hover:scale-105" style={{ backgroundColor: '#FFE87C' }}>
-                                                                <FileText size={16} className="text-slate-800" />
-                                                                <span className="font-bold text-slate-800 text-sm">الصفحة:</span>
+                                                            {/* Page Badge - Specific Color */}
+                                                            <div className="flex items-center gap-2 px-4 py-1 rounded-full shadow-sm transition-transform hover:scale-105" style={{ backgroundColor: '#FFE87C' }}>
+                                                                <span className="font-bold text-slate-800 text-sm">ص</span>
+                                                                <div className="w-px h-4 bg-slate-800/20"></div>
                                                                 <span className="font-mono font-bold text-slate-900 text-base">{student.page}</span>
                                                             </div>
 
@@ -995,14 +1011,21 @@
                                                 </div>
 
                                                 {/* Action Trigger Icon (Visible on Desktop) */}
-                                                <div className="text-slate-300 group-hover:text-primary cursor-pointer transition-colors p-2">
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setActiveRowId(activeRowId === student.id ? null : student.id);
+                                                    }}
+                                                    className="text-slate-300 group-hover:text-primary cursor-pointer transition-colors p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 outline-none focus:ring-2 focus:ring-primary"
+                                                    title="إعدادات البطاقة"
+                                                >
                                                     <Settings size={20} />
-                                                </div>
+                                                </button>
                                             </div>
 
                                             {/* Actions Floating Popup */}
                                             {activeRowId === student.id && (
-                                                <div className="absolute left-4 top-12 flex items-center gap-1 animate-in fade-in slide-in-from-top-2 duration-200 z-20 bg-slate-800 text-white p-1.5 rounded-lg shadow-xl border border-slate-700">
+                                                <div className="absolute left-4 top-12 flex items-center gap-1 animate-in fade-in slide-in-from-top-2 duration-200 z-50 bg-slate-800 text-white p-1.5 rounded-lg shadow-xl border border-slate-700">
                                                     <button 
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -1257,8 +1280,35 @@
                                 </div>
                                 
                                 <div className="space-y-6">
+                                    {/* Appearance Section */}
                                     <div className="space-y-3">
-                                        <h3 className="font-bold text-sm text-slate-500 uppercase">استيراد البيانات</h3>
+                                        <h3 className="font-bold text-sm text-slate-500 uppercase">المظهر العام</h3>
+                                        <button 
+                                            onClick={toggleDarkMode}
+                                            className="w-full p-3 flex items-center justify-between bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600"
+                                        >
+                                            <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
+                                                {darkMode ? <Moon size={20} /> : <Sun size={20} />}
+                                                <span>{darkMode ? 'الوضع الليلي' : 'الوضع النهاري'}</span>
+                                            </div>
+                                            <div className={`w-10 h-5 rounded-full relative transition-colors ${darkMode ? 'bg-primary' : 'bg-slate-300'}`}>
+                                                <div className={`w-3 h-3 bg-white rounded-full absolute top-1 transition-all ${darkMode ? 'left-1' : 'right-1'}`}></div>
+                                            </div>
+                                        </button>
+                                    </div>
+
+                                    {/* Data Management Section */}
+                                    <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                        <h3 className="font-bold text-sm text-slate-500 uppercase">إدارة البيانات</h3>
+                                        
+                                        <button 
+                                            onClick={() => { handleExport(); setSettingsOpen(false); }}
+                                            className="w-full p-3 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-xl border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors flex items-center gap-2"
+                                        >
+                                            <FileDown size={20} />
+                                            <span>تصدير البيانات (Excel)</span>
+                                        </button>
+
                                         <div className="relative">
                                             <input
                                                 type="file"
@@ -1278,6 +1328,7 @@
                                         </div>
                                     </div>
 
+                                    {/* Danger Zone */}
                                     <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
                                         <h3 className="font-bold text-sm text-red-500 uppercase mb-3">منطقة الخطر</h3>
                                         <button 
@@ -1341,11 +1392,15 @@
                                 </h2>
                                 <div className="flex gap-2">
                                     {(printMode === 'full' || (printMode === 'single' && singlePrintStudent) || (printMode === 'qaid' && targetQaid)) && (
-                                        <button onClick={() => window.print()} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                                        // UPDATED: Print Button Logic wrapped in setTimeout to ensure execution
+                                        <button 
+                                            onClick={() => setTimeout(() => window.print(), 10)} 
+                                            className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors"
+                                        >
                                             <Printer size={18} /> طباعة
                                         </button>
                                     )}
-                                    <button onClick={() => setPrintModalOpen(false)} className="bg-slate-300 text-black px-4 py-2 rounded-lg">إغلاق</button>
+                                    <button onClick={() => setPrintModalOpen(false)} className="bg-slate-300 text-black px-4 py-2 rounded-lg hover:bg-slate-400 transition-colors">إغلاق</button>
                                 </div>
                             </div>
                             
@@ -1620,6 +1675,5 @@
         );
     /* ]]> */
     </script>
-<script type="module" src="/index.tsx"></script>
 </body>
-</html>--- START OF FILE index.html ---
+</html>
