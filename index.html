@@ -126,7 +126,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { 
             getFirestore, collection, onSnapshot, query, orderBy, addDoc, 
-            updateDoc, deleteDoc, doc, writeBatch, getDocs 
+            updateDoc, deleteDoc, doc, writeBatch, getDocs, enableIndexedDbPersistence 
         } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { 
             getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut 
@@ -144,6 +144,16 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+        
+        // Enable Offline Persistence for Performance
+        enableIndexedDbPersistence(db).catch((err) => {
+            if (err.code == 'failed-precondition') {
+                console.warn('Persistence failed: Multiple tabs open');
+            } else if (err.code == 'unimplemented') {
+                console.warn('Persistence failed: Browser not supported');
+            }
+        });
+
         const auth = getAuth(app);
         const studentsCol = collection(db, "students");
 
@@ -220,14 +230,11 @@
 
             const fileInputRef = useRef(null);
 
-            // Initialization
+            // Initialization (Auth)
             useEffect(() => {
                 const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
                     setUser(currentUser);
                     setAuthLoading(false);
-                    if (currentUser) {
-                        subscribeToData();
-                    }
                 });
                 
                 if (localStorage.getItem('theme') === 'dark') {
@@ -237,13 +244,21 @@
                 return () => unsubscribe();
             }, []);
 
-            const subscribeToData = () => {
-                const q = query(studentsCol, orderBy("timestamp", "desc"));
-                return onSnapshot(q, (snapshot) => {
-                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setStudents(data);
-                });
-            };
+            // Data Subscription Effect (Optimized)
+            useEffect(() => {
+                if (user) {
+                    const q = query(studentsCol, orderBy("timestamp", "desc"));
+                    const unsubscribe = onSnapshot(q, (snapshot) => {
+                        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setStudents(data);
+                    }, (error) => {
+                        console.error("Error fetching students:", error);
+                    });
+                    return () => unsubscribe();
+                } else {
+                    setStudents([]);
+                }
+            }, [user]);
 
             // Real-time similar name check when adding/editing
             useEffect(() => {
@@ -394,14 +409,14 @@
                         note: lastSavedStudent.note
                     }));
                     showToast('تم نسخ بيانات القيد والصفحة من آخر إضافة');
-                } else {
+                } eeeelselselselse {
                     showToast('لا توجد بيانات سابقة للنسخ', 'error');
                 }
             };
 
             // Excel Actions
             const handleExport = () => {
-                const dataToExport = students.map(({id, timestamp, ...rest}) => ({
+                conssetLoadingport = students.map(({id, timestamp, ...rest}) => ({
                     "الاسم": rest.name,
                     "اللقب": rest.surname,
                     "القيد": rest.qaid,
@@ -419,13 +434,13 @@
                 const file = e.target.files?.[0];
                 if (!file) return;
 
-                setLoading(true);
-                const reader = new FileReader();
-                reader.onload = async (evt) => {
+                setLoadingsetLoading(true);
+                const reader = newnew FileReader();
+                readernewload = async (evt) => {
                     try {
                         const bstr = evt.target?.result;
                         const wb = XLSX.read(bstr, { type: 'array' });
-                        const wsname = wb.SheetNames[0];
+                        coconstsname = wb.SheetNames[0];
                         const ws = wb.Sheets[wsname];
                         const data = XLSX.utils.sheet_to_json(ws);
 
@@ -580,7 +595,7 @@
                                     <Database size={32} />
                                 </div>
                                 <h1 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white leading-relaxed px-4">
-                                    فهرس القيد  <br/> ث. ش . محمد عبدالعزيز الكنعان للبنين
+                                    فهرس القيد. <br/> ث. ش . محمد عبدالعزيز الكنعان للبنين
                                 </h1>
                                 <p className="text-slate-500 dark:text-slate-400 mt-2">يرجى تسجيل الدخول للمتابعة</p>
                             </div>
