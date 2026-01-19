@@ -87,8 +87,8 @@
                 background-color: white !important;
             }
 
-            /* Fix Modal Container for Printing */
-            .fixed.inset-0.z-50.bg-white {
+            /* Fix Modal Container for Printing using Custom Class */
+            .print-modal-container {
                 position: absolute !important;
                 top: 0 !important;
                 left: 0 !important;
@@ -1376,6 +1376,278 @@
                                     >
                                         تأكيد الحذف الشامل
                                     </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Print View Modal */}
+                    {printModalOpen && (
+                        <div className="fixed inset-0 z-50 bg-white flex flex-col print-modal-container">
+                            {/* Toolbar (No Print) */}
+                            <div className="no-print p-4 border-b flex justify-between items-center bg-slate-100">
+                                <h2 className="text-lg font-bold">
+                                    {printMode === 'menu' ? 'خيارات الطباعة' : 
+                                     printMode === 'single' ? 'طباعة قيد طالب محدد' : 
+                                     printMode === 'qaid' ? 'طباعة حسب القيد' : 'معاينة الطباعة (السجل الكامل)'}
+                                </h2>
+                                <div className="flex gap-2">
+                                    {(printMode === 'full' || (printMode === 'single' && singlePrintStudent) || (printMode === 'qaid' && targetQaid)) && (
+                                        <button 
+                                            onClick={() => window.print()} 
+                                            className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors"
+                                        >
+                                            <Printer size={18} /> طباعة
+                                        </button>
+                                    )}
+                                    <button onClick={() => setPrintModalOpen(false)} className="bg-slate-300 text-black px-4 py-2 rounded-lg hover:bg-slate-400 transition-colors">إغلاق</button>
+                                </div>
+                            </div>
+                            
+                            {/* Printable Content */}
+                            <div className="flex-grow bg-white text-black overflow-auto relative">
+                                {/* Mode Selection Menu */}
+                                {printMode === 'menu' && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-slate-50 overflow-y-auto p-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl w-full">
+                                            <button 
+                                                onClick={() => setPrintMode('full')}
+                                                className="flex flex-col items-center justify-center p-8 bg-white border-2 border-slate-200 rounded-2xl hover:border-primary hover:shadow-xl transition-all gap-4 group h-64"
+                                            >
+                                                <div className="p-4 bg-blue-50 text-blue-600 rounded-full group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                                    <FileSpreadsheet size={48} />
+                                                </div>
+                                                <h3 className="text-xl font-bold text-slate-800">طباعة السجل بالكامل</h3>
+                                                <p className="text-slate-500 text-center text-sm">طباعة جدول يحتوي على جميع الطلاب (مقسم على صفحات)</p>
+                                            </button>
+
+                                            <button 
+                                                onClick={() => setPrintMode('single')}
+                                                className="flex flex-col items-center justify-center p-8 bg-white border-2 border-slate-200 rounded-2xl hover:border-purple-500 hover:shadow-xl transition-all gap-4 group h-64"
+                                            >
+                                                <div className="p-4 bg-purple-50 text-purple-600 rounded-full group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                                                    <CreditCard size={48} />
+                                                </div>
+                                                <h3 className="text-xl font-bold text-slate-800">بطاقة طالب مفردة</h3>
+                                                <p className="text-slate-500 text-center text-sm">البحث عن طالب وطباعة بطاقة قيد فردية له</p>
+                                            </button>
+
+                                            <button 
+                                                onClick={() => setPrintMode('qaid')}
+                                                className="flex flex-col items-center justify-center p-8 bg-white border-2 border-slate-200 rounded-2xl hover:border-orange-500 hover:shadow-xl transition-all gap-4 group h-64"
+                                            >
+                                                <div className="p-4 bg-orange-50 text-orange-600 rounded-full group-hover:bg-orange-600 group-hover:text-white transition-colors">
+                                                    <FolderOpen size={48} />
+                                                </div>
+                                                <h3 className="text-xl font-bold text-slate-800">طباعة قيد كامل</h3>
+                                                <p className="text-slate-500 text-center text-sm">طباعة قائمة بجميع الطلاب المسجلين تحت رقم قيد معين</p>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Single Print Search Mode */}
+                                {printMode === 'single' && !singlePrintStudent && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-start pt-20 bg-slate-50">
+                                        <h3 className="text-2xl font-bold mb-6 text-slate-800">ابحث عن الطالب للطباعة</h3>
+                                        <div className="w-full max-w-md relative mb-8">
+                                            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <input 
+                                                autoFocus
+                                                type="text" 
+                                                className="w-full p-4 pr-12 rounded-xl border-2 border-slate-300 focus:border-purple-500 outline-none text-lg shadow-sm"
+                                                placeholder="اكتب اسم الطالب أو رقم القيد..."
+                                                value={singlePrintSearchTerm}
+                                                onChange={(e) => setSinglePrintSearchTerm(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="w-full max-w-md space-y-2 max-h-[50vh] overflow-y-auto">
+                                            {singlePrintFiltered.map(s => (
+                                                <div 
+                                                    key={s.id} 
+                                                    onClick={() => setSinglePrintStudent(s)}
+                                                    className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 cursor-pointer hover:border-purple-500 hover:shadow-md transition-all flex justify-between items-center group"
+                                                >
+                                                    <div>
+                                                        <h4 className="font-bold text-lg group-hover:text-purple-600 transition-colors">{s.name} {s.surname}</h4>
+                                                        <p className="text-slate-500 text-sm">قيد: {s.qaid}</p>
+                                                    </div>
+                                                    <Printer className="text-slate-300 group-hover:text-purple-600" />
+                                                </div>
+                                            ))}
+                                            {singlePrintSearchTerm && singlePrintFiltered.length === 0 && (
+                                                <p className="text-center text-slate-500 mt-4">لا توجد نتائج مطابقة</p>
+                                            )}
+                                        </div>
+                                        <button 
+                                            onClick={() => setPrintMode('menu')}
+                                            className="mt-8 text-slate-500 hover:text-slate-800 underline"
+                                        >
+                                            العودة للقائمة الرئيسية
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Qaid Batch Selection Mode */}
+                                {printMode === 'qaid' && !targetQaid && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-start pt-20 bg-slate-50">
+                                        <h3 className="text-2xl font-bold mb-6 text-slate-800">اختر رقم القيد للطباعة</h3>
+                                        <div className="w-full max-w-md relative mb-8">
+                                            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <input 
+                                                autoFocus
+                                                type="text" 
+                                                className="w-full p-4 pr-12 rounded-xl border-2 border-slate-300 focus:border-orange-500 outline-none text-lg shadow-sm"
+                                                placeholder="ابحث عن رقم القيد..."
+                                                value={singlePrintSearchTerm}
+                                                onChange={(e) => setSinglePrintSearchTerm(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="w-full max-w-md space-y-2 max-h-[50vh] overflow-y-auto custom-scrollbar p-2">
+                                            {qaidBatchFiltered.map(qaid => (
+                                                <div 
+                                                    key={qaid} 
+                                                    onClick={() => setTargetQaid(qaid)}
+                                                    className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 cursor-pointer hover:border-orange-500 hover:shadow-md transition-all flex justify-between items-center group"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="bg-orange-100 text-orange-600 p-2 rounded-lg">
+                                                            <FolderOpen size={20} />
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-bold text-lg text-slate-800 font-mono">{qaid}</h4>
+                                                            <p className="text-slate-500 text-xs">
+                                                                {students.filter(s => s.qaid === qaid).length} طالب
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <Printer className="text-slate-300 group-hover:text-orange-600" />
+                                                </div>
+                                            ))}
+                                            {singlePrintSearchTerm && qaidBatchFiltered.length === 0 && (
+                                                <p className="text-center text-slate-500 mt-4">رقم القيد غير موجود</p>
+                                            )}
+                                        </div>
+                                        <button 
+                                            onClick={() => setPrintMode('menu')}
+                                            className="mt-8 text-slate-500 hover:text-slate-800 underline"
+                                        >
+                                            العودة للقائمة الرئيسية
+                                        </button>
+                                    </div>
+                                )}
+
+                                <div className="print-area">
+                                    {printMode === 'single' && singlePrintStudent ? (
+                                        // Single Student Print View
+                                        <div className="single-slip flex flex-col items-center justify-center p-8 border-2 border-black m-8 max-w-2xl mx-auto rounded-xl">
+                                            <div className="text-center mb-8 border-b-2 border-black w-full pb-4">
+                                                <h1 className="text-2xl font-extrabold mb-2">ث. ش. محمد عبدالعزيز الكنعان للبنين</h1>
+                                                <h2 className="text-xl">بطاقة قيد طالب</h2>
+                                            </div>
+                                            
+                                            <div className="w-full grid grid-cols-1 gap-6 text-right" dir="rtl">
+                                                <div className="flex border-b border-gray-300 pb-2">
+                                                    <span className="font-bold w-32 text-lg">الاسم الكامل:</span>
+                                                    <span className="text-xl flex-grow font-bold">{singlePrintStudent.name} {singlePrintStudent.surname}</span>
+                                                </div>
+                                                <div className="flex border-b border-gray-300 pb-2">
+                                                    <span className="font-bold w-32 text-lg">رقم القيد:</span>
+                                                    <span className="text-xl font-mono">{singlePrintStudent.qaid}</span>
+                                                </div>
+                                                <div className="flex border-b border-gray-300 pb-2">
+                                                    <span className="font-bold w-32 text-lg">الصفحة:</span>
+                                                    <span className="text-xl font-mono">{singlePrintStudent.page}</span>
+                                                </div>
+                                                <div className="flex border-b border-gray-300 pb-2">
+                                                    <span className="font-bold w-32 text-lg">تاريخ الإضافة:</span>
+                                                    <span className="text-xl">{new Date(singlePrintStudent.timestamp).toLocaleDateString('ar-EG')}</span>
+                                                </div>
+                                                {singlePrintStudent.note && (
+                                                    <div className="flex border-b border-gray-300 pb-2">
+                                                        <span className="font-bold w-32 text-lg">ملاحظات:</span>
+                                                        <span className="text-lg">{singlePrintStudent.note}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="mt-12 w-full flex justify-between px-8">
+                                                <div className="text-center">
+                                                    <p className="font-bold mb-8">شؤون الطلاب</p>
+                                                    <p>..................</p>
+                                                </div>
+                                                <div className="text-center">
+                                                    <p className="font-bold mb-8">مدير المدرسة</p>
+                                                    <p>..................</p>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="no-print w-full mt-8 flex justify-center">
+                                                <button 
+                                                    onClick={() => setSinglePrintStudent(null)} 
+                                                    className="bg-slate-200 px-4 py-2 rounded hover:bg-slate-300"
+                                                >
+                                                    بحث عن طالب آخر
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (printMode === 'full' || (printMode === 'qaid' && targetQaid)) ? (
+                                        // List Print View (Used for both Full and Batch Qaid)
+                                        (() => {
+                                            const ROWS_PER_COL = 35;
+                                            const ROWS_PER_PAGE = ROWS_PER_COL * 2;
+                                            
+                                            // Determine which dataset to print
+                                            let dataToPrint = [];
+                                            let title = "";
+                                            
+                                            if (printMode === 'qaid' && targetQaid) {
+                                                dataToPrint = students.filter(s => s.qaid === targetQaid);
+                                                title = `قائمة طلاب القيد رقم: ${targetQaid}`;
+                                            } else {
+                                                // Force Alphabetical Sort for Full Record Print
+                                                dataToPrint = [...filteredStudents].sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+                                                title = "فهرس القيد الشامل";
+                                            }
+
+                                            const pages = [];
+                                            
+                                            // Chunking data into pages
+                                            for(let i = 0; i < dataToPrint.length; i += ROWS_PER_PAGE) {
+                                                pages.push(dataToPrint.slice(i, i + ROWS_PER_PAGE));
+                                            }
+
+                                            if (pages.length === 0) return <div className="p-10 text-center">لا توجد بيانات للطباعة</div>;
+
+                                            return pages.map((pageData, pageIdx) => (
+                                                <div key={pageIdx} className="print-page flex flex-col p-4 box-border">
+                                                    {/* Header per page */}
+                                                    <div className="text-center mb-4 border-b-2 border-black pb-2">
+                                                        <h1 className="text-xl font-extrabold">{title}</h1>
+                                                        <p className="text-xs">تاريخ: {new Date().toLocaleDateString('ar-EG')} - صفحة {pageIdx + 1}</p>
+                                                    </div>
+
+                                                    <div className="flex justify-between gap-4 flex-grow items-start h-full">
+                                                        {/* Right Column (First half of page data) */}
+                                                        <div className="w-[49%]">
+                                                            <PrintTable 
+                                                                data={pageData.slice(0, ROWS_PER_COL)} 
+                                                                startIndex={pageIdx * ROWS_PER_PAGE} 
+                                                            />
+                                                        </div>
+                                                        
+                                                        {/* Left Column (Second half of page data) */}
+                                                        <div className="w-[49%]">
+                                                            <PrintTable 
+                                                                data={pageData.slice(ROWS_PER_COL, ROWS_PER_PAGE)} 
+                                                                startIndex={pageIdx * ROWS_PER_PAGE + ROWS_PER_COL} 
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ));
+                                        })()
+                                    ) : null}
                                 </div>
                             </div>
                         </div>
