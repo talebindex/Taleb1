@@ -266,6 +266,7 @@
             // Data State
             const [students, setStudents] = useState([]);
             const [loading, setLoading] = useState(false);
+            const [loadingText, setLoadingText] = useState('جاري المعالجة...');
 
             // UI State
             const [darkMode, setDarkMode] = useState(false);
@@ -378,12 +379,14 @@
             const handleLogin = async (e) => {
                 e.preventDefault();
                 setLoading(true);
+                setLoadingText('جاري تسجيل الدخول...');
                 try {
                     await signInWithEmailAndPassword(auth, email, password);
                 } catch (err) {
                     showToast('خطأ في تسجيل الدخول. تأكد من البيانات.', 'error');
                 } finally {
                     setLoading(false);
+                    setLoadingText('جاري المعالجة...');
                 }
             };
 
@@ -414,6 +417,7 @@
                 }
 
                 setLoading(true);
+                setLoadingText(editingId ? 'جاري تحديث البيانات...' : 'جاري الحفظ...');
                 try {
                     const originalTimestamp = editingId ? (students.find(s => s.id === editingId)?.timestamp || Date.now()) : Date.now();
                     const payload = { ...formData, timestamp: originalTimestamp };
@@ -433,6 +437,7 @@
                     showToast('حدث خطأ أثناء الحفظ', 'error');
                 } finally {
                     setLoading(false);
+                    setLoadingText('جاري المعالجة...');
                 }
             };
 
@@ -447,24 +452,51 @@
                 }
             };
 
+            // Optimized Master Delete (Batching)
             const handleMasterDelete = async () => {
                 if (masterDeleteInput !== 'حذف الكل') {
                     showToast('كلمة التأكيد غير صحيحة. اكتب "حذف الكل"', 'error');
                     return;
                 }
                 setLoading(true);
+                setLoadingText('جاري جلب البيانات للحذف...');
+                
                 try {
                     const snapshot = await getDocs(studentsCol);
-                    const batch = writeBatch(db);
-                    snapshot.docs.forEach((doc) => batch.delete(doc.ref));
-                    await batch.commit();
+                    const totalDocs = snapshot.docs.length;
+                    
+                    if (totalDocs === 0) {
+                        showToast('لا توجد بيانات لحذفها', 'error');
+                        setLoading(false);
+                        setMasterDeleteOpen(false);
+                        return;
+                    }
+
+                    // Firestore batch limit is 500. We'll use 400 for safety.
+                    const BATCH_SIZE = 400;
+                    const chunks = [];
+                    for (let i = 0; i < totalDocs; i += BATCH_SIZE) {
+                        chunks.push(snapshot.docs.slice(i, i + BATCH_SIZE));
+                    }
+
+                    for (let i = 0; i < chunks.length; i++) {
+                        setLoadingText(`جاري حذف الدفعة ${i + 1} من ${chunks.length}...`);
+                        const batch = writeBatch(db);
+                        chunks[i].forEach((doc) => batch.delete(doc.ref));
+                        await batch.commit();
+                        // Small delay to allow UI updates
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    }
+
                     showToast('تم مسح جميع البيانات من قاعدة البيانات', 'success');
                     setMasterDeleteOpen(false);
                     setSettingsOpen(false);
                 } catch (err) {
+                    console.error(err);
                     showToast('حدث خطأ أثناء الحذف الشامل', 'error');
                 } finally {
                     setLoading(false);
+                    setLoadingText('جاري المعالجة...');
                 }
             };
 
@@ -498,11 +530,14 @@
                 XLSX.writeFile(wb, `ارشيف_الطلاب_${new Date().toISOString().slice(0,10)}.xlsx`);
             };
 
+            // Optimized Import (Batching)
             const handleImport = (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
 
                 setLoading(true);
+                setLoadingText('جاري قراءة الملف...');
+                
                 const reader = new FileReader();
                 reader.onload = async (evt) => {
                     try {
@@ -512,10 +547,11 @@
                         const ws = wb.Sheets[wsname];
                         const data = XLSX.utils.sheet_to_json(ws);
 
-                        const batch = writeBatch(db);
-                        let count = 0;
+                        const validRows = [];
                         const timestampBase = Date.now();
 
+                        // Pre-process data
+                        setLoadingText('جاري معالجة البيانات...');
                         data.forEach((row, index) => {
                             const name = String(row.name || row["الاسم"] || "").trim();
                             const qaid = String(row.qaid || row["القيد"] || "").trim();
@@ -524,26 +560,45 @@
                             const note = String(row.note || row["ملاحظات"] || "").trim();
 
                             if (name && qaid && page) {
-                                const docRef = doc(studentsCol);
-                                batch.set(docRef, {
+                                validRows.push({
                                     name, surname, qaid, page, note,
                                     timestamp: timestampBase - index
                                 });
-                                count++;
                             }
                         });
 
-                        if (count > 0) {
-                            await batch.commit();
-                            showToast(`تم استيراد ${count} سجل بنجاح`);
-                        } else {
+                        if (validRows.length === 0) {
                             showToast('لم يتم العثور على بيانات صالحة في الملف', 'error');
+                            setLoading(false);
+                            return;
                         }
+
+                        // Batch Processing
+                        const BATCH_SIZE = 400;
+                        const chunks = [];
+                        for (let i = 0; i < validRows.length; i += BATCH_SIZE) {
+                            chunks.push(validRows.slice(i, i + BATCH_SIZE));
+                        }
+
+                        for (let i = 0; i < chunks.length; i++) {
+                            setLoadingText(`جاري استيراد الدفعة ${i + 1} من ${chunks.length} (${validRows.length} سجل)...`);
+                            const batch = writeBatch(db);
+                            chunks[i].forEach(item => {
+                                const docRef = doc(studentsCol);
+                                batch.set(docRef, item);
+                            });
+                            await batch.commit();
+                            // Yield to UI
+                            await new Promise(resolve => setTimeout(resolve, 50));
+                        }
+
+                        showToast(`تم استيراد ${validRows.length} سجل بنجاح`);
                     } catch (err) {
                         console.error(err);
-                        showToast('خطأ في قراءة ملف الإكسل', 'error');
+                        showToast('خطأ في قراءة أو استيراد ملف الإكسل', 'error');
                     } finally {
                         setLoading(false);
+                        setLoadingText('جاري المعالجة...');
                         if (fileInputRef.current) fileInputRef.current.value = '';
                     }
                 };
@@ -923,7 +978,7 @@
                                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
                                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-2xl flex flex-col items-center">
                                         <Loader2 className="animate-spin text-primary mb-3" size={32} />
-                                        <p className="text-slate-700 dark:text-slate-200 font-medium">جاري المعالجة...</p>
+                                        <p className="text-slate-700 dark:text-slate-200 font-medium">{loadingText}</p>
                                     </div>
                                 </div>
                             )}
@@ -1605,4 +1660,4 @@
     /* ]]> */
     </script>
 </body>
-</html> حط
+</html>
