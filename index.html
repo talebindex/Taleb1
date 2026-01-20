@@ -48,7 +48,8 @@
             .search-bar, 
             #main-app-content, /* Hides the main card view */
             .settings-modal,
-            .add-modal { 
+            .add-modal,
+            .recycle-bin-modal { 
                 display: none !important; 
             }
 
@@ -210,7 +211,7 @@
             FileSpreadsheet, Printer, FileDown, Upload, Database, Calendar, Users,
             AlertTriangle, Loader2, Settings, X, Check, ChevronLeft, ChevronRight,
             Hash, FileText, Info, Eye, CreditCard, Filter, FolderOpen, Layers, Clock,
-            ArrowUpDown, MoreVertical, PlusCircle
+            ArrowUpDown, MoreVertical, PlusCircle, Undo2, RefreshCw
         } from 'https://esm.sh/lucide-react@0.263.1';
 
         // Firebase Imports
@@ -243,17 +244,6 @@
         const auth = getAuth(app);
         const studentsCol = collection(db, "students");
 
-        // --- Types ---
-        interface Student {
-            id: string;
-            name: string;
-            surname: string;
-            qaid: string;
-            page: string;
-            note: string;
-            timestamp: number;
-        }
-
         const PAGE_SIZE = 50;
 
         function App() {
@@ -272,6 +262,7 @@
             const [darkMode, setDarkMode] = useState(false);
             const [toast, setToast] = useState(null);
             const [modalOpen, setModalOpen] = useState(false);
+            const [recycleBinOpen, setRecycleBinOpen] = useState(false);
             
             // Print State
             const [printModalOpen, setPrintModalOpen] = useState(false);
@@ -335,6 +326,10 @@
                 }
             }, [user]);
 
+            // Filter active vs deleted
+            const activeStudents = useMemo(() => students.filter(s => !s.isDeleted), [students]);
+            const deletedStudents = useMemo(() => students.filter(s => s.isDeleted), [students]);
+
             // Real-time similar name check
             useEffect(() => {
                 if (!modalOpen || !formData.name || formData.name.trim().length === 0) {
@@ -342,7 +337,7 @@
                     return;
                 }
                 const nameInput = formData.name.trim().toLowerCase();
-                const matches = students
+                const matches = activeStudents // Compare only against active students
                     .filter(s => {
                         if (editingId && s.id === editingId) return false;
                         return s.name.toLowerCase().startsWith(nameInput);
@@ -350,7 +345,7 @@
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .slice(0, 5);
                 setSimilarStudents(matches);
-            }, [formData.name, students, modalOpen, editingId]);
+            }, [formData.name, activeStudents, modalOpen, editingId]);
 
             // Helper Functions
             const showToast = (msg, type = 'success') => {
@@ -405,7 +400,7 @@
                     return;
                 }
 
-                const isDuplicate = students.some(s => 
+                const isDuplicate = activeStudents.some(s => 
                     s.id !== editingId && 
                     s.qaid === formData.qaid && 
                     s.page === formData.page
@@ -420,7 +415,7 @@
                 setLoadingText(editingId ? 'جاري تحديث البيانات...' : 'جاري الحفظ...');
                 try {
                     const originalTimestamp = editingId ? (students.find(s => s.id === editingId)?.timestamp || Date.now()) : Date.now();
-                    const payload = { ...formData, timestamp: originalTimestamp };
+                    const payload = { ...formData, timestamp: originalTimestamp, isDeleted: false };
                     
                     if (editingId) {
                         await updateDoc(doc(db, "students", editingId), payload);
@@ -444,15 +439,72 @@
             const handleDelete = async () => {
                 if (!deleteId) return;
                 try {
-                    await deleteDoc(doc(db, "students", deleteId));
-                    showToast('تم حذف السجل بنجاح', 'success');
+                    // Soft delete logic
+                    await updateDoc(doc(db, "students", deleteId), {
+                        isDeleted: true,
+                        deletedAt: Date.now()
+                    });
+                    showToast('تم نقل السجل إلى سلة المحذوفات', 'success');
                     setDeleteId(null);
                 } catch (err) {
                     showToast('فشل في عملية الحذف', 'error');
                 }
             };
 
-            // Optimized Master Delete (Batching)
+            // Restore logic
+            const handleRestore = async (student) => {
+                try {
+                    await updateDoc(doc(db, "students", student.id), {
+                        isDeleted: false,
+                        deletedAt: null
+                    });
+                    showToast('تم استعادة الطالب بنجاح', 'success');
+                } catch (err) {
+                    showToast('فشل في استعادة الطالب', 'error');
+                }
+            };
+
+            // Permanent Delete individual
+            const handlePermanentDelete = async (id) => {
+                if(!window.confirm('هل أنت متأكد من الحذف النهائي؟ لا يمكن التراجع عن هذا الإجراء.')) return;
+                try {
+                    await deleteDoc(doc(db, "students", id));
+                    showToast('تم حذف السجل نهائياً', 'success');
+                } catch (err) {
+                    showToast('فشل في الحذف النهائي', 'error');
+                }
+            };
+
+            // Empty Recycle Bin
+            const handleEmptyTrash = async () => {
+                if (deletedStudents.length === 0) return;
+                if(!window.confirm('هل أنت متأكد من إفراغ سلة المحذوفات بالكامل؟')) return;
+                
+                setLoading(true);
+                setLoadingText('جاري إفراغ السلة...');
+                try {
+                    const BATCH_SIZE = 400;
+                    const chunks = [];
+                    for (let i = 0; i < deletedStudents.length; i += BATCH_SIZE) {
+                        chunks.push(deletedStudents.slice(i, i + BATCH_SIZE));
+                    }
+
+                    for (let i = 0; i < chunks.length; i++) {
+                        const batch = writeBatch(db);
+                        chunks[i].forEach(s => batch.delete(doc(db, "students", s.id)));
+                        await batch.commit();
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    }
+                    showToast('تم إفراغ السلة بنجاح', 'success');
+                } catch(err) {
+                    showToast('حدث خطأ أثناء إفراغ السلة', 'error');
+                } finally {
+                    setLoading(false);
+                    setLoadingText('جاري المعالجة...');
+                }
+            };
+
+            // Optimized Master Delete (Batching) - Handles ALL Data
             const handleMasterDelete = async () => {
                 if (masterDeleteInput !== 'حذف الكل') {
                     showToast('كلمة التأكيد غير صحيحة. اكتب "حذف الكل"', 'error');
@@ -472,7 +524,6 @@
                         return;
                     }
 
-                    // Firestore batch limit is 500. We'll use 400 for safety.
                     const BATCH_SIZE = 400;
                     const chunks = [];
                     for (let i = 0; i < totalDocs; i += BATCH_SIZE) {
@@ -484,7 +535,6 @@
                         const batch = writeBatch(db);
                         chunks[i].forEach((doc) => batch.delete(doc.ref));
                         await batch.commit();
-                        // Small delay to allow UI updates
                         await new Promise(resolve => setTimeout(resolve, 50));
                     }
 
@@ -514,9 +564,9 @@
                 }
             };
 
-            // Excel Actions
+            // Excel Actions - Exports only active students
             const handleExport = () => {
-                const dataToExport = students.map(({id, timestamp, ...rest}) => ({
+                const dataToExport = activeStudents.map(({id, timestamp, ...rest}) => ({
                     "الاسم": rest.name,
                     "اللقب": rest.surname,
                     "القيد": rest.qaid,
@@ -562,7 +612,8 @@
                             if (name && qaid && page) {
                                 validRows.push({
                                     name, surname, qaid, page, note,
-                                    timestamp: timestampBase - index
+                                    timestamp: timestampBase - index,
+                                    isDeleted: false // Explicitly active
                                 });
                             }
                         });
@@ -588,7 +639,6 @@
                                 batch.set(docRef, item);
                             });
                             await batch.commit();
-                            // Yield to UI
                             await new Promise(resolve => setTimeout(resolve, 50));
                         }
 
@@ -607,20 +657,20 @@
 
             // Extract Filter Options
             const availableYears = useMemo(() => {
-                const years = new Set(students.map(s => new Date(s.timestamp).getFullYear()));
+                const years = new Set(activeStudents.map(s => new Date(s.timestamp).getFullYear()));
                 return Array.from(years).sort((a, b) => b - a);
-            }, [students]);
+            }, [activeStudents]);
 
             const availableQaids = useMemo(() => {
-                return [...new Set(students.map(s => s.qaid))].sort((a, b) => a.localeCompare(b));
-            }, [students]);
+                return [...new Set(activeStudents.map(s => s.qaid))].sort((a, b) => a.localeCompare(b));
+            }, [activeStudents]);
 
-            // Filter & Pagination Logic
+            // Filter & Pagination Logic (uses activeStudents)
             const filteredStudents = useMemo(() => {
                 const term = searchTerm.toLowerCase().trim();
                 const pageFilter = selectedPageFilter.trim();
                 
-                let result = students.filter(s => {
+                let result = activeStudents.filter(s => {
                     const matchesSearch = !term || (
                         s.name.toLowerCase().includes(term) ||
                         s.surname.toLowerCase().includes(term) ||
@@ -656,7 +706,7 @@
                 });
 
                 return result;
-            }, [students, searchTerm, sortBy, selectedYear, selectedMonth, selectedQaidFilter, selectedPageFilter]);
+            }, [activeStudents, searchTerm, sortBy, selectedYear, selectedMonth, selectedQaidFilter, selectedPageFilter]);
 
             const totalPages = Math.ceil(filteredStudents.length / PAGE_SIZE);
             const paginatedStudents = useMemo(() => {
@@ -668,15 +718,15 @@
             const singlePrintFiltered = useMemo(() => {
                  const term = singlePrintSearchTerm.toLowerCase().trim();
                  if(!term) return [];
-                 return students.filter(s => 
+                 return activeStudents.filter(s => 
                      s.name.toLowerCase().includes(term) || 
                      s.qaid.includes(term)
                  ).slice(0, 5);
-            }, [students, singlePrintSearchTerm]);
+            }, [activeStudents, singlePrintSearchTerm]);
 
             const uniqueQaids = useMemo(() => {
-                return [...new Set(students.map(s => s.qaid))].sort((a, b) => a.localeCompare(b));
-            }, [students]);
+                return [...new Set(activeStudents.map(s => s.qaid))].sort((a, b) => a.localeCompare(b));
+            }, [activeStudents]);
 
             const qaidBatchFiltered = useMemo(() => {
                 const term = singlePrintSearchTerm.toLowerCase().trim();
@@ -816,7 +866,7 @@
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 stats-cards">
                                 <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                                     <div className="bg-primary text-white text-xl font-bold px-4 py-2 rounded-lg shadow-sm min-w-[60px] text-center">
-                                        {students.length}
+                                        {activeStudents.length}
                                     </div>
                                     <div className="text-blue-500 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-full">
                                         <Users size={20} />
@@ -826,7 +876,7 @@
                                 <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                                     <div>
                                         <p className="text-xs text-slate-500 font-bold mb-1">القيود</p>
-                                        <h3 className="text-lg font-bold">{new Set(students.map(s => s.qaid)).size}</h3>
+                                        <h3 className="text-lg font-bold">{new Set(activeStudents.map(s => s.qaid)).size}</h3>
                                     </div>
                                     <div className="text-purple-500 bg-purple-50 dark:bg-purple-900/20 p-2 rounded-full">
                                         <Hash size={20} />
@@ -836,7 +886,7 @@
                                 <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                                     <div>
                                         <p className="text-xs text-slate-500 font-bold mb-1">الصفحات</p>
-                                        <h3 className="text-lg font-bold">{new Set(students.map(s => s.page)).size}</h3>
+                                        <h3 className="text-lg font-bold">{new Set(activeStudents.map(s => s.page)).size}</h3>
                                     </div>
                                     <div className="text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded-full">
                                         <FileText size={20} />
@@ -847,7 +897,7 @@
                                     <div className="overflow-hidden">
                                         <p className="text-xs text-slate-500 font-bold mb-1">الأحدث</p>
                                         <h3 className="text-sm font-bold truncate">
-                                            {students[0]?.name || '-'}
+                                            {activeStudents[0]?.name || '-'}
                                         </h3>
                                     </div>
                                     <div className="text-green-500 bg-green-50 dark:bg-green-900/20 p-2 rounded-full">
@@ -1301,6 +1351,14 @@
 
                                     <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-700">
                                         <h3 className="font-bold text-sm text-slate-500 uppercase">إدارة البيانات</h3>
+
+                                        <button 
+                                            onClick={() => { setRecycleBinOpen(true); setSettingsOpen(false); }}
+                                            className="w-full p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center gap-2"
+                                        >
+                                            <Trash2 size={20} />
+                                            <span>سلة المحذوفات ({deletedStudents.length})</span>
+                                        </button>
                                         
                                         <button 
                                             onClick={() => { handleExport(); setSettingsOpen(false); }}
@@ -1335,10 +1393,76 @@
                                             onClick={() => setMasterDeleteOpen(true)}
                                             className="w-full p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-900/50 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors flex items-center justify-center gap-2"
                                         >
-                                            <Trash2 size={20} />
-                                            <span>حذف جميع البيانات</span>
+                                            <AlertTriangle size={20} />
+                                            <span>حذف جميع البيانات (نهائي)</span>
                                         </button>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Recycle Bin Modal - COMPLETED */}
+                    {recycleBinOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm recycle-bin-modal">
+                            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col h-[80vh]">
+                                <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                                    <div className="flex items-center gap-2">
+                                        <Trash2 className="text-red-500" size={24} />
+                                        <h2 className="text-xl font-bold text-slate-800 dark:text-white">سلة المحذوفات</h2>
+                                        <span className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs px-2 py-1 rounded-full font-bold">{deletedStudents.length}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {deletedStudents.length > 0 && (
+                                            <button 
+                                                onClick={handleEmptyTrash}
+                                                className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-1"
+                                            >
+                                                <Trash2 size={16} /> إفراغ السلة
+                                            </button>
+                                        )}
+                                        <button onClick={() => setRecycleBinOpen(false)} className="text-slate-500 hover:text-red-500 transition-colors">
+                                            <X size={24} />
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex-grow overflow-y-auto p-4 custom-scrollbar bg-slate-50 dark:bg-slate-900/50">
+                                    {deletedStudents.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                                            <Trash2 size={48} className="mb-4 opacity-20" />
+                                            <p>سلة المحذوفات فارغة</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {deletedStudents.map(student => (
+                                                <div key={student.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                                    <div>
+                                                        <h3 className="font-bold text-slate-800 dark:text-white">{student.name} {student.surname}</h3>
+                                                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+                                                            <span className="bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">قيد: {student.qaid}</span>
+                                                            <span className="bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">صفحة: {student.page}</span>
+                                                            <span>تاريخ الحذف: {student.deletedAt ? new Date(student.deletedAt).toLocaleDateString('ar-EG') : 'غير معروف'}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                                                        <button 
+                                                            onClick={() => handleRestore(student)}
+                                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-sm font-medium"
+                                                        >
+                                                            <Undo2 size={16} /> استعادة
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handlePermanentDelete(student.id)}
+                                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-sm font-medium"
+                                                        >
+                                                            <Trash2 size={16} /> حذف نهائي
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -1349,8 +1473,8 @@
                             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-2xl max-w-md w-full">
                                 <h3 className="text-2xl font-bold text-red-600 mb-4">تحذير شديد!</h3>
                                 <p className="mb-4 text-slate-600 dark:text-slate-300">
-                                    أنت على وشك حذف <strong>جميع بيانات الطلاب</strong> من قاعدة البيانات. 
-                                    هذا الإجراء نهائي ولا يمكن استرجاعه.
+                                    أنت على وشك حذف <strong>جميع بيانات الطلاب</strong> من قاعدة البيانات بشكل نهائي. 
+                                    هذا الإجراء لا يمكن استرجاعه، حتى من سلة المحذوفات.
                                 </p>
                                 <p className="mb-4 text-sm">أكتب "حذف الكل" للتأكيد:</p>
                                 <input 
@@ -1509,7 +1633,7 @@
                                                         <div>
                                                             <h4 className="font-bold text-lg text-slate-800 font-mono">{qaid}</h4>
                                                             <p className="text-slate-500 text-xs">
-                                                                {students.filter(s => s.qaid === qaid).length} طالب
+                                                                {students.filter(s => s.qaid === qaid && !s.isDeleted).length} طالب
                                                             </p>
                                                         </div>
                                                     </div>
@@ -1589,7 +1713,7 @@
                                             let title = "";
                                             
                                             if (printMode === 'qaid' && targetQaid) {
-                                                dataToPrint = students.filter(s => s.qaid === targetQaid);
+                                                dataToPrint = activeStudents.filter(s => s.qaid === targetQaid);
                                                 title = `قائمة طلاب القيد رقم: ${targetQaid}`;
                                             } else {
                                                 dataToPrint = [...filteredStudents].sort((a, b) => a.name.localeCompare(b.name, 'ar'));
