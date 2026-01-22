@@ -17,10 +17,7 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    <!-- Lucide Icons (UMD) -->
-    <script src="https://unpkg.com/lucide-react@0.344.0/dist/umd/lucide-react.min.js"></script>
-    
-    <!-- Babel Standalone (Compiles JSX/TS in browser) -->
+    <!-- Babel Standalone -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
@@ -49,6 +46,7 @@
             margin: 0;
         }
       }
+      /* Custom Scrollbar */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
@@ -62,6 +60,20 @@
       }
       ::-webkit-scrollbar-thumb:hover {
         background: #94a3b8; 
+      }
+      /* Error Container */
+      #error-container {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(255,255,255,0.95);
+        z-index: 9999;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: #ef4444;
+        padding: 20px;
       }
     </style>
 <script type="importmap">
@@ -78,71 +90,62 @@
 </head>
 <body>
     <div id="root"></div>
+    
+    <div id="error-container">
+        <h2 class="text-2xl font-bold mb-4">عذراً، حدث خطأ في التطبيق</h2>
+        <div id="error-message" class="bg-red-50 p-4 rounded border border-red-200 font-mono text-sm text-left dir-ltr"></div>
+        <button onclick="window.location.reload()" class="mt-6 px-4 py-2 bg-slate-800 text-white rounded">تحديث الصفحة</button>
+    </div>
 
-    <!-- Main Application Script -->
-    <script type="text/babel" data-presets="react,typescript">
-        const { useState, useEffect } = React;
-        // Destructure icons from global lucideReact object
-        const { 
-            Trash2, Pencil, ArrowUp, ArrowDown, 
-            PlusCircle, SplitSquareVertical, Save, X, Plus, 
-            AlignJustify, AlignLeft, Type, Bold, EyeOff, Eye,
-            BookOpen, Layers, Hash, GraduationCap, CheckSquare,
-            School, UserPen, Frame, Printer, PenTool
-        } = lucideReact;
+    <script>
+        // Global Error Handler
+        window.onerror = function(msg, url, line, col, error) {
+            document.getElementById('root').style.display = 'none';
+            document.getElementById('error-container').style.display = 'flex';
+            document.getElementById('error-message').textContent = msg + "\nLine: " + line;
+            return false;
+        };
+    </script>
 
-        // --- Types & Enums (Merged from types.ts) ---
-        enum Difficulty {
-            Easy = "سهل",
-            Medium = "متوسط",
-            Hard = "صعب",
-        }
+    <script type="text/babel">
+        // --- 1. SETUP & UTILS ---
+        const { useState, useEffect, useRef } = React;
+        
+        // --- 2. ICONS (Inlined for reliability) ---
+        const Icons = {
+            Trash2: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
+            Pencil: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>,
+            ArrowUp: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>,
+            ArrowDown: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>,
+            PlusCircle: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>,
+            SplitSquareVertical: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M5 8V5c0-1 1-2 2-2h10c1 0 2 1 2 2v3"/><path d="M19 16v3c0 1-1 2-2 2H7c-1 0-2-1-2-2v-3"/><line x1="4" x2="20" y1="12" y2="12"/></svg>,
+            Save: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+            X: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+            Plus: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
+            AlignJustify: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="3" x2="21" y1="6" y2="6"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="21" y1="18" y2="18"/></svg>,
+            AlignLeft: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="17" x2="3" y1="6" y2="6"/><line x1="21" x2="3" y1="12" y2="12"/><line x1="17" x2="3" y1="18" y2="18"/></svg>,
+            Bold: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M14 12a4 4 0 0 0 0-8H6v8"/><path d="M15 20a4 4 0 0 0 0-8H6v8Z"/></svg>,
+            EyeOff: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>,
+            Eye: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>,
+            School: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m4 6 8-4 8 4"/><path d="m18 10 4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2"/><path d="M14 22v-4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v4"/><path d="M18 5v17"/><path d="M6 5v17"/><circle cx="12" cy="9" r="2"/></svg>,
+            UserPen: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M11.5 15H7a4 4 0 0 0-4 4v2"/><path d="M21.378 16.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/><circle cx="10" cy="7" r="4"/></svg>,
+            Frame: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="22" x2="2" y1="6" y2="6"/><line x1="22" x2="2" y1="18" y2="18"/><line x1="6" x2="6" y1="2" y2="22"/><line x1="18" x2="18" y1="2" y2="22"/></svg>,
+            Printer: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>,
+            PenTool: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+        };
 
-        enum QuestionType {
-            MultipleChoice = "اختيار من متعدد",
-            TrueFalse = "صح أو خطأ",
-            ShortAnswer = "إجابة قصيرة",
-            Mixed = "مختلط",
-            Separator = "فاصل / عنوان"
-        }
+        // --- 3. TYPES & CONSTANTS ---
+        const QuestionType = {
+            MultipleChoice: "اختيار من متعدد",
+            TrueFalse: "صح أو خطأ",
+            ShortAnswer: "إجابة قصيرة",
+            Mixed: "مختلط",
+            Separator: "فاصل / عنوان"
+        };
 
-        interface Question {
-            id: string;
-            label?: string;
-            text: string;
-            type: QuestionType;
-            options?: string[];
-            correctAnswer?: string;
-            points?: number;
-            hidePoints?: boolean;
-            subPoints?: string[];
-            subPointsStyle?: 'block' | 'inline';
-            fontSize?: number;
-            isBold?: boolean;
-            fontFamily?: string;
-            subPointsFontSize?: number;
-            subPointsFontFamily?: string;
-            subPointsIsBold?: boolean;
-        }
+        // --- 4. COMPONENTS ---
 
-        interface ExamHeader {
-            directorate: string;
-            schoolName: string;
-            examName: string;
-            round?: string;
-            year: string;
-            subject: string;
-            grade: string;
-            time: string;
-            note?: string;
-            teacherLabel?: string;
-            teacherName?: string;
-            borderStyle?: string;
-        }
-
-        // --- COMPONENTS ---
-
-        // 1. ExamHeaderForm
+        // 4.1 ExamHeaderForm
         const ExamHeaderForm = ({ header, setHeader }) => {
             const handleChange = (field, value) => {
                 setHeader(prev => ({ ...prev, [field]: value }));
@@ -155,109 +158,41 @@
             return (
                 <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-100 mb-6">
                 <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <School className="w-6 h-6 text-indigo-600" />
+                    <Icons.School className="w-6 h-6 text-indigo-600" />
                     ترويسة وتذييل الامتحان
                 </h2>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Right Side */}
                     <div className="space-y-3">
-                    <input
-                        type="text"
-                        value={header.directorate}
-                        onChange={(e) => handleChange('directorate', e.target.value)}
-                        placeholder="المديرية / الوزارة"
-                        className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none"
-                    />
-                    <input
-                        type="text"
-                        value={header.schoolName}
-                        onChange={(e) => handleChange('schoolName', e.target.value)}
-                        placeholder="اسم المدرسة"
-                        className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none"
-                    />
+                    <input type="text" value={header.directorate} onChange={(e) => handleChange('directorate', e.target.value)} placeholder="المديرية / الوزارة" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" />
+                    <input type="text" value={header.schoolName} onChange={(e) => handleChange('schoolName', e.target.value)} placeholder="اسم المدرسة" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" />
                     </div>
 
-                    {/* Left Side */}
                     <div className="space-y-3">
-                    <select
-                        value={header.examName}
-                        onChange={(e) => handleChange('examName', e.target.value)}
-                        className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none bg-white font-medium"
-                    >
-                        {examTypes.map((type) => (
-                            <option key={type} value={type}>{type}</option>
-                        ))}
+                    <select value={header.examName} onChange={(e) => handleChange('examName', e.target.value)} className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none bg-white font-medium">
+                        {examTypes.map((type) => <option key={type} value={type}>{type}</option>)}
                     </select>
-                    
-                    <select
-                        value={header.round || 'الدور الأول'}
-                        onChange={(e) => handleChange('round', e.target.value)}
-                        className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none bg-white"
-                    >
-                        {rounds.map((round) => (
-                            <option key={round} value={round}>{round}</option>
-                        ))}
+                    <select value={header.round || 'الدور الأول'} onChange={(e) => handleChange('round', e.target.value)} className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none bg-white">
+                        {rounds.map((round) => <option key={round} value={round}>{round}</option>)}
                     </select>
-
-                    <select
-                        value={header.year}
-                        onChange={(e) => handleChange('year', e.target.value)}
-                        className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none bg-white"
-                    >
-                        {academicYears.map((year) => (
-                            <option key={year} value={year}>{year}</option>
-                        ))}
+                    <select value={header.year} onChange={(e) => handleChange('year', e.target.value)} className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none bg-white">
+                        {academicYears.map((year) => <option key={year} value={year}>{year}</option>)}
                     </select>
                     </div>
 
-                    {/* Subject/Grade/Time */}
                     <div className="col-span-1 md:col-span-2 grid grid-cols-3 gap-2 pt-2 border-t border-slate-100">
-                    <input
-                        type="text"
-                        value={header.subject}
-                        onChange={(e) => handleChange('subject', e.target.value)}
-                        placeholder="المادة"
-                        className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none"
-                    />
-                    <input
-                        type="text"
-                        value={header.grade}
-                        onChange={(e) => handleChange('grade', e.target.value)}
-                        placeholder="الصف"
-                        className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none"
-                    />
-                    <input
-                        type="text"
-                        value={header.time}
-                        onChange={(e) => handleChange('time', e.target.value)}
-                        placeholder="الوقت"
-                        className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none"
-                    />
+                    <input type="text" value={header.subject} onChange={(e) => handleChange('subject', e.target.value)} placeholder="المادة" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" />
+                    <input type="text" value={header.grade} onChange={(e) => handleChange('grade', e.target.value)} placeholder="الصف" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" />
+                    <input type="text" value={header.time} onChange={(e) => handleChange('time', e.target.value)} placeholder="الوقت" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" />
                     </div>
 
-                    {/* Note */}
                     <div className="col-span-1 md:col-span-2">
-                        <input
-                        type="text"
-                        value={header.note}
-                        onChange={(e) => handleChange('note', e.target.value)}
-                        placeholder="ملاحظة علوية (اختياري)"
-                        className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none text-red-500 placeholder-red-300"
-                    />
+                        <input type="text" value={header.note} onChange={(e) => handleChange('note', e.target.value)} placeholder="ملاحظة علوية (اختياري)" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none text-red-500 placeholder-red-300" />
                     </div>
 
-                    {/* Visual Settings: Border Style */}
                     <div className="col-span-1 md:col-span-2 pt-4 mt-2 border-t border-slate-100">
-                        <h3 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                            <Frame className="w-4 h-4" />
-                            تنسيق الورقة (الإطار)
-                        </h3>
-                        <select
-                            value={header.borderStyle || 'double'}
-                            onChange={(e) => handleChange('borderStyle', e.target.value)}
-                            className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none bg-white"
-                        >
+                        <h3 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><Icons.Frame className="w-4 h-4" /> تنسيق الورقة (الإطار)</h3>
+                        <select value={header.borderStyle || 'double'} onChange={(e) => handleChange('borderStyle', e.target.value)} className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none bg-white">
                             <option value="simple">إطار خط واحد (Simple)</option>
                             <option value="double">إطار مزدوج رسمي (Double)</option>
                             <option value="thick">إطار سميك (Thick)</option>
@@ -266,27 +201,11 @@
                         </select>
                     </div>
 
-                    {/* Footer Info */}
                     <div className="col-span-1 md:col-span-2 pt-4 mt-2 border-t border-slate-100">
-                        <h3 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                            <UserPen className="w-4 h-4" />
-                            توقيع الورقة (التذييل)
-                        </h3>
+                        <h3 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><Icons.UserPen className="w-4 h-4" /> توقيع الورقة (التذييل)</h3>
                         <div className="grid grid-cols-2 gap-2">
-                            <input
-                                type="text"
-                                value={header.teacherLabel}
-                                onChange={(e) => handleChange('teacherLabel', e.target.value)}
-                                placeholder="عنوان الموقع (مثال: مدرس المادة)"
-                                className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none"
-                            />
-                            <input
-                                type="text"
-                                value={header.teacherName}
-                                onChange={(e) => handleChange('teacherName', e.target.value)}
-                                placeholder="الاسم (اختياري)"
-                                className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none"
-                            />
+                            <input type="text" value={header.teacherLabel} onChange={(e) => handleChange('teacherLabel', e.target.value)} placeholder="عنوان الموقع (مثال: مدرس المادة)" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" />
+                            <input type="text" value={header.teacherName} onChange={(e) => handleChange('teacherName', e.target.value)} placeholder="الاسم (اختياري)" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" />
                         </div>
                     </div>
                 </div>
@@ -294,31 +213,17 @@
             );
         };
 
-        // 2. SeparatorForm
+        // 4.2 SeparatorForm
         const SeparatorForm = ({ onAddQuestion }) => {
             const [separatorStyle, setSeparatorStyle] = useState('SEPARATOR_SOLID');
             const [customText, setCustomText] = useState('');
 
             const handleAdd = () => {
                 if (separatorStyle === 'CUSTOM' && !customText) return;
-
-                let finalText = separatorStyle;
-                if (separatorStyle === 'CUSTOM') {
-                    finalText = customText;
-                }
-
-                const newQuestion = {
-                    id: `sep-${Date.now()}`,
-                    text: finalText,
-                    type: QuestionType.Separator,
-                    points: 0,
-                    label: ''
-                };
-
+                let finalText = separatorStyle === 'CUSTOM' ? customText : separatorStyle;
+                const newQuestion = { id: `sep-${Date.now()}`, text: finalText, type: QuestionType.Separator, points: 0, label: '' };
                 onAddQuestion(newQuestion);
-                if (separatorStyle === 'CUSTOM') {
-                    setCustomText('');
-                }
+                if (separatorStyle === 'CUSTOM') setCustomText('');
             };
 
             const renderPreview = () => {
@@ -336,17 +241,9 @@
 
             return (
                 <div className="bg-white p-4 rounded-2xl shadow-lg border border-slate-100 mb-6">
-                    <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                        <SplitSquareVertical className="w-4 h-4 text-orange-600" />
-                        إدراج فاصل زخرفي أو عنوان قسم
-                    </h3>
-                    
+                    <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><Icons.SplitSquareVertical className="w-4 h-4 text-orange-600" /> إدراج فاصل زخرفي أو عنوان قسم</h3>
                     <div className="flex flex-col gap-3">
-                        <select
-                            value={separatorStyle}
-                            onChange={(e) => setSeparatorStyle(e.target.value)}
-                            className="w-full p-2 text-sm rounded border border-slate-200 focus:border-orange-500 outline-none bg-white"
-                        >
+                        <select value={separatorStyle} onChange={(e) => setSeparatorStyle(e.target.value)} className="w-full p-2 text-sm rounded border border-slate-200 focus:border-orange-500 outline-none bg-white">
                             <option value="SEPARATOR_SOLID">خط متصل</option>
                             <option value="SEPARATOR_DASHED">خط متقطع</option>
                             <option value="SEPARATOR_DOUBLE">خط مزدوج</option>
@@ -355,40 +252,18 @@
                             <option value="SEPARATOR_GEOMETRIC">شكل هندسي (◆ ◇ ◆)</option>
                             <option value="CUSTOM">عنوان نصي مخصص</option>
                         </select>
-
                         {separatorStyle === 'CUSTOM' && (
-                            <input
-                                type="text"
-                                value={customText}
-                                onChange={(e) => setCustomText(e.target.value)}
-                                placeholder="اكتب العنوان هنا..."
-                                className="w-full p-2 text-sm rounded border border-slate-200 focus:border-orange-500 outline-none"
-                            />
+                            <input type="text" value={customText} onChange={(e) => setCustomText(e.target.value)} placeholder="اكتب العنوان هنا..." className="w-full p-2 text-sm rounded border border-slate-200 focus:border-orange-500 outline-none" />
                         )}
-
-                        <div className="py-2 px-4 bg-slate-50 rounded border border-slate-100 flex items-center justify-center min-h-[40px]">
-                            {renderPreview()}
-                        </div>
-
-                        <button
-                            onClick={handleAdd}
-                            className="w-full py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold rounded transition flex items-center justify-center gap-2 shadow-sm"
-                        >
-                            <Plus className="w-4 h-4" />
-                            إدراج في الورقة
-                        </button>
+                        <div className="py-2 px-4 bg-slate-50 rounded border border-slate-100 flex items-center justify-center min-h-[40px]">{renderPreview()}</div>
+                        <button onClick={handleAdd} className="w-full py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold rounded transition flex items-center justify-center gap-2 shadow-sm"><Icons.Plus className="w-4 h-4" /> إدراج في الورقة</button>
                     </div>
                 </div>
             );
         };
 
-        // 3. ManualQuestionForm
-        const ManualQuestionForm = ({ 
-            onAddQuestion, 
-            questionToEdit, 
-            onUpdateQuestion,
-            onCancelEdit 
-        }) => {
+        // 4.3 ManualQuestionForm
+        const ManualQuestionForm = ({ onAddQuestion, questionToEdit, onUpdateQuestion, onCancelEdit }) => {
             const [text, setText] = useState('');
             const [label, setLabel] = useState('س1');
             const [points, setPoints] = useState(10);
@@ -396,23 +271,15 @@
             const [type, setType] = useState(QuestionType.ShortAnswer);
             const [options, setOptions] = useState(['', '', '', '']);
             const [correctAnswer, setCorrectAnswer] = useState('');
-            
-            // Sub-points
             const [subPoints, setSubPoints] = useState([]);
             const [newSubPoint, setNewSubPoint] = useState('');
             const [subPointsStyle, setSubPointsStyle] = useState('block');
-            
-            // Font Styling
             const [fontSize, setFontSize] = useState(18);
             const [isBold, setIsBold] = useState(true); 
             const [fontFamily, setFontFamily] = useState('Cairo');
-
-            // Sub-points Styling
             const [subPointsFontSize, setSubPointsFontSize] = useState(16);
             const [subPointsFontFamily, setSubPointsFontFamily] = useState('Cairo');
             const [subPointsIsBold, setSubPointsIsBold] = useState(true);
-            
-            // Separator
             const [separatorStyle, setSeparatorStyle] = useState('SEPARATOR_SOLID');
 
             const availableFonts = [
@@ -428,17 +295,10 @@
                     setType(questionToEdit.type);
                     setPoints(questionToEdit.points || 0);
                     setHidePoints(questionToEdit.hidePoints || false);
-                    
                     if (questionToEdit.type === QuestionType.Separator) {
-                        const style = ['SEPARATOR_SOLID', 'SEPARATOR_DASHED', 'SEPARATOR_DOUBLE', 'SEPARATOR_STARS', 'SEPARATOR_FLOWERS', 'SEPARATOR_GEOMETRIC'].includes(questionToEdit.text) 
-                            ? questionToEdit.text 
-                            : 'CUSTOM';
+                        const style = ['SEPARATOR_SOLID', 'SEPARATOR_DASHED', 'SEPARATOR_DOUBLE', 'SEPARATOR_STARS', 'SEPARATOR_FLOWERS', 'SEPARATOR_GEOMETRIC'].includes(questionToEdit.text) ? questionToEdit.text : 'CUSTOM';
                         setSeparatorStyle(style);
-                        if (style === 'CUSTOM') {
-                            setText(questionToEdit.text);
-                        } else {
-                            setText('');
-                        }
+                        if (style === 'CUSTOM') setText(questionToEdit.text); else setText('');
                     } else {
                         setText(questionToEdit.text);
                         setLabel(questionToEdit.label || 'س1');
@@ -446,73 +306,37 @@
                         setCorrectAnswer(questionToEdit.correctAnswer || '');
                         setSubPoints(questionToEdit.subPoints || []);
                         setSubPointsStyle(questionToEdit.subPointsStyle || 'block');
-                        
                         setFontSize(questionToEdit.fontSize || 18);
                         setIsBold(questionToEdit.isBold ?? true);
                         setFontFamily(questionToEdit.fontFamily || 'Cairo');
-
                         setSubPointsFontSize(questionToEdit.subPointsFontSize || 16);
                         setSubPointsFontFamily(questionToEdit.subPointsFontFamily || 'Cairo');
                         setSubPointsIsBold(questionToEdit.subPointsIsBold ?? true);
                     }
                 } else {
                     if (!questionToEdit) {
-                    setType(QuestionType.ShortAnswer);
-                    setSubPoints([]);
-                    setSubPointsStyle('block');
-                    setHidePoints(false);
-                    setFontSize(18);
-                    setIsBold(true);
-                    setFontFamily('Cairo');
-                    setSubPointsFontSize(16);
-                    setSubPointsFontFamily('Cairo');
-                    setSubPointsIsBold(true);
+                       setType(QuestionType.ShortAnswer); setSubPoints([]); setSubPointsStyle('block'); setHidePoints(false); setFontSize(18); setIsBold(true); setFontFamily('Cairo'); setSubPointsFontSize(16); setSubPointsFontFamily('Cairo'); setSubPointsIsBold(true);
                     }
                 }
             }, [questionToEdit]);
 
             const questionLabels = [];
             for (let i = 1; i <= 6; i++) {
-                questionLabels.push(`س${i}`);
-                questionLabels.push(`س${i} / أ`);
-                questionLabels.push(`س${i} / ب`);
-                questionLabels.push(`س${i} / ج`);
+                questionLabels.push(`س${i}`); questionLabels.push(`س${i} / أ`); questionLabels.push(`س${i} / ب`); questionLabels.push(`س${i} / ج`);
             }
 
-            const handleOptionChange = (index, value) => {
-                const newOptions = [...options];
-                newOptions[index] = value;
-                setOptions(newOptions);
-            };
-
-            const handleAddSubPoint = () => {
-                if (newSubPoint.trim()) {
-                    setSubPoints([...subPoints, newSubPoint.trim()]);
-                    setNewSubPoint('');
-                }
-            };
-
-            const handleRemoveSubPoint = (index) => {
-                setSubPoints(subPoints.filter((_, i) => i !== index));
-            };
-
-            const handleKeyDownSubPoint = (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddSubPoint();
-                }
-            };
+            const handleOptionChange = (index, value) => { const newOptions = [...options]; newOptions[index] = value; setOptions(newOptions); };
+            const handleAddSubPoint = () => { if (newSubPoint.trim()) { setSubPoints([...subPoints, newSubPoint.trim()]); setNewSubPoint(''); } };
+            const handleRemoveSubPoint = (index) => { setSubPoints(subPoints.filter((_, i) => i !== index)); };
+            const handleKeyDownSubPoint = (e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubPoint(); } };
 
             const handleSubmit = (e) => {
                 e.preventDefault();
-                
                 if (type !== QuestionType.Separator && !text) return;
                 if (type === QuestionType.Separator && separatorStyle === 'CUSTOM' && !text) return;
 
                 let finalQuestionText = text;
-                if (type === QuestionType.Separator && separatorStyle !== 'CUSTOM') {
-                    finalQuestionText = separatorStyle;
-                }
+                if (type === QuestionType.Separator && separatorStyle !== 'CUSTOM') { finalQuestionText = separatorStyle; }
 
                 const questionData = {
                     id: questionToEdit ? questionToEdit.id : `manual-${Date.now()}`,
@@ -533,29 +357,15 @@
                     subPointsIsBold: type !== QuestionType.Separator ? subPointsIsBold : undefined
                 };
 
-                if (questionToEdit && onUpdateQuestion) {
-                    onUpdateQuestion(questionData);
-                } else {
-                    onAddQuestion(questionData);
-                }
+                if (questionToEdit && onUpdateQuestion) { onUpdateQuestion(questionData); } else { onAddQuestion(questionData); }
                 
                 if (!questionToEdit) {
-                    if (type !== QuestionType.Separator) {
-                        setText('');
-                        setOptions(['', '', '', '']);
-                        setCorrectAnswer('');
-                        setSubPoints([]);
-                        setNewSubPoint('');
-                        setSubPointsStyle('block');
-                    } else {
-                        setText('');
-                    }
+                    if (type !== QuestionType.Separator) { setText(''); setOptions(['', '', '', '']); setCorrectAnswer(''); setSubPoints([]); setNewSubPoint(''); setSubPointsStyle('block'); } else { setText(''); }
                 }
             };
 
             const isSeparator = type === QuestionType.Separator;
             const isEditing = !!questionToEdit;
-
             const renderSeparatorPreview = () => {
                 switch(separatorStyle) {
                     case 'SEPARATOR_SOLID': return <hr className="border-t-2 border-slate-400 w-full" />;
@@ -572,324 +382,38 @@
             return (
                 <div className={`bg-white p-6 rounded-2xl shadow-lg border mt-6 transition-colors ${isEditing ? 'border-indigo-500 ring-2 ring-indigo-100' : 'border-slate-100'}`}>
                 <h3 className="font-bold text-slate-800 mb-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        {isSeparator ? <SplitSquareVertical className="w-5 h-5 text-orange-500" /> : <PlusCircle className="w-5 h-5 text-indigo-600" />}
-                        {isEditing 
-                            ? (isSeparator ? 'تعديل الفاصل' : 'تعديل السؤال') 
-                            : 'إضافة سؤال يدوياً'
-                        }
-                    </div>
-                    {isEditing && onCancelEdit && (
-                        <button onClick={onCancelEdit} className="text-sm text-slate-400 hover:text-red-500 flex items-center gap-1">
-                            <X className="w-4 h-4" /> إلغاء
-                        </button>
-                    )}
+                    <div className="flex items-center gap-2">{isSeparator ? <Icons.SplitSquareVertical className="w-5 h-5 text-orange-500" /> : <Icons.PlusCircle className="w-5 h-5 text-indigo-600" />}{isEditing ? (isSeparator ? 'تعديل الفاصل' : 'تعديل السؤال') : 'إضافة سؤال يدوياً'}</div>
+                    {isEditing && onCancelEdit && (<button onClick={onCancelEdit} className="text-sm text-slate-400 hover:text-red-500 flex items-center gap-1"><Icons.X className="w-4 h-4" /> إلغاء</button>)}
                 </h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    
-                    <div className="grid grid-cols-1 gap-2">
-                        <label className="text-xs font-bold text-slate-500">نوع السؤال:</label>
-                        <select
-                            value={type}
-                            onChange={(e) => setType(e.target.value)}
-                            className="w-full p-2 rounded border border-slate-200 focus:border-indigo-500 outline-none text-sm bg-white font-bold"
-                            disabled={isEditing && type === QuestionType.Separator}
-                        >
-                            <option value={QuestionType.ShortAnswer}>سؤال شرح / فراغات</option>
-                            <option value={QuestionType.MultipleChoice}>سؤال اختيارات</option>
-                            <option value={QuestionType.TrueFalse}>سؤال صح وخطأ</option>
-                            {isEditing && type === QuestionType.Separator && (
-                                <option value={QuestionType.Separator}>♦ تعديل الفاصل / العنوان ♦</option>
-                            )}
-                        </select>
-                    </div>
-
+                    <div className="grid grid-cols-1 gap-2"><label className="text-xs font-bold text-slate-500">نوع السؤال:</label><select value={type} onChange={(e) => setType(e.target.value)} className="w-full p-2 rounded border border-slate-200 focus:border-indigo-500 outline-none text-sm bg-white font-bold" disabled={isEditing && type === QuestionType.Separator}><option value={QuestionType.ShortAnswer}>سؤال شرح / فراغات</option><option value={QuestionType.MultipleChoice}>سؤال اختيارات</option><option value={QuestionType.TrueFalse}>سؤال صح وخطأ</option>{isEditing && type === QuestionType.Separator && (<option value={QuestionType.Separator}>♦ تعديل الفاصل / العنوان ♦</option>)}</select></div>
                     {isSeparator ? (
                         <div className="space-y-3 bg-orange-50 p-4 rounded-lg border border-orange-100">
                             <label className="text-sm font-bold text-slate-700">اختر شكل الفاصل:</label>
-                            <select
-                                value={separatorStyle}
-                                onChange={(e) => setSeparatorStyle(e.target.value)}
-                                className="w-full p-2 rounded border border-slate-200 focus:border-orange-500 outline-none text-sm bg-white"
-                            >
-                                <option value="SEPARATOR_SOLID">خط متصل (_________________)</option>
-                                <option value="SEPARATOR_DASHED">خط متقطع (-----------------)</option>
-                                <option value="SEPARATOR_DOUBLE">خط مزدوج (=================)</option>
-                                <option value="SEPARATOR_STARS">نجوم (★ ★ ★)</option>
-                                <option value="SEPARATOR_FLOWERS">زخرفة أزهار (❀ ❀ ❀)</option>
-                                <option value="SEPARATOR_GEOMETRIC">شكل هندسي (◆ ◇ ◆)</option>
-                                <option value="CUSTOM">كتابة عنوان مخصص (نص)</option>
+                            <select value={separatorStyle} onChange={(e) => setSeparatorStyle(e.target.value)} className="w-full p-2 rounded border border-slate-200 focus:border-orange-500 outline-none text-sm bg-white">
+                                <option value="SEPARATOR_SOLID">خط متصل (_________________)</option><option value="SEPARATOR_DASHED">خط متقطع (-----------------)</option><option value="SEPARATOR_DOUBLE">خط مزدوج (=================)</option><option value="SEPARATOR_STARS">نجوم (★ ★ ★)</option><option value="SEPARATOR_FLOWERS">زخرفة أزهار (❀ ❀ ❀)</option><option value="SEPARATOR_GEOMETRIC">شكل هندسي (◆ ◇ ◆)</option><option value="CUSTOM">كتابة عنوان مخصص (نص)</option>
                             </select>
-
-                            <div className="p-3 bg-white border border-slate-200 rounded text-center">
-                                <p className="text-xs text-slate-400 mb-2">معاينة:</p>
-                                {renderSeparatorPreview()}
-                            </div>
-
-                            {separatorStyle === 'CUSTOM' && (
-                                <input
-                                    type="text"
-                                    value={text}
-                                    onChange={(e) => setText(e.target.value)}
-                                    placeholder="اكتب عنوان القسم أو الملاحظة هنا..."
-                                    className="w-full p-2 rounded border border-slate-200 focus:border-orange-500 outline-none"
-                                />
-                            )}
+                            <div className="p-3 bg-white border border-slate-200 rounded text-center"><p className="text-xs text-slate-400 mb-2">معاينة:</p>{renderSeparatorPreview()}</div>
+                            {separatorStyle === 'CUSTOM' && (<input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder="اكتب عنوان القسم أو الملاحظة هنا..." className="w-full p-2 rounded border border-slate-200 focus:border-orange-500 outline-none" />)}
                         </div>
                     ) : (
                         <>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="text-xs text-slate-500 block mb-1">ترقيم السؤال:</label>
-                                    <select
-                                        value={label}
-                                        onChange={(e) => setLabel(e.target.value)}
-                                        className="w-full p-2 rounded border border-slate-200 focus:border-indigo-500 outline-none text-sm bg-white"
-                                    >
-                                        {questionLabels.map((l) => (
-                                            <option key={l} value={l}>{l}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-xs text-slate-500 block mb-1">الدرجة:</label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="number"
-                                            value={points}
-                                            onChange={(e) => setPoints(Number(e.target.value))}
-                                            disabled={hidePoints}
-                                            placeholder="الدرجة"
-                                            className={`w-full p-2 rounded border border-slate-200 focus:border-indigo-500 outline-none text-sm ${hidePoints ? 'bg-slate-100 text-slate-400' : ''}`}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setHidePoints(!hidePoints)}
-                                            className={`p-2 rounded border transition-colors ${hidePoints ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-400 border-slate-200 hover:text-slate-600'}`}
-                                            title={hidePoints ? "إظهار الدرجة" : "إخفاء الدرجة"}
-                                        >
-                                            <EyeOff className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* FONT STYLING TOOLBAR */}
-                            <div className="bg-slate-50 p-2 rounded border border-slate-200 grid grid-cols-12 gap-2 items-end">
-                                <div className="col-span-6">
-                                    <label className="text-xs text-slate-500 block mb-1">نوع الخط:</label>
-                                    <select
-                                        value={fontFamily}
-                                        onChange={(e) => setFontFamily(e.target.value)}
-                                        className="w-full p-2 h-9 rounded border border-slate-300 focus:border-indigo-500 outline-none text-sm bg-white"
-                                    >
-                                        {availableFonts.map(f => (
-                                            <option key={f.name} value={f.name} style={{fontFamily: f.name}}>{f.label}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="col-span-4">
-                                    <label className="text-xs text-slate-500 block mb-1">حجم الخط (px):</label>
-                                    <input
-                                        type="number"
-                                        min="10"
-                                        max="60"
-                                        value={fontSize}
-                                        onChange={(e) => setFontSize(Number(e.target.value))}
-                                        className="w-full p-2 h-9 rounded border border-slate-300 focus:border-indigo-500 outline-none text-sm text-center"
-                                    />
-                                </div>
-                                <div className="col-span-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsBold(!isBold)}
-                                        className={`w-full h-9 rounded border flex items-center justify-center transition-colors ${
-                                            isBold 
-                                            ? 'bg-slate-800 text-white border-slate-800' 
-                                            : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-100'
-                                        }`}
-                                        title="خط عريض (Bold)"
-                                    >
-                                        <Bold className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <textarea
-                                value={text}
-                                onChange={(e) => setText(e.target.value)}
-                                placeholder="اكتب نص السؤال هنا... (مثال: عرف ما يأتي)"
-                                rows={3}
-                                style={{ 
-                                    fontFamily: fontFamily, 
-                                    fontSize: `${Math.max(14, fontSize * 0.8)}px`, 
-                                    fontWeight: isBold ? 'bold' : 'normal'
-                                }}
-                                className="w-full p-2 rounded border border-slate-200 focus:border-indigo-500 outline-none transition-all"
-                            />
-
-                            {/* SUB POINTS SECTION */}
-                            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                <label className="text-xs font-bold text-slate-500 block mb-2">النقاط الفرعية:</label>
-                                
-                                <div className="flex gap-2 mb-3 bg-white p-2 rounded border border-slate-100 items-end">
-                                    <div className="flex-grow">
-                                        <label className="text-[10px] text-slate-400 block mb-1">خط النقاط الفرعية:</label>
-                                        <select
-                                            value={subPointsFontFamily}
-                                            onChange={(e) => setSubPointsFontFamily(e.target.value)}
-                                            className="w-full p-1 h-8 rounded border border-slate-200 text-xs outline-none"
-                                        >
-                                            {availableFonts.map(f => (
-                                                <option key={f.name} value={f.name} style={{fontFamily: f.name}}>{f.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="w-20">
-                                        <label className="text-[10px] text-slate-400 block mb-1">الحجم:</label>
-                                        <input
-                                            type="number"
-                                            min="10"
-                                            max="40"
-                                            value={subPointsFontSize}
-                                            onChange={(e) => setSubPointsFontSize(Number(e.target.value))}
-                                            className="w-full p-1 h-8 rounded border border-slate-200 text-xs text-center outline-none"
-                                        />
-                                    </div>
-                                    <div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setSubPointsIsBold(!subPointsIsBold)}
-                                            className={`w-8 h-8 rounded border flex items-center justify-center transition-colors ${
-                                                subPointsIsBold 
-                                                ? 'bg-slate-700 text-white border-slate-700' 
-                                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                                            }`}
-                                            title="خط عريض"
-                                        >
-                                            <Bold className="w-3 h-3" />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-4 mb-3 text-xs font-bold text-slate-600 bg-white p-2 rounded border border-slate-100">
-                                    <span>طريقة العرض:</span>
-                                    <label className={`flex items-center gap-1 cursor-pointer transition-colors ${subPointsStyle === 'block' ? 'text-indigo-600' : 'text-slate-400'}`}>
-                                        <input 
-                                            type="radio" 
-                                            name="sp-style" 
-                                            checked={subPointsStyle === 'block'} 
-                                            onChange={() => setSubPointsStyle('block')} 
-                                            className="accent-indigo-600"
-                                        />
-                                        <AlignJustify className="w-3 h-3" />
-                                        قائمة عمودية
-                                    </label>
-                                    <label className={`flex items-center gap-1 cursor-pointer transition-colors ${subPointsStyle === 'inline' ? 'text-indigo-600' : 'text-slate-400'}`}>
-                                        <input 
-                                            type="radio" 
-                                            name="sp-style" 
-                                            checked={subPointsStyle === 'inline'} 
-                                            onChange={() => setSubPointsStyle('inline')} 
-                                            className="accent-indigo-600"
-                                        />
-                                        <AlignLeft className="w-3 h-3 rotate-90" />
-                                        سطر واحد
-                                    </label>
-                                </div>
-
-                                <div className="flex gap-2 mb-2">
-                                    <input 
-                                        type="text" 
-                                        value={newSubPoint}
-                                        onChange={(e) => setNewSubPoint(e.target.value)}
-                                        onKeyDown={handleKeyDownSubPoint}
-                                        placeholder="أضف نقطة فرعية (مثال: المحث)"
-                                        className="flex-grow p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none"
-                                        style={{ fontFamily: subPointsFontFamily }}
-                                    />
-                                    <button 
-                                        type="button" 
-                                        onClick={handleAddSubPoint}
-                                        className="bg-indigo-600 text-white p-2 rounded hover:bg-indigo-700"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                    </button>
-                                </div>
-                                {subPoints.length > 0 && (
-                                    <ul className="space-y-1 mt-2">
-                                        {subPoints.map((point, idx) => (
-                                            <li key={idx} className="flex justify-between items-center bg-white p-2 rounded border border-slate-100 text-sm">
-                                                <span style={{ 
-                                                    fontFamily: subPointsFontFamily, 
-                                                    fontSize: '14px', 
-                                                    fontWeight: subPointsIsBold ? 'bold' : 'normal' 
-                                                }}>
-                                                    {idx + 1}- {point}
-                                                </span>
-                                                <button 
-                                                    type="button" 
-                                                    onClick={() => handleRemoveSubPoint(idx)}
-                                                    className="text-red-400 hover:text-red-600"
-                                                >
-                                                    <Trash2 className="w-3 h-3" />
-                                                </button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                            </div>
-
-                            {type === QuestionType.MultipleChoice && (
-                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
-                                    <label className="text-xs font-bold text-slate-500 block mb-1">الخيارات (لأسئلة الاختيار من متعدد فقط):</label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {options.map((opt, idx) => (
-                                            <input
-                                                key={idx}
-                                                type="text"
-                                                value={opt}
-                                                onChange={(e) => handleOptionChange(idx, e.target.value)}
-                                                placeholder={`خيار ${idx + 1}`}
-                                                className="p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none"
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            <input
-                                type="text"
-                                value={correctAnswer}
-                                onChange={(e) => setCorrectAnswer(e.target.value)}
-                                placeholder="الإجابة النموذجية (اختياري - لن تظهر في الطباعة)"
-                                className="w-full p-2 text-sm rounded border border-slate-200 focus:border-green-500 outline-none bg-green-50 placeholder-green-700/50 text-green-800"
-                            />
+                            <div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-slate-500 block mb-1">ترقيم السؤال:</label><select value={label} onChange={(e) => setLabel(e.target.value)} className="w-full p-2 rounded border border-slate-200 focus:border-indigo-500 outline-none text-sm bg-white">{questionLabels.map((l) => (<option key={l} value={l}>{l}</option>))}</select></div><div><label className="text-xs text-slate-500 block mb-1">الدرجة:</label><div className="flex gap-2"><input type="number" value={points} onChange={(e) => setPoints(Number(e.target.value))} disabled={hidePoints} placeholder="الدرجة" className={`w-full p-2 rounded border border-slate-200 focus:border-indigo-500 outline-none text-sm ${hidePoints ? 'bg-slate-100 text-slate-400' : ''}`} /><button type="button" onClick={() => setHidePoints(!hidePoints)} className={`p-2 rounded border transition-colors ${hidePoints ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-400 border-slate-200 hover:text-slate-600'}`} title={hidePoints ? "إظهار الدرجة" : "إخفاء الدرجة"}><Icons.EyeOff className="w-4 h-4" /></button></div></div></div>
+                            <div className="bg-slate-50 p-2 rounded border border-slate-200 grid grid-cols-12 gap-2 items-end"><div className="col-span-6"><label className="text-xs text-slate-500 block mb-1">نوع الخط:</label><select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} className="w-full p-2 h-9 rounded border border-slate-300 focus:border-indigo-500 outline-none text-sm bg-white">{availableFonts.map(f => (<option key={f.name} value={f.name} style={{fontFamily: f.name}}>{f.label}</option>))}</select></div><div className="col-span-4"><label className="text-xs text-slate-500 block mb-1">حجم الخط (px):</label><input type="number" min="10" max="60" value={fontSize} onChange={(e) => setFontSize(Number(e.target.value))} className="w-full p-2 h-9 rounded border border-slate-300 focus:border-indigo-500 outline-none text-sm text-center" /></div><div className="col-span-2"><button type="button" onClick={() => setIsBold(!isBold)} className={`w-full h-9 rounded border flex items-center justify-center transition-colors ${isBold ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-100'}`} title="خط عريض (Bold)"><Icons.Bold className="w-4 h-4" /></button></div></div>
+                            <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="اكتب نص السؤال هنا... (مثال: عرف ما يأتي)" rows={3} style={{ fontFamily: fontFamily, fontSize: `${Math.max(14, fontSize * 0.8)}px`, fontWeight: isBold ? 'bold' : 'normal'}} className="w-full p-2 rounded border border-slate-200 focus:border-indigo-500 outline-none transition-all" />
+                            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200"><label className="text-xs font-bold text-slate-500 block mb-2">النقاط الفرعية:</label><div className="flex gap-2 mb-3 bg-white p-2 rounded border border-slate-100 items-end"><div className="flex-grow"><label className="text-[10px] text-slate-400 block mb-1">خط النقاط الفرعية:</label><select value={subPointsFontFamily} onChange={(e) => setSubPointsFontFamily(e.target.value)} className="w-full p-1 h-8 rounded border border-slate-200 text-xs outline-none">{availableFonts.map(f => (<option key={f.name} value={f.name} style={{fontFamily: f.name}}>{f.label}</option>))}</select></div><div className="w-20"><label className="text-[10px] text-slate-400 block mb-1">الحجم:</label><input type="number" min="10" max="40" value={subPointsFontSize} onChange={(e) => setSubPointsFontSize(Number(e.target.value))} className="w-full p-1 h-8 rounded border border-slate-200 text-xs text-center outline-none" /></div><div><button type="button" onClick={() => setSubPointsIsBold(!subPointsIsBold)} className={`w-8 h-8 rounded border flex items-center justify-center transition-colors ${subPointsIsBold ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`} title="خط عريض"><Icons.Bold className="w-3 h-3" /></button></div></div><div className="flex gap-4 mb-3 text-xs font-bold text-slate-600 bg-white p-2 rounded border border-slate-100"><span>طريقة العرض:</span><label className={`flex items-center gap-1 cursor-pointer transition-colors ${subPointsStyle === 'block' ? 'text-indigo-600' : 'text-slate-400'}`}><input type="radio" name="sp-style" checked={subPointsStyle === 'block'} onChange={() => setSubPointsStyle('block')} className="accent-indigo-600" /><Icons.AlignJustify className="w-3 h-3" /> قائمة عمودية</label><label className={`flex items-center gap-1 cursor-pointer transition-colors ${subPointsStyle === 'inline' ? 'text-indigo-600' : 'text-slate-400'}`}><input type="radio" name="sp-style" checked={subPointsStyle === 'inline'} onChange={() => setSubPointsStyle('inline')} className="accent-indigo-600" /><Icons.AlignLeft className="w-3 h-3 rotate-90" /> سطر واحد</label></div><div className="flex gap-2 mb-2"><input type="text" value={newSubPoint} onChange={(e) => setNewSubPoint(e.target.value)} onKeyDown={handleKeyDownSubPoint} placeholder="أضف نقطة فرعية (مثال: المحث)" className="flex-grow p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" style={{ fontFamily: subPointsFontFamily }} /><button type="button" onClick={handleAddSubPoint} className="bg-indigo-600 text-white p-2 rounded hover:bg-indigo-700"><Icons.Plus className="w-4 h-4" /></button></div>{subPoints.length > 0 && (<ul className="space-y-1 mt-2">{subPoints.map((point, idx) => (<li key={idx} className="flex justify-between items-center bg-white p-2 rounded border border-slate-100 text-sm"><span style={{ fontFamily: subPointsFontFamily, fontSize: '14px', fontWeight: subPointsIsBold ? 'bold' : 'normal' }}>{idx + 1}- {point}</span><button type="button" onClick={() => handleRemoveSubPoint(idx)} className="text-red-400 hover:text-red-600"><Icons.Trash2 className="w-3 h-3" /></button></li>))}</ul>)}</div>
+                            {type === QuestionType.MultipleChoice && (<div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2"><label className="text-xs font-bold text-slate-500 block mb-1">الخيارات (لأسئلة الاختيار من متعدد فقط):</label><div className="grid grid-cols-2 gap-2">{options.map((opt, idx) => (<input key={idx} type="text" value={opt} onChange={(e) => handleOptionChange(idx, e.target.value)} placeholder={`خيار ${idx + 1}`} className="p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" />))}</div></div>)}
+                            <input type="text" value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)} placeholder="الإجابة النموذجية (اختياري - لن تظهر في الطباعة)" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-green-500 outline-none bg-green-50 placeholder-green-700/50 text-green-800" />
                         </>
                     )}
-
-                    <button
-                        type="submit"
-                        className={`w-full py-3 text-white font-bold rounded-lg transition flex items-center justify-center gap-2 ${isEditing ? 'bg-indigo-600 hover:bg-indigo-700' : (isSeparator ? 'bg-orange-600 hover:bg-orange-700' : 'bg-slate-800 hover:bg-slate-900')}`}
-                    >
-                        {isEditing ? <Save className="w-5 h-5" /> : (isSeparator ? <SplitSquareVertical className="w-5 h-5" /> : <PlusCircle className="w-5 h-5" />)}
-                        {isEditing ? 'حفظ التعديلات' : (isSeparator ? 'إدراج الفاصل' : 'إضافة للسؤال')}
-                    </button>
+                    <button type="submit" className={`w-full py-3 text-white font-bold rounded-lg transition flex items-center justify-center gap-2 ${isEditing ? 'bg-indigo-600 hover:bg-indigo-700' : (isSeparator ? 'bg-orange-600 hover:bg-orange-700' : 'bg-slate-800 hover:bg-slate-900')}`}>{isEditing ? <Icons.Save className="w-5 h-5" /> : (isSeparator ? <Icons.SplitSquareVertical className="w-5 h-5" /> : <Icons.PlusCircle className="w-5 h-5" />)}{isEditing ? 'حفظ التعديلات' : (isSeparator ? 'إدراج الفاصل' : 'إضافة للسؤال')}</button>
                 </form>
                 </div>
             );
         };
 
-        // 4. ExamPreview
-        const ExamPreview = ({ 
-            questions, 
-            header,
-            onDelete,
-            onEdit,
-            onMove, 
-            showAnswers 
-        }) => {
-            
+        // 4.4 ExamPreview
+        const ExamPreview = ({ questions, header, onDelete, onEdit, onMove, showAnswers }) => {
             const getBorderClasses = (style) => {
                 switch (style) {
                     case 'simple': return 'border border-slate-800';
@@ -900,131 +424,36 @@
                     default: return 'border-4 border-double border-slate-800';
                 }
             };
-
-            const getBorderStyleStyle = (style) => {
-                if (style === 'ridge') return { borderStyle: 'ridge', borderColor: '#334155' };
-                return {};
-            };
+            const getBorderStyleStyle = (style) => { if (style === 'ridge') return { borderStyle: 'ridge', borderColor: '#334155' }; return {}; };
 
             return (
                 <div className="bg-white shadow-2xl print:shadow-none mx-auto w-full max-w-[210mm] print:max-w-full min-h-[297mm] p-4 md:p-8 print:p-0 relative text-black" style={{ fontFamily: "'Cairo', serif" }}>
-                
                 <div className="h-full p-1 relative min-h-[900px]">
-                    <div 
-                        className={`h-full p-4 print:p-4 relative ${getBorderClasses(header.borderStyle)}`}
-                        style={getBorderStyleStyle(header.borderStyle)}
-                    >
-                        
-                        {/* --- HEADER SECTION --- */}
+                    <div className={`h-full p-4 print:p-4 relative ${getBorderClasses(header.borderStyle)}`} style={getBorderStyleStyle(header.borderStyle)}>
                         <div className="w-full mb-2 border-b-2 border-slate-800 pb-1">
                             <div className="flex justify-between items-start w-full mb-2 font-bold text-sm text-center leading-tight">
-                                {/* Right: Directorate + School Name */}
-                                <div className="w-1/3 flex flex-col items-center pt-1">
-                                    <p className="font-bold text-lg">{header.directorate}</p>
-                                    <p className="mt-1 text-base font-normal">{header.schoolName || 'اسم المدرسة...'}</p>
-                                </div>
-
-                                {/* Center: Exam Name/Year */}
-                                <div className="w-1/3 text-center pt-1">
-                                    <p className="text-base">{header.examName || 'أسئلة الامتحان'}</p>
-                                    {header.round && header.round !== 'بدون دور' && (
-                                        <p className="mt-0.5">{header.round}</p>
-                                    )}
-                                    <p className="mt-0.5 font-normal text-xs">{header.year || '2025 - 2026'}</p>
-                                </div>
-
-                                {/* Left: Subject Details */}
-                                <div className="w-1/3 flex justify-end pl-2">
-                                    <div className="flex flex-col items-start gap-1 text-xs md:text-sm pt-1 min-w-[120px]">
-                                        <div className="flex items-center gap-2 w-full">
-                                            <span className="font-bold min-w-[40px]">المادة:</span>
-                                            <span className="font-normal border-b border-dotted border-slate-400 flex-grow text-center">{header.subject || '......'}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 w-full">
-                                            <span className="font-bold min-w-[40px]">الصف:</span>
-                                            <span className="font-normal border-b border-dotted border-slate-400 flex-grow text-center">{header.grade || '......'}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 w-full">
-                                            <span className="font-bold min-w-[40px]">الوقت:</span>
-                                            <span className="font-normal border-b border-dotted border-slate-400 flex-grow text-center">{header.time || '......'}</span>
-                                        </div>
-                                    </div>
-                                </div>
+                                <div className="w-1/3 flex flex-col items-center pt-1"><p className="font-bold text-lg">{header.directorate}</p><p className="mt-1 text-base font-normal">{header.schoolName || 'اسم المدرسة...'}</p></div>
+                                <div className="w-1/3 text-center pt-1"><p className="text-base">{header.examName || 'أسئلة الامتحان'}</p>{header.round && header.round !== 'بدون دور' && (<p className="mt-0.5">{header.round}</p>)}<p className="mt-0.5 font-normal text-xs">{header.year || '2025 - 2026'}</p></div>
+                                <div className="w-1/3 flex justify-end pl-2"><div className="flex flex-col items-start gap-1 text-xs md:text-sm pt-1 min-w-[120px]"><div className="flex items-center gap-2 w-full"><span className="font-bold min-w-[40px]">المادة:</span><span className="font-normal border-b border-dotted border-slate-400 flex-grow text-center">{header.subject || '......'}</span></div><div className="flex items-center gap-2 w-full"><span className="font-bold min-w-[40px]">الصف:</span><span className="font-normal border-b border-dotted border-slate-400 flex-grow text-center">{header.grade || '......'}</span></div><div className="flex items-center gap-2 w-full"><span className="font-bold min-w-[40px]">الوقت:</span><span className="font-normal border-b border-dotted border-slate-400 flex-grow text-center">{header.time || '......'}</span></div></div></div>
                             </div>
-
-                            {header.note && (
-                                <div className="text-center font-bold text-xs mt-1 mb-1">
-                                    <span className="border-b border-slate-800 pb-0.5 inline-block px-4">ملاحظة: {header.note}</span>
-                                </div>
-                            )}
+                            {header.note && (<div className="text-center font-bold text-xs mt-1 mb-1"><span className="border-b border-slate-800 pb-0.5 inline-block px-4">ملاحظة: {header.note}</span></div>)}
                         </div>
-
-
-                        {/* --- QUESTIONS SECTION --- */}
                         <div className="space-y-2">
-                            {questions.length === 0 && (
-                                <div className="text-center text-slate-400 py-10 no-print">
-                                    (أضف أسئلة لتظهر هنا)
-                                </div>
-                            )}
-
+                            {questions.length === 0 && (<div className="text-center text-slate-400 py-10 no-print">(أضف أسئلة لتظهر هنا)</div>)}
                             {questions.map((q, index) => {
-                                const isFirst = index === 0;
-                                const isLast = index === questions.length - 1;
-
-                                const questionStyle = {
-                                    fontSize: q.fontSize ? `${q.fontSize}px` : '18px',
-                                    fontWeight: q.isBold ? 'bold' : 'normal',
-                                    fontFamily: q.fontFamily || 'inherit',
-                                    lineHeight: 1.3
-                                };
-
-                                const subPointStyle = {
-                                    fontSize: q.subPointsFontSize ? `${q.subPointsFontSize}px` : '16px',
-                                    fontFamily: q.subPointsFontFamily || q.fontFamily || 'inherit',
-                                    fontWeight: q.subPointsIsBold !== undefined ? (q.subPointsIsBold ? 'bold' : 'normal') : 'bold', 
-                                    lineHeight: 1.3
-                                };
-
+                                const isFirst = index === 0; const isLast = index === questions.length - 1;
+                                const questionStyle = { fontSize: q.fontSize ? `${q.fontSize}px` : '18px', fontWeight: q.isBold ? 'bold' : 'normal', fontFamily: q.fontFamily || 'inherit', lineHeight: 1.3 };
+                                const subPointStyle = { fontSize: q.subPointsFontSize ? `${q.subPointsFontSize}px` : '16px', fontFamily: q.subPointsFontFamily || q.fontFamily || 'inherit', fontWeight: q.subPointsIsBold !== undefined ? (q.subPointsIsBold ? 'bold' : 'normal') : 'bold', lineHeight: 1.3 };
                                 const ActionButtons = () => (
                                     <div className="absolute left-[-50px] top-0 flex flex-col gap-1 no-print z-20">
-                                        <button 
-                                            onClick={() => onDelete(q.id)}
-                                            className="p-1 text-red-400 hover:text-red-600 bg-white shadow-sm rounded border border-slate-100"
-                                            title="حذف"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                            onClick={() => onEdit(q)}
-                                            className="p-1 text-blue-400 hover:text-blue-600 bg-white shadow-sm rounded border border-slate-100"
-                                            title="تعديل"
-                                        >
-                                            <Pencil className="w-4 h-4" />
-                                        </button>
+                                        <button onClick={() => onDelete(q.id)} className="p-1 text-red-400 hover:text-red-600 bg-white shadow-sm rounded border border-slate-100" title="حذف"><Icons.Trash2 className="w-4 h-4" /></button>
+                                        <button onClick={() => onEdit(q)} className="p-1 text-blue-400 hover:text-blue-600 bg-white shadow-sm rounded border border-slate-100" title="تعديل"><Icons.Pencil className="w-4 h-4" /></button>
                                         <div className="flex flex-col mt-1">
-                                            {!isFirst && (
-                                                <button 
-                                                    onClick={() => onMove(q.id, 'up')}
-                                                    className="p-1 text-slate-400 hover:text-slate-600 bg-white shadow-sm rounded-t border border-slate-100"
-                                                    title="نقل لأعلى"
-                                                >
-                                                    <ArrowUp className="w-3 h-3" />
-                                                </button>
-                                            )}
-                                            {!isLast && (
-                                                <button 
-                                                    onClick={() => onMove(q.id, 'down')}
-                                                    className="p-1 text-slate-400 hover:text-slate-600 bg-white shadow-sm rounded-b border-t-0 border border-slate-100"
-                                                    title="نقل لأسفل"
-                                                >
-                                                    <ArrowDown className="w-3 h-3" />
-                                                </button>
-                                            )}
+                                            {!isFirst && (<button onClick={() => onMove(q.id, 'up')} className="p-1 text-slate-400 hover:text-slate-600 bg-white shadow-sm rounded-t border border-slate-100" title="نقل لأعلى"><Icons.ArrowUp className="w-3 h-3" /></button>)}
+                                            {!isLast && (<button onClick={() => onMove(q.id, 'down')} className="p-1 text-slate-400 hover:text-slate-600 bg-white shadow-sm rounded-b border-t-0 border border-slate-100" title="نقل لأسفل"><Icons.ArrowDown className="w-3 h-3" /></button>)}
                                         </div>
                                     </div>
                                 );
-
                                 if (q.type === QuestionType.Separator) {
                                     return (
                                         <div key={q.id} className="group relative w-full py-1 text-center hover:bg-slate-50 transition-colors">
@@ -1035,105 +464,40 @@
                                             {q.text === 'SEPARATOR_STARS' && <div className="text-xl tracking-[1em] text-slate-800">★ ★ ★</div>}
                                             {q.text === 'SEPARATOR_FLOWERS' && <div className="text-xl tracking-[1em] text-slate-800">❀ ❀ ❀</div>}
                                             {q.text === 'SEPARATOR_GEOMETRIC' && <div className="text-xl tracking-[1em] text-slate-800">◆ ◇ ◆</div>}
-                                            
                                             {!['SEPARATOR_SOLID', 'SEPARATOR_DASHED', 'SEPARATOR_DOUBLE', 'SEPARATOR_STARS', 'SEPARATOR_FLOWERS', 'SEPARATOR_GEOMETRIC'].includes(q.text) && (
-                                                <div className="flex items-center justify-center gap-4">
-                                                    <div className="h-px bg-slate-800 flex-grow max-w-[50px]"></div>
-                                                    <span className="font-bold text-lg">{q.text}</span>
-                                                    <div className="h-px bg-slate-800 flex-grow max-w-[50px]"></div>
-                                                </div>
+                                                <div className="flex items-center justify-center gap-4"><div className="h-px bg-slate-800 flex-grow max-w-[50px]"></div><span className="font-bold text-lg">{q.text}</span><div className="h-px bg-slate-800 flex-grow max-w-[50px]"></div></div>
                                             )}
                                         </div>
                                     );
                                 }
-
                                 return (
                                     <div key={q.id} className="group relative flex items-start gap-4 hover:bg-slate-50 transition-colors rounded p-1 -mx-1">
                                         <ActionButtons />
                                         <div className="flex-grow text-right">
                                             <div className="w-full">
-                                                <p className="text-slate-900 text-justify" style={questionStyle}>
-                                                    <span className="whitespace-nowrap ml-2 font-bold inline-block" style={{ ...questionStyle, textDecoration: 'underline' }}>
-                                                        {q.label ? q.label : `س ${index + 1} /`}
-                                                    </span>
-                                                    {q.text}
-                                                </p>
-
+                                                <p className="text-slate-900 text-justify" style={questionStyle}><span className="whitespace-nowrap ml-2 font-bold inline-block" style={{ ...questionStyle, textDecoration: 'underline' }}>{q.label ? q.label : `س ${index + 1} /`}</span>{q.text}</p>
                                                 {q.subPoints && q.subPoints.length > 0 && (
                                                     <>
-                                                        {q.subPointsStyle === 'inline' ? (
-                                                            <div className="mt-1 text-slate-900 text-right" style={subPointStyle}>
-                                                                {q.subPoints.map((point, i) => (
-                                                                    <span key={i} className="ml-6 inline-block">
-                                                                        {i + 1}- {point}
-                                                                    </span>
-                                                                ))}
-                                                            </div>
-                                                        ) : (
-                                                            <div className="mt-1 mr-4">
-                                                                {q.subPoints.map((point, i) => (
-                                                                    <div key={i} className="text-slate-900" style={subPointStyle}>
-                                                                        {i + 1}- {point}
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
+                                                        {q.subPointsStyle === 'inline' ? (<div className="mt-1 text-slate-900 text-right" style={subPointStyle}>{q.subPoints.map((point, i) => (<span key={i} className="ml-6 inline-block">{i + 1}- {point}</span>))}</div>) : (<div className="mt-1 mr-4">{q.subPoints.map((point, i) => (<div key={i} className="text-slate-900" style={subPointStyle}>{i + 1}- {point}</div>))}</div>)}
                                                     </>
                                                 )}
-                                                
-                                                {(q.type === QuestionType.MultipleChoice || (q.options && q.options.length > 0)) && (
-                                                    <div className="mt-1 grid grid-cols-2 md:grid-cols-4 gap-4 px-4">
-                                                        {q.options?.map((opt, i) => (
-                                                            <span key={i} className="text-base text-slate-800 leading-tight">
-                                                                {i + 1}. {opt}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                                
-                                                {q.type === QuestionType.TrueFalse && (
-                                                    <div className="mt-0.5 text-slate-600 text-sm">
-                                                        (صح / خطأ)
-                                                    </div>
-                                                )}
+                                                {(q.type === QuestionType.MultipleChoice || (q.options && q.options.length > 0)) && (<div className="mt-1 grid grid-cols-2 md:grid-cols-4 gap-4 px-4">{q.options?.map((opt, i) => (<span key={i} className="text-base text-slate-800 leading-tight">{i + 1}. {opt}</span>))}</div>)}
+                                                {q.type === QuestionType.TrueFalse && (<div className="mt-0.5 text-slate-600 text-sm">(صح / خطأ)</div>)}
                                             </div>
-                                            
-                                            {showAnswers && q.correctAnswer && (
-                                                <div className="mt-2 mr-10 p-2 bg-green-50 text-green-800 text-sm border border-green-200 inline-block no-print">
-                                                    الجواب: {q.correctAnswer}
-                                                </div>
-                                            )}
+                                            {showAnswers && q.correctAnswer && (<div className="mt-2 mr-10 p-2 bg-green-50 text-green-800 text-sm border border-green-200 inline-block no-print">الجواب: {q.correctAnswer}</div>)}
                                         </div>
-
-                                        {!q.hidePoints && (
-                                            <div className="flex-shrink-0 w-16 text-left font-bold pt-1">
-                                                <span className="inline-block border border-slate-800 rounded-full px-2 py-0.5 text-sm min-w-[3rem] text-center leading-tight">
-                                                    {q.points} د
-                                                </span>
-                                            </div>
-                                        )}
+                                        {!q.hidePoints && (<div className="flex-shrink-0 w-16 text-left font-bold pt-1"><span className="inline-block border border-slate-800 rounded-full px-2 py-0.5 text-sm min-w-[3rem] text-center leading-tight">{q.points} د</span></div>)}
                                     </div>
                                 );
                             })}
                         </div>
-
-                        {/* --- FOOTER SECTION --- */}
                         <div className="absolute bottom-6 left-0 right-0 px-6">
                             <div className="flex justify-between items-end mt-4 pt-4">
-                                <div className="text-center w-1/3">
-                                    <p className="font-bold">{header.teacherLabel || 'مدرس المادة'}</p>
-                                    <p className="mt-4 text-slate-800">{header.teacherName || '..................'}</p>
-                                </div>
-                                
-                                <div className="text-center w-1/3">
-                                    <p className="font-bold text-lg">دعائي لكم بالنجاح</p>
-                                </div>
-
-                                <div className="text-center w-1/3">
-                                </div>
+                                <div className="text-center w-1/3"><p className="font-bold">{header.teacherLabel || 'مدرس المادة'}</p><p className="mt-4 text-slate-800">{header.teacherName || '..................'}</p></div>
+                                <div className="text-center w-1/3"><p className="font-bold text-lg">دعائي لكم بالنجاح</p></div>
+                                <div className="text-center w-1/3"></div>
                             </div>
                         </div>
-
                     </div>
                 </div>
                 </div>
@@ -1142,143 +506,54 @@
 
         // 5. App Component
         const App = () => {
-            const [header, setHeader] = useState({
-                directorate: 'إدارة',
-                schoolName: '',
-                examName: 'امتحانات نصف السنة',
-                round: 'الدور الأول',
-                year: '2025 - 2026',
-                subject: '',
-                grade: '',
-                time: 'ساعتان',
-                note: 'الإجابة عن جميع الأسئلة',
-                teacherLabel: 'مدرس المادة',
-                teacherName: '',
-                borderStyle: 'double'
-            });
-
+            const [header, setHeader] = useState({ directorate: 'إدارة', schoolName: '', examName: 'امتحانات نصف السنة', round: 'الدور الأول', year: '2025 - 2026', subject: '', grade: '', time: 'ساعتان', note: 'الإجابة عن جميع الأسئلة', teacherLabel: 'مدرس المادة', teacherName: '', borderStyle: 'double' });
             const [questions, setQuestions] = useState([]);
             const [showAnswers, setShowAnswers] = useState(false);
             const [editingQuestion, setEditingQuestion] = useState(null);
 
-            const handleAddManualQuestion = (question) => {
-                setQuestions(prev => [...prev, question]);
-            };
-
-            const handleUpdateQuestion = (updatedQuestion) => {
-                setQuestions(prev => prev.map(q => q.id === updatedQuestion.id ? updatedQuestion : q));
-                setEditingQuestion(null);
-            };
-
-            const handleCancelEdit = () => {
-                setEditingQuestion(null);
-            };
-
-            const handleDeleteQuestion = (id) => {
-                setQuestions(prev => prev.filter(q => q.id !== id));
-                if (editingQuestion?.id === id) {
-                setEditingQuestion(null);
-                }
-            };
-
-            const handleEditQuestion = (question) => {
-                setEditingQuestion(question);
-                const formElement = document.getElementById('manual-question-form');
-                if (formElement) {
-                    formElement.scrollIntoView({ behavior: 'smooth' });
-                }
-            };
-
-            const handleMoveQuestion = (id, direction) => {
-                const index = questions.findIndex(q => q.id === id);
-                if (index === -1) return;
-                if (direction === 'up' && index === 0) return;
-                if (direction === 'down' && index === questions.length - 1) return;
-
-                const newQuestions = [...questions];
-                const targetIndex = direction === 'up' ? index - 1 : index + 1;
-                
-                [newQuestions[index], newQuestions[targetIndex]] = [newQuestions[targetIndex], newQuestions[index]];
-                setQuestions(newQuestions);
-            };
-
-            const handlePrint = () => {
-                window.print();
-            };
+            const handleAddManualQuestion = (question) => { setQuestions(prev => [...prev, question]); };
+            const handleUpdateQuestion = (updatedQuestion) => { setQuestions(prev => prev.map(q => q.id === updatedQuestion.id ? updatedQuestion : q)); setEditingQuestion(null); };
+            const handleCancelEdit = () => { setEditingQuestion(null); };
+            const handleDeleteQuestion = (id) => { setQuestions(prev => prev.filter(q => q.id !== id)); if (editingQuestion?.id === id) { setEditingQuestion(null); } };
+            const handleEditQuestion = (question) => { setEditingQuestion(question); const formElement = document.getElementById('manual-question-form'); if (formElement) { formElement.scrollIntoView({ behavior: 'smooth' }); } };
+            const handleMoveQuestion = (id, direction) => { const index = questions.findIndex(q => q.id === id); if (index === -1) return; if (direction === 'up' && index === 0) return; if (direction === 'down' && index === questions.length - 1) return; const newQuestions = [...questions]; const targetIndex = direction === 'up' ? index - 1 : index + 1; [newQuestions[index], newQuestions[targetIndex]] = [newQuestions[targetIndex], newQuestions[index]]; setQuestions(newQuestions); };
+            const handlePrint = () => { window.print(); };
 
             return (
                 <div className="min-h-screen flex flex-col bg-slate-100">
                 <header className="bg-white border-b border-slate-200 sticky top-0 z-50 no-print shadow-sm">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-indigo-600 p-2 rounded-lg">
-                            <PenTool className="w-6 h-6 text-white" />
-                        </div>
-                        <h1 className="text-xl font-bold text-slate-800 tracking-tight">صانع الامتحانات</h1>
-                    </div>
+                    <div className="flex items-center gap-3"><div className="bg-indigo-600 p-2 rounded-lg"><Icons.PenTool className="w-6 h-6 text-white" /></div><h1 className="text-xl font-bold text-slate-800 tracking-tight">صانع الامتحانات</h1></div>
                     <div className="flex gap-3">
                         {questions.length > 0 && (
                             <>
-                                <button 
-                                    onClick={() => setShowAnswers(!showAnswers)}
-                                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-50 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200"
-                                >
-                                    {showAnswers ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                    {showAnswers ? 'إخفاء الأجوبة' : 'عرض الأجوبة'}
-                                </button>
-                                <button 
-                                    onClick={handlePrint}
-                                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"
-                                >
-                                    <Printer className="w-4 h-4" />
-                                    طباعة الورقة
-                                </button>
+                                <button onClick={() => setShowAnswers(!showAnswers)} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-50 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200">{showAnswers ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}{showAnswers ? 'إخفاء الأجوبة' : 'عرض الأجوبة'}</button>
+                                <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"><Icons.Printer className="w-4 h-4" /> طباعة الورقة</button>
                             </>
                         )}
                     </div>
                     </div>
                 </header>
-
                 <main className="flex-grow p-4 sm:p-8">
                     <div className="max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-12 gap-8">
-                    
                     <div className="xl:col-span-4 no-print space-y-6">
                         <ExamHeaderForm header={header} setHeader={setHeader} />
                         <SeparatorForm onAddQuestion={handleAddManualQuestion} />
-                        <div id="manual-question-form">
-                            <ManualQuestionForm 
-                                onAddQuestion={handleAddManualQuestion}
-                                questionToEdit={editingQuestion}
-                                onUpdateQuestion={handleUpdateQuestion}
-                                onCancelEdit={handleCancelEdit}
-                            />
-                        </div>
+                        <div id="manual-question-form"><ManualQuestionForm onAddQuestion={handleAddManualQuestion} questionToEdit={editingQuestion} onUpdateQuestion={handleUpdateQuestion} onCancelEdit={handleCancelEdit} /></div>
                     </div>
-
                     <div className="xl:col-span-8 print:w-full print:col-span-12 flex justify-center bg-slate-200/50 p-4 rounded-3xl print:p-0 print:bg-white print:block">
-                        <ExamPreview 
-                            questions={questions}
-                            header={header}
-                            onDelete={handleDeleteQuestion}
-                            onEdit={handleEditQuestion}
-                            onMove={handleMoveQuestion}
-                            showAnswers={showAnswers}
-                        />
+                        <ExamPreview questions={questions} header={header} onDelete={handleDeleteQuestion} onEdit={handleEditQuestion} onMove={handleMoveQuestion} showAnswers={showAnswers} />
                     </div>
-
                     </div>
                 </main>
-                
-                <footer className="bg-white border-t border-slate-200 py-6 mt-auto no-print">
-                    <div className="max-w-7xl mx-auto px-4 text-center text-slate-500 text-sm">
-                    &copy; {new Date().getFullYear()} ExamMaker. جميع الحقوق محفوظة.
-                    </div>
-                </footer>
+                <footer className="bg-white border-t border-slate-200 py-6 mt-auto no-print"><div className="max-w-7xl mx-auto px-4 text-center text-slate-500 text-sm">&copy; {new Date().getFullYear()} ExamMaker. جميع الحقوق محفوظة.</div></footer>
                 </div>
             );
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
+        // Initialize App
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
         root.render(<App />);
     </script>
 </body>
