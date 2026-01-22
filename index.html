@@ -1,198 +1,46 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام أرشيف الكنعان الذكي</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>مولد الاختبارات الذكي</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@300;400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #0f172a; color: white; font-family: 'Segoe UI', sans-serif; }
-        .card { background: #1e293b; border-radius: 1rem; padding: 1.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); }
-        .input-style { background: #334155; border: 1px solid #475569; border-radius: 0.5rem; padding: 0.7rem; width: 100%; color: white; outline: none; }
-        .input-style:focus { border-color: #10b981; }
-        .btn-save { background: #10b981; transition: 0.3s; width: 100%; padding: 0.8rem; border-radius: 0.5rem; font-weight: bold; }
-        .btn-save:hover { background: #059669; transform: translateY(-2px); }
-        .btn-save:disabled { background: #475569; cursor: not-allowed; }
+      body {
+        font-family: 'Cairo', sans-serif;
+        background-color: #f8fafc;
+      }
+      @media print {
+        .no-print {
+          display: none !important;
+        }
+        .print-only {
+          display: block !important;
+        }
+        body {
+          background-color: white;
+        }
+        .page-break {
+          page-break-inside: avoid;
+        }
+      }
     </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0"
+  }
+}
+</script>
 </head>
-<body class="p-4 md:p-8">
-
-    <div class="max-w-4xl mx-auto">
-        <header class="text-center mb-10">
-            <h1 class="text-4xl font-bold text-emerald-400 mb-2">أرشيف الطلاب الرقمي</h1>
-            <p class="text-slate-400">نظام تخزين سحابي غير محدود عبر Telegram API</p>
-        </header>
-
-        <div class="card mb-10">
-            <h2 class="text-xl font-semibold mb-6 flex items-center gap-2 text-emerald-300">
-                <span>📥</span> تسجيل طالب جديد
-            </h2>
-            <form id="studentForm" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <input type="text" id="name" placeholder="الاسم الكامل للطالب" class="input-style" required>
-                <input type="text" id="uid" placeholder="رقم القيد" class="input-style" required>
-                
-                <div class="space-y-2">
-                    <label class="text-sm text-slate-400">الصورة الشخصية (الجودة الأصلية)</label>
-                    <input type="file" id="pPhoto" class="input-style" accept="image/*">
-                </div>
-
-                <div class="space-y-2">
-                    <label class="text-sm text-slate-400">صورة صفحة المعلومات</label>
-                    <input type="file" id="iPage" class="input-style" accept="image/*">
-                </div>
-
-                <button type="submit" id="saveBtn" class="md:col-span-2 btn-save">حفظ في الأرشيف</button>
-            </form>
-            <div id="status" class="hidden mt-4 p-3 rounded text-center bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                جاري رفع الصور للأرشيف.. يرجى الانتظار
-            </div>
-        </div>
-
-        <div class="card">
-            <h2 class="text-xl font-semibold mb-6 text-emerald-300">سجل الطلاب المأرشفين</h2>
-            <div class="overflow-x-auto text-right">
-                <table class="w-full border-collapse">
-                    <thead>
-                        <tr class="text-slate-500 border-b border-slate-700">
-                            <th class="p-3">رقم القيد</th>
-                            <th class="p-3">الاسم</th>
-                            <th class="p-3">الإجراء</th>
-                        </tr>
-                    </thead>
-                    <tbody id="listBody"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <div id="modal" class="fixed inset-0 bg-black/90 hidden items-center justify-center p-4 z-50">
-        <div class="bg-slate-800 w-full max-w-2xl rounded-2xl p-8 relative">
-            <button onclick="closeModal()" class="absolute top-4 left-4 text-2xl hover:text-red-500">✕</button>
-            <div id="modalContent" class="text-center"></div>
-        </div>
-    </div>
-
-    <script>
-        // --- إعدادات Firebase الخاصة بك ---
-        // (ضع إعدادات مشروعك هنا لتفعيل قاعدة البيانات)
-        const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_AUTH_DOMAIN",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-
-        // --- إعدادات تلجرام التي زودتني بها ---
-        const TG = {
-            TOKEN: '8513150426:AAFVDjMF-2hfWiW-4CCc3WNxWXnuQ4WfMFY',
-            CHAT_ID: '-1003325942139'
-        };
-
-        // دالة الرفع لتلجرام كملف (Document) لضمان عدم نقص الجودة
-        async function uploadFile(file, studentId, type) {
-            const formData = new FormData();
-            formData.append('chat_id', TG.CHAT_ID);
-            formData.append('document', file);
-            formData.append('caption', `طالب: ${studentId} | نوع الملف: ${type}`);
-
-            const res = await fetch(`https://api.telegram.org/bot${TG.TOKEN}/sendDocument`, {
-                method: 'POST',
-                body: formData
-            });
-            const data = await res.json();
-            return data.ok ? data.result.document.file_id : null;
-        }
-
-        // حفظ البيانات
-        document.getElementById('studentForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = document.getElementById('saveBtn');
-            const status = document.getElementById('status');
-            
-            btn.disabled = true;
-            status.classList.remove('hidden');
-
-            const pFile = document.getElementById('pPhoto').files[0];
-            const iFile = document.getElementById('iPage').files[0];
-            const sName = document.getElementById('name').value;
-            const sId = document.getElementById('uid').value;
-
-            try {
-                const pId = pFile ? await uploadFile(pFile, sId, "شخصية") : null;
-                const iId = iFile ? await uploadFile(iFile, sId, "صفحة معلومات") : null;
-
-                await db.collection("students_archive").add({
-                    name: sName,
-                    uid: sId,
-                    photoId: pId,
-                    infoId: iId,
-                    date: new Date().toISOString()
-                });
-
-                alert("تمت الأرشفة بنجاح في تلجرام و Firebase");
-                e.target.reset();
-            } catch (err) {
-                alert("حدث خطأ في الاتصال");
-            } finally {
-                btn.disabled = false;
-                status.classList.add('hidden');
-            }
-        });
-
-        // جلب البيانات وعرضها
-        db.collection("students_archive").orderBy("date", "desc").onSnapshot(snap => {
-            const list = document.getElementById('listBody');
-            list.innerHTML = '';
-            snap.forEach(doc => {
-                const s = doc.data();
-                list.innerHTML += `
-                    <tr class="border-b border-slate-800 hover:bg-slate-700/30 transition">
-                        <td class="p-4 text-emerald-400 font-mono">${s.uid}</td>
-                        <td class="p-4 font-bold">${s.name}</td>
-                        <td class="p-4">
-                            <button onclick="showProfile('${doc.id}')" class="bg-slate-700 px-3 py-1 rounded text-sm hover:bg-emerald-600 transition">تحميل/عرض</button>
-                        </td>
-                    </tr>
-                `;
-            });
-        });
-
-        async function showProfile(id) {
-            const doc = await db.collection("students_archive").doc(id).get();
-            const s = doc.data();
-            const content = document.getElementById('modalContent');
-            
-            content.innerHTML = `
-                <h3 class="text-2xl font-bold mb-4">${s.name}</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="bg-slate-700 p-4 rounded-xl">
-                        <p class="text-sm text-slate-400 mb-2">معرف الصورة الشخصية</p>
-                        <code class="text-xs text-emerald-300 break-all">${s.photoId || 'لا توجد'}</code>
-                    </div>
-                    <div class="bg-slate-700 p-4 rounded-xl">
-                        <p class="text-sm text-slate-400 mb-2">معرف صفحة المعلومات</p>
-                        <code class="text-xs text-sky-300 break-all">${s.infoId || 'لا توجد'}</code>
-                    </div>
-                </div>
-                <div class="mt-6 text-sm text-slate-400 leading-relaxed">
-                    💡 الصور محفوظة بأمان في قناتك الخاصة على تلجرام.<br>
-                    يمكنك جلب الصورة الأصلية (5MB) من القناة باستخدام الـ ID الموضح أعلاه.
-                </div>
-            `;
-            document.getElementById('modal').classList.remove('hidden');
-            document.getElementById('modal').classList.add('flex');
-        }
-
-        function closeModal() {
-            document.getElementById('modal').classList.add('hidden');
-            document.getElementById('modal').classList.remove('flex');
-        }
-    </script>
-</body>
+  <body>
+    <div id="root"></div>
+  </body>
 </html>
