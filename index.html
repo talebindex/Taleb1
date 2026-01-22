@@ -20,7 +20,7 @@
     <!-- Lucide Icons (UMD) -->
     <script src="https://unpkg.com/lucide-react@0.344.0/dist/umd/lucide-react.min.js"></script>
     
-    <!-- Babel Standalone (for JSX/TS) -->
+    <!-- Babel Standalone (Compiles JSX/TS in browser) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
@@ -40,7 +40,6 @@
           margin: 0;
           padding: 0;
         }
-        /* Ensure background colors print */
         * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
@@ -50,7 +49,6 @@
             margin: 0;
         }
       }
-      /* Custom Scrollbar */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
@@ -69,11 +67,11 @@
 <script type="importmap">
 {
   "imports": {
-    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3"
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0"
   }
 }
 </script>
@@ -81,8 +79,10 @@
 <body>
     <div id="root"></div>
 
+    <!-- Main Application Script -->
     <script type="text/babel" data-presets="react,typescript">
         const { useState, useEffect } = React;
+        // Destructure icons from global lucideReact object
         const { 
             Trash2, Pencil, ArrowUp, ArrowDown, 
             PlusCircle, SplitSquareVertical, Save, X, Plus, 
@@ -91,7 +91,7 @@
             School, UserPen, Frame, Printer, PenTool
         } = lucideReact;
 
-        // --- Types & Enums ---
+        // --- Types & Enums (Merged from types.ts) ---
         enum Difficulty {
             Easy = "سهل",
             Medium = "متوسط",
@@ -140,7 +140,7 @@
             borderStyle?: string;
         }
 
-        // --- Components ---
+        // --- COMPONENTS ---
 
         // 1. ExamHeaderForm
         const ExamHeaderForm = ({ header, setHeader }) => {
@@ -160,7 +160,7 @@
                 </h2>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Right Side Info */}
+                    {/* Right Side */}
                     <div className="space-y-3">
                     <input
                         type="text"
@@ -178,7 +178,7 @@
                     />
                     </div>
 
-                    {/* Center/Left Info */}
+                    {/* Left Side */}
                     <div className="space-y-3">
                     <select
                         value={header.examName}
@@ -211,7 +211,7 @@
                     </select>
                     </div>
 
-                    {/* Exam Details */}
+                    {/* Subject/Grade/Time */}
                     <div className="col-span-1 md:col-span-2 grid grid-cols-3 gap-2 pt-2 border-t border-slate-100">
                     <input
                         type="text"
