@@ -1,560 +1,1285 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ar" lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>مولد الاختبارات الذكي</title>
+    <title>فهرس القيد الذكي</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@300;400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
-    
-    <!-- React & ReactDOM (UMD) -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
-    <!-- Babel Standalone -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-    <style>
-      body {
-        font-family: 'Cairo', sans-serif;
-        background-color: #f8fafc;
-      }
-      @media print {
-        .no-print {
-          display: none !important;
+    <script type="text/javascript">
+        /* <![CDATA[ */
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#0ea5e9',
+                        secondary: '#6366f1',
+                        dark: '#0f172a',
+                        card: '#1e293b'
+                    },
+                    fontFamily: {
+                        sans: ['Tajawal', 'sans-serif'],
+                    }
+                }
+            }
         }
-        .print-only {
-          display: block !important;
-        }
-        body {
-          background-color: white;
-          margin: 0;
-          padding: 0;
-        }
-        * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-        }
-        @page {
-            size: A4;
-            margin: 0;
-        }
-      }
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #f1f5f9; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #cbd5e1; 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8; 
-      }
-      /* Error Container */
-      #error-container {
-        display: none;
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(255,255,255,0.95);
-        z-index: 9999;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        color: #ef4444;
-        padding: 20px;
-      }
-    </style>
-<script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0"
-  }
-}
-</script>
-</head>
-<body>
-    <div id="root"></div>
-    
-    <div id="error-container">
-        <h2 class="text-2xl font-bold mb-4">عذراً، حدث خطأ في التطبيق</h2>
-        <div id="error-message" class="bg-red-50 p-4 rounded border border-red-200 font-mono text-sm text-left dir-ltr"></div>
-        <button onclick="window.location.reload()" class="mt-6 px-4 py-2 bg-slate-800 text-white rounded">تحديث الصفحة</button>
-    </div>
-
-    <script>
-        // Global Error Handler
-        window.onerror = function(msg, url, line, col, error) {
-            document.getElementById('root').style.display = 'none';
-            document.getElementById('error-container').style.display = 'flex';
-            document.getElementById('error-message').textContent = msg + "\nLine: " + line;
-            return false;
-        };
+        /* ]]> */
     </script>
 
-    <script type="text/babel">
-        // --- 1. SETUP & UTILS ---
-        const { useState, useEffect, useRef } = React;
+    <!-- Babel for JSX transformation in browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style type="text/css">
+        /* <![CDATA[ */
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
         
-        // --- 2. ICONS (Inlined for reliability) ---
-        const Icons = {
-            Trash2: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
-            Pencil: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>,
-            ArrowUp: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>,
-            ArrowDown: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>,
-            PlusCircle: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>,
-            SplitSquareVertical: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M5 8V5c0-1 1-2 2-2h10c1 0 2 1 2 2v3"/><path d="M19 16v3c0 1-1 2-2 2H7c-1 0-2-1-2-2v-3"/><line x1="4" x2="20" y1="12" y2="12"/></svg>,
-            Save: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
-            X: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
-            Plus: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
-            AlignJustify: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="3" x2="21" y1="6" y2="6"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="21" y1="18" y2="18"/></svg>,
-            AlignLeft: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="17" x2="3" y1="6" y2="6"/><line x1="21" x2="3" y1="12" y2="12"/><line x1="17" x2="3" y1="18" y2="18"/></svg>,
-            Bold: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M14 12a4 4 0 0 0 0-8H6v8"/><path d="M15 20a4 4 0 0 0 0-8H6v8Z"/></svg>,
-            EyeOff: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>,
-            Eye: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>,
-            School: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m4 6 8-4 8 4"/><path d="m18 10 4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2"/><path d="M14 22v-4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v4"/><path d="M18 5v17"/><path d="M6 5v17"/><circle cx="12" cy="9" r="2"/></svg>,
-            UserPen: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M11.5 15H7a4 4 0 0 0-4 4v2"/><path d="M21.378 16.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/><circle cx="10" cy="7" r="4"/></svg>,
-            Frame: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="22" x2="2" y1="6" y2="6"/><line x1="22" x2="2" y1="18" y2="18"/><line x1="6" x2="6" y1="2" y2="22"/><line x1="18" x2="18" y1="2" y2="22"/></svg>,
-            Printer: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>,
-            PenTool: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
-        };
+        body {
+            font-family: 'Tajawal', sans-serif;
+        }
 
-        // --- 3. TYPES & CONSTANTS ---
-        const QuestionType = {
-            MultipleChoice: "اختيار من متعدد",
-            TrueFalse: "صح أو خطأ",
-            ShortAnswer: "إجابة قصيرة",
-            Mixed: "مختلط",
-            Separator: "فاصل / عنوان"
-        };
-
-        // --- 4. COMPONENTS ---
-
-        // 4.1 ExamHeaderForm
-        const ExamHeaderForm = ({ header, setHeader }) => {
-            const handleChange = (field, value) => {
-                setHeader(prev => ({ ...prev, [field]: value }));
-            };
-
-            const academicYears = ["2025 - 2026", "2026 - 2027", "2027 - 2028", "2028 - 2029"];
-            const rounds = ["الدور الأول", "الدور الثاني", "الدور الثالث", "الدور التمهيدي", "بدون دور"];
-            const examTypes = ["امتحانات نصف السنة", "امتحانات نهاية السنة", "امتحان شهري", "امتحان يومي"];
-
-            return (
-                <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-100 mb-6">
-                <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <Icons.School className="w-6 h-6 text-indigo-600" />
-                    ترويسة وتذييل الامتحان
-                </h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-3">
-                    <input type="text" value={header.directorate} onChange={(e) => handleChange('directorate', e.target.value)} placeholder="المديرية / الوزارة" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" />
-                    <input type="text" value={header.schoolName} onChange={(e) => handleChange('schoolName', e.target.value)} placeholder="اسم المدرسة" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" />
-                    </div>
-
-                    <div className="space-y-3">
-                    <select value={header.examName} onChange={(e) => handleChange('examName', e.target.value)} className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none bg-white font-medium">
-                        {examTypes.map((type) => <option key={type} value={type}>{type}</option>)}
-                    </select>
-                    <select value={header.round || 'الدور الأول'} onChange={(e) => handleChange('round', e.target.value)} className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none bg-white">
-                        {rounds.map((round) => <option key={round} value={round}>{round}</option>)}
-                    </select>
-                    <select value={header.year} onChange={(e) => handleChange('year', e.target.value)} className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none bg-white">
-                        {academicYears.map((year) => <option key={year} value={year}>{year}</option>)}
-                    </select>
-                    </div>
-
-                    <div className="col-span-1 md:col-span-2 grid grid-cols-3 gap-2 pt-2 border-t border-slate-100">
-                    <input type="text" value={header.subject} onChange={(e) => handleChange('subject', e.target.value)} placeholder="المادة" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" />
-                    <input type="text" value={header.grade} onChange={(e) => handleChange('grade', e.target.value)} placeholder="الصف" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" />
-                    <input type="text" value={header.time} onChange={(e) => handleChange('time', e.target.value)} placeholder="الوقت" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" />
-                    </div>
-
-                    <div className="col-span-1 md:col-span-2">
-                        <input type="text" value={header.note} onChange={(e) => handleChange('note', e.target.value)} placeholder="ملاحظة علوية (اختياري)" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none text-red-500 placeholder-red-300" />
-                    </div>
-
-                    <div className="col-span-1 md:col-span-2 pt-4 mt-2 border-t border-slate-100">
-                        <h3 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><Icons.Frame className="w-4 h-4" /> تنسيق الورقة (الإطار)</h3>
-                        <select value={header.borderStyle || 'double'} onChange={(e) => handleChange('borderStyle', e.target.value)} className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none bg-white">
-                            <option value="simple">إطار خط واحد (Simple)</option>
-                            <option value="double">إطار مزدوج رسمي (Double)</option>
-                            <option value="thick">إطار سميك (Thick)</option>
-                            <option value="dashed">إطار متقطع (Dashed)</option>
-                            <option value="ridge">إطار مزخرف (Ridge)</option>
-                        </select>
-                    </div>
-
-                    <div className="col-span-1 md:col-span-2 pt-4 mt-2 border-t border-slate-100">
-                        <h3 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><Icons.UserPen className="w-4 h-4" /> توقيع الورقة (التذييل)</h3>
-                        <div className="grid grid-cols-2 gap-2">
-                            <input type="text" value={header.teacherLabel} onChange={(e) => handleChange('teacherLabel', e.target.value)} placeholder="عنوان الموقع (مثال: مدرس المادة)" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" />
-                            <input type="text" value={header.teacherName} onChange={(e) => handleChange('teacherName', e.target.value)} placeholder="الاسم (اختياري)" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" />
-                        </div>
-                    </div>
-                </div>
-                </div>
-            );
-        };
-
-        // 4.2 SeparatorForm
-        const SeparatorForm = ({ onAddQuestion }) => {
-            const [separatorStyle, setSeparatorStyle] = useState('SEPARATOR_SOLID');
-            const [customText, setCustomText] = useState('');
-
-            const handleAdd = () => {
-                if (separatorStyle === 'CUSTOM' && !customText) return;
-                let finalText = separatorStyle === 'CUSTOM' ? customText : separatorStyle;
-                const newQuestion = { id: `sep-${Date.now()}`, text: finalText, type: QuestionType.Separator, points: 0, label: '' };
-                onAddQuestion(newQuestion);
-                if (separatorStyle === 'CUSTOM') setCustomText('');
-            };
-
-            const renderPreview = () => {
-                switch(separatorStyle) {
-                    case 'SEPARATOR_SOLID': return <hr className="border-t-2 border-slate-400 w-full" />;
-                    case 'SEPARATOR_DASHED': return <hr className="border-t-2 border-dashed border-slate-400 w-full" />;
-                    case 'SEPARATOR_DOUBLE': return <hr className="border-t-4 border-double border-slate-400 w-full" />;
-                    case 'SEPARATOR_STARS': return <div className="text-xl tracking-[1em] text-center text-slate-800">★ ★ ★</div>;
-                    case 'SEPARATOR_FLOWERS': return <div className="text-xl tracking-[1em] text-center text-slate-800">❀ ❀ ❀</div>;
-                    case 'SEPARATOR_GEOMETRIC': return <div className="text-xl tracking-[1em] text-center text-slate-800">◆ ◇ ◆</div>;
-                    case 'CUSTOM': return <div className="text-center text-slate-500 text-sm">{customText || '(نص العنوان)'}</div>;
-                    default: return null;
-                }
-            };
-
-            return (
-                <div className="bg-white p-4 rounded-2xl shadow-lg border border-slate-100 mb-6">
-                    <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><Icons.SplitSquareVertical className="w-4 h-4 text-orange-600" /> إدراج فاصل زخرفي أو عنوان قسم</h3>
-                    <div className="flex flex-col gap-3">
-                        <select value={separatorStyle} onChange={(e) => setSeparatorStyle(e.target.value)} className="w-full p-2 text-sm rounded border border-slate-200 focus:border-orange-500 outline-none bg-white">
-                            <option value="SEPARATOR_SOLID">خط متصل</option>
-                            <option value="SEPARATOR_DASHED">خط متقطع</option>
-                            <option value="SEPARATOR_DOUBLE">خط مزدوج</option>
-                            <option value="SEPARATOR_STARS">نجوم (★ ★ ★)</option>
-                            <option value="SEPARATOR_FLOWERS">زخرفة أزهار (❀ ❀ ❀)</option>
-                            <option value="SEPARATOR_GEOMETRIC">شكل هندسي (◆ ◇ ◆)</option>
-                            <option value="CUSTOM">عنوان نصي مخصص</option>
-                        </select>
-                        {separatorStyle === 'CUSTOM' && (
-                            <input type="text" value={customText} onChange={(e) => setCustomText(e.target.value)} placeholder="اكتب العنوان هنا..." className="w-full p-2 text-sm rounded border border-slate-200 focus:border-orange-500 outline-none" />
-                        )}
-                        <div className="py-2 px-4 bg-slate-50 rounded border border-slate-100 flex items-center justify-center min-h-[40px]">{renderPreview()}</div>
-                        <button onClick={handleAdd} className="w-full py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold rounded transition flex items-center justify-center gap-2 shadow-sm"><Icons.Plus className="w-4 h-4" /> إدراج في الورقة</button>
-                    </div>
-                </div>
-            );
-        };
-
-        // 4.3 ManualQuestionForm
-        const ManualQuestionForm = ({ onAddQuestion, questionToEdit, onUpdateQuestion, onCancelEdit }) => {
-            const [text, setText] = useState('');
-            const [label, setLabel] = useState('س1');
-            const [points, setPoints] = useState(10);
-            const [hidePoints, setHidePoints] = useState(false);
-            const [type, setType] = useState(QuestionType.ShortAnswer);
-            const [options, setOptions] = useState(['', '', '', '']);
-            const [correctAnswer, setCorrectAnswer] = useState('');
-            const [subPoints, setSubPoints] = useState([]);
-            const [newSubPoint, setNewSubPoint] = useState('');
-            const [subPointsStyle, setSubPointsStyle] = useState('block');
-            const [fontSize, setFontSize] = useState(18);
-            const [isBold, setIsBold] = useState(true); 
-            const [fontFamily, setFontFamily] = useState('Cairo');
-            const [subPointsFontSize, setSubPointsFontSize] = useState(16);
-            const [subPointsFontFamily, setSubPointsFontFamily] = useState('Cairo');
-            const [subPointsIsBold, setSubPointsIsBold] = useState(true);
-            const [separatorStyle, setSeparatorStyle] = useState('SEPARATOR_SOLID');
-
-            const availableFonts = [
-                { name: 'Cairo', label: 'كايرو (الافتراضي)' },
-                { name: 'Amiri', label: 'الأميري (نسخ)' },
-                { name: 'Tajawal', label: 'تجوال (حديث)' },
-                { name: 'Noto Naskh Arabic', label: 'نوتو نسخ (رسمي)' },
-                { name: 'IBM Plex Sans Arabic', label: 'IBM Plex (عصري)' },
-            ];
-
-            useEffect(() => {
-                if (questionToEdit) {
-                    setType(questionToEdit.type);
-                    setPoints(questionToEdit.points || 0);
-                    setHidePoints(questionToEdit.hidePoints || false);
-                    if (questionToEdit.type === QuestionType.Separator) {
-                        const style = ['SEPARATOR_SOLID', 'SEPARATOR_DASHED', 'SEPARATOR_DOUBLE', 'SEPARATOR_STARS', 'SEPARATOR_FLOWERS', 'SEPARATOR_GEOMETRIC'].includes(questionToEdit.text) ? questionToEdit.text : 'CUSTOM';
-                        setSeparatorStyle(style);
-                        if (style === 'CUSTOM') setText(questionToEdit.text); else setText('');
-                    } else {
-                        setText(questionToEdit.text);
-                        setLabel(questionToEdit.label || 'س1');
-                        setOptions(questionToEdit.options && questionToEdit.options.length === 4 ? questionToEdit.options : ['', '', '', '']);
-                        setCorrectAnswer(questionToEdit.correctAnswer || '');
-                        setSubPoints(questionToEdit.subPoints || []);
-                        setSubPointsStyle(questionToEdit.subPointsStyle || 'block');
-                        setFontSize(questionToEdit.fontSize || 18);
-                        setIsBold(questionToEdit.isBold ?? true);
-                        setFontFamily(questionToEdit.fontFamily || 'Cairo');
-                        setSubPointsFontSize(questionToEdit.subPointsFontSize || 16);
-                        setSubPointsFontFamily(questionToEdit.subPointsFontFamily || 'Cairo');
-                        setSubPointsIsBold(questionToEdit.subPointsIsBold ?? true);
-                    }
-                } else {
-                    if (!questionToEdit) {
-                       setType(QuestionType.ShortAnswer); setSubPoints([]); setSubPointsStyle('block'); setHidePoints(false); setFontSize(18); setIsBold(true); setFontFamily('Cairo'); setSubPointsFontSize(16); setSubPointsFontFamily('Cairo'); setSubPointsIsBold(true);
-                    }
-                }
-            }, [questionToEdit]);
-
-            const questionLabels = [];
-            for (let i = 1; i <= 6; i++) {
-                questionLabels.push(`س${i}`); questionLabels.push(`س${i} / أ`); questionLabels.push(`س${i} / ب`); questionLabels.push(`س${i} / ج`);
+        /* --- Print Styles --- */
+        @media print {
+            /* HIDE EVERYTHING NOT RELATED TO PRINT */
+            .no-print, 
+            nav, 
+            .stats-cards, 
+            .search-bar, 
+            #main-app-content, /* Hides the main card view */
+            .settings-modal,
+            .add-modal,
+            .recycle-bin-modal,
+            .delete-confirm-modal,
+            .stats-detail-modal,
+            .logs-modal,
+            .profile-modal,
+            .image-preview-modal { 
+                display: none !important; 
             }
 
-            const handleOptionChange = (index, value) => { const newOptions = [...options]; newOptions[index] = value; setOptions(newOptions); };
-            const handleAddSubPoint = () => { if (newSubPoint.trim()) { setSubPoints([...subPoints, newSubPoint.trim()]); setNewSubPoint(''); } };
-            const handleRemoveSubPoint = (index) => { setSubPoints(subPoints.filter((_, i) => i !== index)); };
-            const handleKeyDownSubPoint = (e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubPoint(); } };
+            .print-area { display: block !important; }
+            
+            /* GLOBAL RESET FOR PRINT */
+            body, html, #root {
+                width: 100%;
+                height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: visible !important;
+                background-color: white !important;
+            }
 
-            const handleSubmit = (e) => {
-                e.preventDefault();
-                if (type !== QuestionType.Separator && !text) return;
-                if (type === QuestionType.Separator && separatorStyle === 'CUSTOM' && !text) return;
+            /* Fix Modal Container for Printing */
+            .print-modal-container {
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                overflow: visible !important;
+                display: block !important;
+                height: auto !important;
+                width: 100% !important;
+                z-index: 9999 !important;
+                background: white !important;
+            }
 
-                let finalQuestionText = text;
-                if (type === QuestionType.Separator && separatorStyle !== 'CUSTOM') { finalQuestionText = separatorStyle; }
+            .flex-grow.bg-white.text-black.overflow-auto {
+                overflow: visible !important;
+                height: auto !important;
+                position: static !important;
+                display: block !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
+            body, * { 
+                color: black !important; 
+                border-color: black !important; 
+            }
+            
+            @page { 
+                margin: 10mm; 
+                size: A4 portrait; 
+            }
+            
+            /* AUTOMATIC COLUMN LAYOUT STYLE */
+            .print-col-layout {
+                column-count: 2;
+                column-gap: 15px;
+                direction: rtl;
+                width: 100%;
+            }
+            
+            .print-row-card {
+                display: flex;
+                width: 100%;
+                border: 1px solid #000;
+                margin-top: -1px; /* Overlap borders to look like table */
+                break-inside: avoid;
+                page-break-inside: avoid;
+                background: #fff;
+                height: 28px;
+                align-items: center;
+                font-size: 11px;
+            }
 
-                const questionData = {
-                    id: questionToEdit ? questionToEdit.id : `manual-${Date.now()}`,
-                    label: type === QuestionType.Separator ? '' : label,
-                    text: finalQuestionText,
-                    type,
-                    points: type === QuestionType.Separator ? 0 : points,
-                    hidePoints: type === QuestionType.Separator ? true : hidePoints,
-                    options: type === QuestionType.MultipleChoice ? options.filter(o => o.trim() !== '') : [],
-                    correctAnswer,
-                    subPoints: type !== QuestionType.Separator ? subPoints : undefined,
-                    subPointsStyle: type !== QuestionType.Separator ? subPointsStyle : undefined,
-                    fontSize: type !== QuestionType.Separator ? fontSize : undefined,
-                    isBold: type !== QuestionType.Separator ? isBold : undefined,
-                    fontFamily: type !== QuestionType.Separator ? fontFamily : undefined,
-                    subPointsFontSize: type !== QuestionType.Separator ? subPointsFontSize : undefined,
-                    subPointsFontFamily: type !== QuestionType.Separator ? subPointsFontFamily : undefined,
-                    subPointsIsBold: type !== QuestionType.Separator ? subPointsIsBold : undefined
-                };
+            .print-header-row {
+                display: flex;
+                width: 100%;
+                border: 1px solid #000;
+                background: #f3f4f6 !important;
+                font-weight: 800;
+                font-size: 12px;
+                margin-bottom: -1px;
+                break-inside: avoid;
+                page-break-inside: avoid;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
 
-                if (questionToEdit && onUpdateQuestion) { onUpdateQuestion(questionData); } else { onAddQuestion(questionData); }
-                
-                if (!questionToEdit) {
-                    if (type !== QuestionType.Separator) { setText(''); setOptions(['', '', '', '']); setCorrectAnswer(''); setSubPoints([]); setNewSubPoint(''); setSubPointsStyle('block'); } else { setText(''); }
-                }
-            };
+            .print-cell {
+                padding: 0 4px;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                border-left: 1px solid #000;
+            }
+            .print-cell:last-child {
+                border-left: none;
+            }
 
-            const isSeparator = type === QuestionType.Separator;
-            const isEditing = !!questionToEdit;
-            const renderSeparatorPreview = () => {
-                switch(separatorStyle) {
-                    case 'SEPARATOR_SOLID': return <hr className="border-t-2 border-slate-400 w-full" />;
-                    case 'SEPARATOR_DASHED': return <hr className="border-t-2 border-dashed border-slate-400 w-full" />;
-                    case 'SEPARATOR_DOUBLE': return <hr className="border-t-4 border-double border-slate-400 w-full" />;
-                    case 'SEPARATOR_STARS': return <div className="text-xl tracking-[1em] text-center text-slate-800">★ ★ ★</div>;
-                    case 'SEPARATOR_FLOWERS': return <div className="text-xl tracking-[1em] text-center text-slate-800">❀ ❀ ❀</div>;
-                    case 'SEPARATOR_GEOMETRIC': return <div className="text-xl tracking-[1em] text-center text-slate-800">◆ ◇ ◆</div>;
-                    case 'CUSTOM': return <div className="text-center text-slate-500 text-sm">(سيظهر النص الذي تكتبه كعنوان في الوسط)</div>;
-                    default: return null;
-                }
-            };
+            .print-page-continuous {
+                width: 100%;
+                height: auto;
+                overflow: visible;
+                padding-bottom: 20px;
+            }
 
-            return (
-                <div className={`bg-white p-6 rounded-2xl shadow-lg border mt-6 transition-colors ${isEditing ? 'border-indigo-500 ring-2 ring-indigo-100' : 'border-slate-100'}`}>
-                <h3 className="font-bold text-slate-800 mb-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2">{isSeparator ? <Icons.SplitSquareVertical className="w-5 h-5 text-orange-500" /> : <Icons.PlusCircle className="w-5 h-5 text-indigo-600" />}{isEditing ? (isSeparator ? 'تعديل الفاصل' : 'تعديل السؤال') : 'إضافة سؤال يدوياً'}</div>
-                    {isEditing && onCancelEdit && (<button onClick={onCancelEdit} className="text-sm text-slate-400 hover:text-red-500 flex items-center gap-1"><Icons.X className="w-4 h-4" /> إلغاء</button>)}
-                </h3>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 gap-2"><label className="text-xs font-bold text-slate-500">نوع السؤال:</label><select value={type} onChange={(e) => setType(e.target.value)} className="w-full p-2 rounded border border-slate-200 focus:border-indigo-500 outline-none text-sm bg-white font-bold" disabled={isEditing && type === QuestionType.Separator}><option value={QuestionType.ShortAnswer}>سؤال شرح / فراغات</option><option value={QuestionType.MultipleChoice}>سؤال اختيارات</option><option value={QuestionType.TrueFalse}>سؤال صح وخطأ</option>{isEditing && type === QuestionType.Separator && (<option value={QuestionType.Separator}>♦ تعديل الفاصل / العنوان ♦</option>)}</select></div>
-                    {isSeparator ? (
-                        <div className="space-y-3 bg-orange-50 p-4 rounded-lg border border-orange-100">
-                            <label className="text-sm font-bold text-slate-700">اختر شكل الفاصل:</label>
-                            <select value={separatorStyle} onChange={(e) => setSeparatorStyle(e.target.value)} className="w-full p-2 rounded border border-slate-200 focus:border-orange-500 outline-none text-sm bg-white">
-                                <option value="SEPARATOR_SOLID">خط متصل (_________________)</option><option value="SEPARATOR_DASHED">خط متقطع (-----------------)</option><option value="SEPARATOR_DOUBLE">خط مزدوج (=================)</option><option value="SEPARATOR_STARS">نجوم (★ ★ ★)</option><option value="SEPARATOR_FLOWERS">زخرفة أزهار (❀ ❀ ❀)</option><option value="SEPARATOR_GEOMETRIC">شكل هندسي (◆ ◇ ◆)</option><option value="CUSTOM">كتابة عنوان مخصص (نص)</option>
-                            </select>
-                            <div className="p-3 bg-white border border-slate-200 rounded text-center"><p className="text-xs text-slate-400 mb-2">معاينة:</p>{renderSeparatorPreview()}</div>
-                            {separatorStyle === 'CUSTOM' && (<input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder="اكتب عنوان القسم أو الملاحظة هنا..." className="w-full p-2 rounded border border-slate-200 focus:border-orange-500 outline-none" />)}
-                        </div>
-                    ) : (
-                        <>
-                            <div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-slate-500 block mb-1">ترقيم السؤال:</label><select value={label} onChange={(e) => setLabel(e.target.value)} className="w-full p-2 rounded border border-slate-200 focus:border-indigo-500 outline-none text-sm bg-white">{questionLabels.map((l) => (<option key={l} value={l}>{l}</option>))}</select></div><div><label className="text-xs text-slate-500 block mb-1">الدرجة:</label><div className="flex gap-2"><input type="number" value={points} onChange={(e) => setPoints(Number(e.target.value))} disabled={hidePoints} placeholder="الدرجة" className={`w-full p-2 rounded border border-slate-200 focus:border-indigo-500 outline-none text-sm ${hidePoints ? 'bg-slate-100 text-slate-400' : ''}`} /><button type="button" onClick={() => setHidePoints(!hidePoints)} className={`p-2 rounded border transition-colors ${hidePoints ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-400 border-slate-200 hover:text-slate-600'}`} title={hidePoints ? "إظهار الدرجة" : "إخفاء الدرجة"}><Icons.EyeOff className="w-4 h-4" /></button></div></div></div>
-                            <div className="bg-slate-50 p-2 rounded border border-slate-200 grid grid-cols-12 gap-2 items-end"><div className="col-span-6"><label className="text-xs text-slate-500 block mb-1">نوع الخط:</label><select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} className="w-full p-2 h-9 rounded border border-slate-300 focus:border-indigo-500 outline-none text-sm bg-white">{availableFonts.map(f => (<option key={f.name} value={f.name} style={{fontFamily: f.name}}>{f.label}</option>))}</select></div><div className="col-span-4"><label className="text-xs text-slate-500 block mb-1">حجم الخط (px):</label><input type="number" min="10" max="60" value={fontSize} onChange={(e) => setFontSize(Number(e.target.value))} className="w-full p-2 h-9 rounded border border-slate-300 focus:border-indigo-500 outline-none text-sm text-center" /></div><div className="col-span-2"><button type="button" onClick={() => setIsBold(!isBold)} className={`w-full h-9 rounded border flex items-center justify-center transition-colors ${isBold ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-100'}`} title="خط عريض (Bold)"><Icons.Bold className="w-4 h-4" /></button></div></div>
-                            <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="اكتب نص السؤال هنا... (مثال: عرف ما يأتي)" rows={3} style={{ fontFamily: fontFamily, fontSize: `${Math.max(14, fontSize * 0.8)}px`, fontWeight: isBold ? 'bold' : 'normal'}} className="w-full p-2 rounded border border-slate-200 focus:border-indigo-500 outline-none transition-all" />
-                            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200"><label className="text-xs font-bold text-slate-500 block mb-2">النقاط الفرعية:</label><div className="flex gap-2 mb-3 bg-white p-2 rounded border border-slate-100 items-end"><div className="flex-grow"><label className="text-[10px] text-slate-400 block mb-1">خط النقاط الفرعية:</label><select value={subPointsFontFamily} onChange={(e) => setSubPointsFontFamily(e.target.value)} className="w-full p-1 h-8 rounded border border-slate-200 text-xs outline-none">{availableFonts.map(f => (<option key={f.name} value={f.name} style={{fontFamily: f.name}}>{f.label}</option>))}</select></div><div className="w-20"><label className="text-[10px] text-slate-400 block mb-1">الحجم:</label><input type="number" min="10" max="40" value={subPointsFontSize} onChange={(e) => setSubPointsFontSize(Number(e.target.value))} className="w-full p-1 h-8 rounded border border-slate-200 text-xs text-center outline-none" /></div><div><button type="button" onClick={() => setSubPointsIsBold(!subPointsIsBold)} className={`w-8 h-8 rounded border flex items-center justify-center transition-colors ${subPointsIsBold ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`} title="خط عريض"><Icons.Bold className="w-3 h-3" /></button></div></div><div className="flex gap-4 mb-3 text-xs font-bold text-slate-600 bg-white p-2 rounded border border-slate-100"><span>طريقة العرض:</span><label className={`flex items-center gap-1 cursor-pointer transition-colors ${subPointsStyle === 'block' ? 'text-indigo-600' : 'text-slate-400'}`}><input type="radio" name="sp-style" checked={subPointsStyle === 'block'} onChange={() => setSubPointsStyle('block')} className="accent-indigo-600" /><Icons.AlignJustify className="w-3 h-3" /> قائمة عمودية</label><label className={`flex items-center gap-1 cursor-pointer transition-colors ${subPointsStyle === 'inline' ? 'text-indigo-600' : 'text-slate-400'}`}><input type="radio" name="sp-style" checked={subPointsStyle === 'inline'} onChange={() => setSubPointsStyle('inline')} className="accent-indigo-600" /><Icons.AlignLeft className="w-3 h-3 rotate-90" /> سطر واحد</label></div><div className="flex gap-2 mb-2"><input type="text" value={newSubPoint} onChange={(e) => setNewSubPoint(e.target.value)} onKeyDown={handleKeyDownSubPoint} placeholder="أضف نقطة فرعية (مثال: المحث)" className="flex-grow p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" style={{ fontFamily: subPointsFontFamily }} /><button type="button" onClick={handleAddSubPoint} className="bg-indigo-600 text-white p-2 rounded hover:bg-indigo-700"><Icons.Plus className="w-4 h-4" /></button></div>{subPoints.length > 0 && (<ul className="space-y-1 mt-2">{subPoints.map((point, idx) => (<li key={idx} className="flex justify-between items-center bg-white p-2 rounded border border-slate-100 text-sm"><span style={{ fontFamily: subPointsFontFamily, fontSize: '14px', fontWeight: subPointsIsBold ? 'bold' : 'normal' }}>{idx + 1}- {point}</span><button type="button" onClick={() => handleRemoveSubPoint(idx)} className="text-red-400 hover:text-red-600"><Icons.Trash2 className="w-3 h-3" /></button></li>))}</ul>)}</div>
-                            {type === QuestionType.MultipleChoice && (<div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2"><label className="text-xs font-bold text-slate-500 block mb-1">الخيارات (لأسئلة الاختيار من متعدد فقط):</label><div className="grid grid-cols-2 gap-2">{options.map((opt, idx) => (<input key={idx} type="text" value={opt} onChange={(e) => handleOptionChange(idx, e.target.value)} placeholder={`خيار ${idx + 1}`} className="p-2 text-sm rounded border border-slate-200 focus:border-indigo-500 outline-none" />))}</div></div>)}
-                            <input type="text" value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)} placeholder="الإجابة النموذجية (اختياري - لن تظهر في الطباعة)" className="w-full p-2 text-sm rounded border border-slate-200 focus:border-green-500 outline-none bg-green-50 placeholder-green-700/50 text-green-800" />
-                        </>
-                    )}
-                    <button type="submit" className={`w-full py-3 text-white font-bold rounded-lg transition flex items-center justify-center gap-2 ${isEditing ? 'bg-indigo-600 hover:bg-indigo-700' : (isSeparator ? 'bg-orange-600 hover:bg-orange-700' : 'bg-slate-800 hover:bg-slate-900')}`}>{isEditing ? <Icons.Save className="w-5 h-5" /> : (isSeparator ? <Icons.SplitSquareVertical className="w-5 h-5" /> : <Icons.PlusCircle className="w-5 h-5" />)}{isEditing ? 'حفظ التعديلات' : (isSeparator ? 'إدراج الفاصل' : 'إضافة للسؤال')}</button>
-                </form>
-                </div>
-            );
+            /* Single Slip Print Style */
+            .single-slip {
+                border: 2px solid #000;
+                padding: 20px;
+                margin: 20px auto;
+                width: 100%;
+                max-width: 600px;
+                page-break-inside: avoid;
+            }
+        }
+
+        .loader {
+            border-top-color: #0ea5e9;
+            -webkit-animation: spinner 1.5s linear infinite;
+            animation: spinner 1.5s linear infinite;
+        }
+
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .dark ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #334155;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        /* ]]> */
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-300">
+    <div id="root"></div>
+
+    <script type="text/babel" data-presets="typescript,react" data-type="module">
+    /* <![CDATA[ */
+        import React, { useState, useEffect, useMemo, useRef } from 'https://esm.sh/react@18.2.0';
+        import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
+        import * as XLSX from 'https://esm.sh/xlsx@0.18.5';
+        
+        // Lucide Icons
+        import { 
+            User as UserIcon, LogOut, Plus, Search, Trash2, Edit, Copy, Moon, Sun,
+            FileSpreadsheet, Printer, FileDown, Upload, Database, Calendar, Users,
+            AlertTriangle, Loader2, Settings, X, Check, ChevronLeft, ChevronRight,
+            Hash, FileText, Info, Eye, CreditCard, Filter, FolderOpen, Layers, Clock,
+            ArrowUpDown, MoreVertical, PlusCircle, Undo2, RefreshCw, List,
+            Wifi, WifiOff, Activity, QrCode, ShieldAlert, ChevronDown, Camera, Image as ImageIcon, Send, Download
+        } from 'https://esm.sh/lucide-react@0.263.1';
+
+        // Firebase Imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { 
+            getFirestore, collection, onSnapshot, query, orderBy, addDoc, 
+            updateDoc, deleteDoc, doc, writeBatch, getDocs, enableIndexedDbPersistence, limit, arrayUnion 
+        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { 
+            getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut 
+        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        // --- Firebase Config ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyC-RyeNVI6aNmWSJIYhQCG_4J_RQDAovds",
+            authDomain: "student-archive-f8689.firebaseapp.com",
+            projectId: "student-archive-f8689",
+            storageBucket: "student-archive-f8689.appspot.com",
+            messagingSenderId: "815104091476",
+            appId: "1:815104091476:web:8e725238d8ebabaf26d4c1"
         };
 
-        // 4.4 ExamPreview
-        const ExamPreview = ({ questions, header, onDelete, onEdit, onMove, showAnswers }) => {
-            const getBorderClasses = (style) => {
-                switch (style) {
-                    case 'simple': return 'border border-slate-800';
-                    case 'double': return 'border-4 border-double border-slate-800';
-                    case 'thick': return 'border-4 border-slate-900';
-                    case 'dashed': return 'border-2 border-dashed border-slate-600';
-                    case 'ridge': return 'border-[8px] border-slate-300';
-                    default: return 'border-4 border-double border-slate-800';
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        enableIndexedDbPersistence(db).catch((err) => {
+             console.log("Persistence error (likely multiple tabs open):", err.code);
+        });
+
+        const auth = getAuth(app);
+        const studentsCol = collection(db, "students");
+
+        // --- Configuration Constants ---
+        const INITIAL_LOAD_COUNT = 30;
+        const LOAD_MORE_COUNT = 30;
+        const SCHOOL_NAME = "ث. ش. محمد عبدالعزيز الكنعان";
+        const SCHOOL_LOGO = "https://i.imgur.com/05ANc5p.png";
+
+        function App() {
+            // Auth State
+            const [user, setUser] = useState(null);
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [authLoading, setAuthLoading] = useState(true);
+
+            // Data State
+            const [students, setStudents] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [loadingText, setLoadingText] = useState('جاري المعالجة...');
+            const [progress, setProgress] = useState(0); 
+
+            // UI State
+            const [darkMode, setDarkMode] = useState(false);
+            const [toast, setToast] = useState(null);
+            const [isOffline, setIsOffline] = useState(!navigator.onLine); 
+            const [visibleCount, setVisibleCount] = useState(INITIAL_LOAD_COUNT); 
+            
+            // App Settings (Hardcoded)
+            const telegramToken = "8513150426:AAFNRs33OdxL07Red1wNyCg06BkXtIVw1t4";
+            const telegramChatId = "-1003325942139";
+
+            // Modals
+            const [modalOpen, setModalOpen] = useState(false);
+            const [recycleBinOpen, setRecycleBinOpen] = useState(false);
+            const [qaidStatsOpen, setQaidStatsOpen] = useState(false);
+            const [latestStatsOpen, setLatestStatsOpen] = useState(false);
+            const [settingsOpen, setSettingsOpen] = useState(false);
+            const [profileModalOpen, setProfileModalOpen] = useState(false);
+            const [previewImage, setPreviewImage] = useState(null);
+            
+            // Delete Operations
+            const [deleteId, setDeleteId] = useState(null);
+            const [masterDeleteOpen, setMasterDeleteOpen] = useState(false);
+            const [masterDeleteInput, setMasterDeleteInput] = useState('');
+            
+            // Print State
+            const [printModalOpen, setPrintModalOpen] = useState(false);
+            const [printMode, setPrintMode] = useState('menu');
+            const [singlePrintSearchTerm, setSinglePrintSearchTerm] = useState('');
+            const [singlePrintStudent, setSinglePrintStudent] = useState(null);
+            const [targetQaid, setTargetQaid] = useState(''); 
+
+            // Active State
+            const [activeRowId, setActiveRowId] = useState(null);
+            const [currentProfileStudent, setCurrentProfileStudent] = useState(null);
+
+            // Filter State
+            const [searchTerm, setSearchTerm] = useState('');
+            const [sortBy, setSortBy] = useState('newest');
+            const [selectedYear, setSelectedYear] = useState('');
+            const [selectedMonth, setSelectedMonth] = useState('');
+            const [selectedQaidFilter, setSelectedQaidFilter] = useState('');
+            const [selectedPageFilter, setSelectedPageFilter] = useState('');
+
+            // Form State
+            const [formData, setFormData] = useState({
+                name: '', surname: '', qaid: '', page: '', note: ''
+            });
+            const [editingId, setEditingId] = useState(null);
+            const [lastSavedStudent, setLastSavedStudent] = useState(null);
+            const [similarStudents, setSimilarStudents] = useState([]);
+
+            const fileInputRef = useRef(null);
+            const profilePicInputRef = useRef(null);
+            const documentInputRef = useRef(null);
+
+            // Network Status Listener
+            useEffect(() => {
+                const handleOnline = () => setIsOffline(false);
+                const handleOffline = () => setIsOffline(true);
+                window.addEventListener('online', handleOnline);
+                window.addEventListener('offline', handleOffline);
+                return () => {
+                    window.removeEventListener('online', handleOnline);
+                    window.removeEventListener('offline', handleOffline);
+                };
+            }, []);
+
+            // Initialization (Auth)
+            useEffect(() => {
+                const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+                    setUser(currentUser);
+                    setAuthLoading(false);
+                });
+                
+                if (localStorage.getItem('theme') === 'dark') {
+                    setDarkMode(true);
+                    document.documentElement.classList.add('dark');
+                }
+                return () => unsubscribe();
+            }, []);
+
+            // Data Subscription Effect
+            useEffect(() => {
+                if (user) {
+                    const q = query(studentsCol, orderBy("timestamp", "desc"));
+                    const unsubscribe = onSnapshot(q, (snapshot) => {
+                        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setStudents(data);
+                        // Update current profile student if open
+                        if (currentProfileStudent) {
+                            const updated = data.find(s => s.id === currentProfileStudent.id);
+                            if (updated) setCurrentProfileStudent(updated);
+                        }
+                    });
+                    return () => unsubscribe();
+                } else {
+                    setStudents([]);
+                }
+            }, [user, currentProfileStudent?.id]);
+
+            // Filter active vs deleted
+            const activeStudents = useMemo(() => students.filter(s => !s.isDeleted), [students]);
+            const deletedStudents = useMemo(() => students.filter(s => s.isDeleted), [students]);
+
+            // Real-time similar name check
+            useEffect(() => {
+                if (!modalOpen || !formData.name || formData.name.trim().length === 0) {
+                    setSimilarStudents([]);
+                    return;
+                }
+                const nameInput = formData.name.trim().toLowerCase();
+                const matches = activeStudents
+                    .filter(s => {
+                        if (editingId && s.id === editingId) return false;
+                        return s.name.toLowerCase().startsWith(nameInput);
+                    })
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .slice(0, 5);
+                setSimilarStudents(matches);
+            }, [formData.name, activeStudents, modalOpen, editingId]);
+
+            // Compute Stats
+            const qaidStats = useMemo(() => {
+                const stats = {};
+                activeStudents.forEach(s => {
+                    if (!stats[s.qaid]) stats[s.qaid] = new Set();
+                    stats[s.qaid].add(s.page);
+                });
+                return Object.entries(stats).map(([qaid, pages]) => ({
+                    qaid,
+                    pageCount: pages.size,
+                    studentCount: activeStudents.filter(s => s.qaid === qaid).length
+                })).sort((a, b) => a.qaid.localeCompare(b.qaid));
+            }, [activeStudents]);
+
+            const latest25Students = useMemo(() => [...activeStudents].sort((a, b) => b.timestamp - a.timestamp).slice(0, 25), [activeStudents]);
+
+            // Helper Functions
+            const showToast = (msg, type = 'success') => {
+                setToast({ msg, type });
+                setTimeout(() => setToast(null), 3000);
+            };
+
+            const toggleDarkMode = () => {
+                setDarkMode(!darkMode);
+                if (!darkMode) {
+                    document.documentElement.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
                 }
             };
-            const getBorderStyleStyle = (style) => { if (style === 'ridge') return { borderStyle: 'ridge', borderColor: '#334155' }; return {}; };
+
+            const resetForm = () => {
+                setFormData({ name: '', surname: '', qaid: '', page: '', note: '' });
+                setEditingId(null);
+                setSimilarStudents([]);
+            };
+
+            // --- Telegram Upload Logic ---
+            const uploadToTelegram = async (file) => {
+                if (!telegramToken || !telegramChatId) {
+                    throw new Error('يرجى ضبط إعدادات تيليجرام أولاً');
+                }
+
+                const formData = new FormData();
+                formData.append('chat_id', telegramChatId);
+                formData.append('photo', file);
+
+                const response = await fetch(`https://api.telegram.org/bot${telegramToken}/sendPhoto`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('فشل الرفع إلى تيليجرام');
+                }
+
+                const data = await response.json();
+                if (!data.ok) throw new Error(data.description);
+
+                // Get the largest photo (last in array)
+                const fileId = data.result.photo[data.result.photo.length - 1].file_id;
+                
+                // Get File Path
+                const fileRes = await fetch(`https://api.telegram.org/bot${telegramToken}/getFile?file_id=${fileId}`);
+                const fileData = await fileRes.json();
+                
+                if (!fileData.ok) throw new Error('فشل جلب مسار الملف');
+
+                // Construct direct URL (Note: Exposes token in URL)
+                return `https://api.telegram.org/file/bot${telegramToken}/${fileData.result.file_path}`;
+            };
+
+            const handleProfilePicUpload = async (e) => {
+                const file = e.target.files?.[0];
+                if (!file || !currentProfileStudent) return;
+
+                setLoading(true);
+                setLoadingText('جاري رفع الصورة الشخصية...');
+                try {
+                    const imageUrl = await uploadToTelegram(file);
+                    await updateDoc(doc(db, "students", currentProfileStudent.id), {
+                        personalPhoto: imageUrl
+                    });
+                    showToast('تم تحديث الصورة الشخصية');
+                } catch (err) {
+                    showToast(err.message, 'error');
+                } finally {
+                    setLoading(false);
+                    if (profilePicInputRef.current) profilePicInputRef.current.value = '';
+                }
+            };
+
+            const handleDocumentUpload = async (e) => {
+                const file = e.target.files?.[0];
+                if (!file || !currentProfileStudent) return;
+
+                setLoading(true);
+                setLoadingText('جاري رفع المستند...');
+                try {
+                    const imageUrl = await uploadToTelegram(file);
+                    const newDoc = {
+                        id: Date.now().toString(),
+                        url: imageUrl,
+                        timestamp: Date.now()
+                    };
+                    await updateDoc(doc(db, "students", currentProfileStudent.id), {
+                        documents: arrayUnion(newDoc)
+                    });
+                    showToast('تم إضافة المستند');
+                } catch (err) {
+                    showToast(err.message, 'error');
+                } finally {
+                    setLoading(false);
+                    if (documentInputRef.current) documentInputRef.current.value = '';
+                }
+            };
+
+            const handleDeleteDocument = async (e, docItem) => {
+                e.stopPropagation(); // Stop the click from bubbling up to the card
+                if (!window.confirm('حذف هذا المستند؟')) return;
+                
+                try {
+                     // Filter out the document to delete based on ID
+                     const updatedDocs = (currentProfileStudent.documents || []).filter(d => d.id !== docItem.id);
+                     
+                     // Update Firebase
+                     await updateDoc(doc(db, "students", currentProfileStudent.id), {
+                         documents: updatedDocs
+                     });
+                     
+                     showToast('تم حذف المستند');
+                } catch(err) {
+                    console.error(err);
+                    showToast('خطأ في الحذف', 'error');
+                }
+            };
+
+            const handleDownloadDocument = async (e, docItem) => {
+                e.stopPropagation();
+                try {
+                    // Attempt to fetch blob for download
+                    const response = await fetch(docItem.url);
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `doc_${docItem.id}.jpg`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                } catch (e) {
+                    // Fallback if CORS fails
+                    window.open(docItem.url, '_blank');
+                }
+            };
+
+            const handlePreviewImage = (e, url) => {
+                e.stopPropagation();
+                setPreviewImage(url);
+            }
+
+            // Auth Actions
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setLoadingText('جاري تسجيل الدخول...');
+                try {
+                    await signInWithEmailAndPassword(auth, email, password);
+                } catch (err) {
+                    showToast('خطأ في تسجيل الدخول.', 'error');
+                } finally {
+                    setLoading(false);
+                    setLoadingText('جاري المعالجة...');
+                }
+            };
+
+            const handleLogout = async () => {
+                await signOut(auth);
+                setStudents([]);
+                setEmail('');
+                setPassword('');
+            };
+
+            // CRUD Actions
+            const handleSave = async (e) => {
+                e.preventDefault();
+                if (!formData.name || !formData.qaid || !formData.page) {
+                    showToast('يرجى إكمال البيانات الأساسية', 'error');
+                    return;
+                }
+
+                const isDuplicate = activeStudents.some(s => 
+                    s.id !== editingId && s.qaid === formData.qaid && s.page === formData.page
+                );
+
+                if (isDuplicate) {
+                    showToast('تنبيه: هذا القيد والصفحة مسجلين مسبقاً لطالب آخر!', 'error');
+                    return;
+                }
+
+                setLoading(true);
+                setLoadingText(editingId ? 'جاري التحديث...' : 'جاري الحفظ...');
+                try {
+                    const originalTimestamp = editingId ? (students.find(s => s.id === editingId)?.timestamp || Date.now()) : Date.now();
+                    const payload = { ...formData, timestamp: originalTimestamp, isDeleted: false };
+                    
+                    if (editingId) {
+                        await updateDoc(doc(db, "students", editingId), payload);
+                        showToast('تم التحديث بنجاح');
+                    } else {
+                        await addDoc(studentsCol, payload);
+                        setLastSavedStudent(formData);
+                        showToast('تم الإضافة بنجاح');
+                    }
+                    setModalOpen(false);
+                    resetForm();
+                } catch (err) {
+                    console.error(err);
+                    showToast('حدث خطأ أثناء الحفظ', 'error');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handleDelete = async () => {
+                if (!deleteId) return;
+                try {
+                    await updateDoc(doc(db, "students", deleteId), { isDeleted: true, deletedAt: Date.now() });
+                    showToast('تم النقل لسلة المحذوفات', 'success');
+                    setDeleteId(null);
+                } catch (err) {
+                    showToast('فشل في عملية الحذف', 'error');
+                }
+            };
+
+            const handleRestore = async (student) => {
+                try {
+                    await updateDoc(doc(db, "students", student.id), { isDeleted: false, deletedAt: null });
+                    showToast('تم استعادة الطالب', 'success');
+                } catch (err) {
+                    showToast('فشل في الاستعادة', 'error');
+                }
+            };
+
+            const handlePermanentDelete = async (id) => {
+                if(!window.confirm('هل أنت متأكد من الحذف النهائي؟')) return;
+                try {
+                    await deleteDoc(doc(db, "students", id));
+                    showToast('تم الحذف نهائياً', 'success');
+                } catch (err) {
+                    showToast('فشل في الحذف', 'error');
+                }
+            };
+
+            const handleEmptyTrash = async () => {
+                if (deletedStudents.length === 0) return;
+                if(!window.confirm('هل أنت متأكد من إفراغ سلة المحذوفات؟')) return;
+                
+                setLoading(true);
+                setProgress(0);
+                try {
+                    const BATCH_SIZE = 400;
+                    const chunks = [];
+                    for (let i = 0; i < deletedStudents.length; i += BATCH_SIZE) chunks.push(deletedStudents.slice(i, i + BATCH_SIZE));
+
+                    for (let i = 0; i < chunks.length; i++) {
+                        setLoadingText(`جاري الحذف... ${Math.round(((i) / chunks.length) * 100)}%`);
+                        setProgress(Math.round(((i) / chunks.length) * 100));
+                        const batch = writeBatch(db);
+                        chunks[i].forEach(s => batch.delete(doc(db, "students", s.id)));
+                        await batch.commit();
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    }
+                    showToast('تم إفراغ السلة', 'success');
+                } catch(err) {
+                    showToast('حدث خطأ', 'error');
+                } finally {
+                    setLoading(false);
+                    setProgress(0);
+                }
+            };
+
+            const handleMasterDelete = async () => {
+                if (masterDeleteInput !== 'حذف الكل') {
+                    showToast('كلمة التأكيد غير صحيحة', 'error');
+                    return;
+                }
+                setLoading(true);
+                setProgress(0);
+                
+                try {
+                    const snapshot = await getDocs(studentsCol);
+                    const totalDocs = snapshot.docs.length;
+                    
+                    if (totalDocs === 0) {
+                        setLoading(false);
+                        setMasterDeleteOpen(false);
+                        return;
+                    }
+
+                    const BATCH_SIZE = 400;
+                    const chunks = [];
+                    for (let i = 0; i < totalDocs; i += BATCH_SIZE) chunks.push(snapshot.docs.slice(i, i + BATCH_SIZE));
+
+                    for (let i = 0; i < chunks.length; i++) {
+                        const pct = Math.round(((i) / chunks.length) * 100);
+                        setLoadingText(`جاري الحذف الشامل... ${pct}%`);
+                        setProgress(pct);
+                        const batch = writeBatch(db);
+                        chunks[i].forEach((doc) => batch.delete(doc.ref));
+                        await batch.commit();
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    }
+
+                    showToast('تم مسح جميع البيانات', 'success');
+                    setMasterDeleteOpen(false);
+                    setSettingsOpen(false);
+                } catch (err) {
+                    showToast('حدث خطأ', 'error');
+                } finally {
+                    setLoading(false);
+                    setProgress(0);
+                }
+            };
+
+            const handleCopyLast = () => {
+                if (lastSavedStudent) {
+                    setFormData(prev => ({ ...prev, qaid: lastSavedStudent.qaid, page: lastSavedStudent.page, note: lastSavedStudent.note }));
+                    showToast('تم نسخ البيانات');
+                } else {
+                    showToast('لا توجد بيانات سابقة', 'error');
+                }
+            };
+
+            const handleExport = () => {
+                const dataToExport = activeStudents.map(({id, timestamp, ...rest}) => ({
+                    "الاسم": rest.name, "اللقب": rest.surname, "القيد": rest.qaid, "الصفحة": rest.page,
+                    "ملاحظات": rest.note, "تاريخ الإضافة": new Date(timestamp).toLocaleDateString('ar-EG')
+                }));
+                const ws = XLSX.utils.json_to_sheet(dataToExport);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "الطلاب");
+                XLSX.writeFile(wb, `Students_Archive_${new Date().toISOString().slice(0,10)}.xlsx`);
+            };
+
+            const handleImport = (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+
+                setLoading(true);
+                setProgress(0);
+                
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
+                    try {
+                        const bstr = evt.target?.result;
+                        const wb = XLSX.read(bstr, { type: 'array' });
+                        const wsname = wb.SheetNames[0];
+                        const ws = wb.Sheets[wsname];
+                        const data = XLSX.utils.sheet_to_json(ws);
+
+                        const validRows = [];
+                        const timestampBase = Date.now();
+
+                        data.forEach((row, index) => {
+                            const name = String(row.name || row["الاسم"] || "").trim();
+                            const qaid = String(row.qaid || row["القيد"] || "").trim();
+                            const page = String(row.page || row["الصفحة"] || "").trim();
+                            const surname = String(row.surname || row["اللقب"] || "").trim();
+                            const note = String(row.note || row["ملاحظات"] || "").trim();
+
+                            if (name && qaid && page) {
+                                validRows.push({ name, surname, qaid, page, note, timestamp: timestampBase - index, isDeleted: false });
+                            }
+                        });
+
+                        const BATCH_SIZE = 400;
+                        const chunks = [];
+                        for (let i = 0; i < validRows.length; i += BATCH_SIZE) chunks.push(validRows.slice(i, i + BATCH_SIZE));
+
+                        for (let i = 0; i < chunks.length; i++) {
+                            const pct = Math.round(((i) / chunks.length) * 100);
+                            setLoadingText(`جاري الاستيراد... ${pct}%`);
+                            setProgress(pct);
+                            const batch = writeBatch(db);
+                            chunks[i].forEach(item => batch.set(doc(studentsCol), item));
+                            await batch.commit();
+                            await new Promise(resolve => setTimeout(resolve, 50));
+                        }
+                        showToast(`تم استيراد ${validRows.length} سجل`);
+                    } catch (err) {
+                        showToast('خطأ في الملف', 'error');
+                    } finally {
+                        setLoading(false);
+                        setProgress(0);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            };
+
+            // Filters & "Infinite Scroll" Logic
+            const availableYears = useMemo(() => Array.from(new Set(activeStudents.map(s => new Date(s.timestamp).getFullYear()))).sort((a,b)=>b-a), [activeStudents]);
+            const availableQaids = useMemo(() => [...new Set(activeStudents.map(s => s.qaid))].sort((a,b)=>a.localeCompare(b)), [activeStudents]);
+
+            const filteredStudents = useMemo(() => {
+                const term = searchTerm.toLowerCase().trim();
+                const pageFilter = selectedPageFilter.trim();
+                
+                let result = activeStudents.filter(s => {
+                    const matchesSearch = !term || (s.name.toLowerCase().includes(term) || s.surname.toLowerCase().includes(term) || s.qaid.includes(term) || s.page.includes(term));
+                    const date = new Date(s.timestamp);
+                    const matchesYear = !selectedYear || date.getFullYear().toString() === selectedYear;
+                    const matchesMonth = !selectedMonth || (date.getMonth() + 1).toString() === selectedMonth;
+                    const matchesQaid = !selectedQaidFilter || s.qaid === selectedQaidFilter;
+                    const matchesPage = !pageFilter || s.page.includes(pageFilter);
+                    return matchesSearch && matchesYear && matchesMonth && matchesQaid && matchesPage;
+                });
+
+                result.sort((a, b) => {
+                    if (term) return a.name.localeCompare(b.name, 'ar'); // Search prioritizing name match? Simplified sort
+                    if (sortBy === 'newest') return b.timestamp - a.timestamp;
+                    if (sortBy === 'alpha') return a.name.localeCompare(b.name, 'ar');
+                    if (sortBy === 'qaid') return a.qaid.localeCompare(b.qaid);
+                    return 0;
+                });
+                return result;
+            }, [activeStudents, searchTerm, sortBy, selectedYear, selectedMonth, selectedQaidFilter, selectedPageFilter]);
+
+            // Reset visible count when filters change
+            useEffect(() => {
+                setVisibleCount(INITIAL_LOAD_COUNT);
+            }, [filteredStudents.length, searchTerm, sortBy, selectedYear, selectedMonth, selectedQaidFilter, selectedPageFilter]);
+
+            const visibleStudents = filteredStudents.slice(0, visibleCount);
+
+            // Single Print Logic
+            const singlePrintFiltered = useMemo(() => {
+                 const term = singlePrintSearchTerm.toLowerCase().trim();
+                 if(!term) return [];
+                 return activeStudents.filter(s => s.name.toLowerCase().includes(term) || s.qaid.includes(term)).slice(0, 5);
+            }, [activeStudents, singlePrintSearchTerm]);
+
+            const qaidBatchFiltered = useMemo(() => {
+                const term = singlePrintSearchTerm.toLowerCase().trim();
+                return [...new Set(activeStudents.map(s => s.qaid))].filter(q => q.toLowerCase().includes(term)).sort();
+            }, [activeStudents, singlePrintSearchTerm]);
+
+            // UI Render
+            if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900"><Loader2 className="animate-spin h-8 w-8 text-primary"/></div>;
+
+            if (!user) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-800 p-4">
+                        <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200 dark:border-slate-700">
+                            <div className="text-center mb-8">
+                                <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-primary"><Database size={32} /></div>
+                                <h1 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white leading-relaxed px-4">{SCHOOL_NAME}</h1>
+                                <p className="text-slate-500 dark:text-slate-400 mt-2">نظام الأرشيف الذكي</p>
+                            </div>
+                            <form onSubmit={handleLogin} className="space-y-4">
+                                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3 rounded-lg border dark:bg-slate-700 dark:text-white outline-none" placeholder="البريد الإلكتروني" required />
+                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 rounded-lg border dark:bg-slate-700 dark:text-white outline-none" placeholder="كلمة المرور" required />
+                                <button type="submit" disabled={loading} className="w-full bg-primary hover:bg-sky-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2">{loading ? <Loader2 className="animate-spin" /> : 'تسجيل الدخول'}</button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
 
             return (
-                <div className="bg-white shadow-2xl print:shadow-none mx-auto w-full max-w-[210mm] print:max-w-full min-h-[297mm] p-4 md:p-8 print:p-0 relative text-black" style={{ fontFamily: "'Cairo', serif" }}>
-                <div className="h-full p-1 relative min-h-[900px]">
-                    <div className={`h-full p-4 print:p-4 relative ${getBorderClasses(header.borderStyle)}`} style={getBorderStyleStyle(header.borderStyle)}>
-                        <div className="w-full mb-2 border-b-2 border-slate-800 pb-1">
-                            <div className="flex justify-between items-start w-full mb-2 font-bold text-sm text-center leading-tight">
-                                <div className="w-1/3 flex flex-col items-center pt-1"><p className="font-bold text-lg">{header.directorate}</p><p className="mt-1 text-base font-normal">{header.schoolName || 'اسم المدرسة...'}</p></div>
-                                <div className="w-1/3 text-center pt-1"><p className="text-base">{header.examName || 'أسئلة الامتحان'}</p>{header.round && header.round !== 'بدون دور' && (<p className="mt-0.5">{header.round}</p>)}<p className="mt-0.5 font-normal text-xs">{header.year || '2025 - 2026'}</p></div>
-                                <div className="w-1/3 flex justify-end pl-2"><div className="flex flex-col items-start gap-1 text-xs md:text-sm pt-1 min-w-[120px]"><div className="flex items-center gap-2 w-full"><span className="font-bold min-w-[40px]">المادة:</span><span className="font-normal border-b border-dotted border-slate-400 flex-grow text-center">{header.subject || '......'}</span></div><div className="flex items-center gap-2 w-full"><span className="font-bold min-w-[40px]">الصف:</span><span className="font-normal border-b border-dotted border-slate-400 flex-grow text-center">{header.grade || '......'}</span></div><div className="flex items-center gap-2 w-full"><span className="font-bold min-w-[40px]">الوقت:</span><span className="font-normal border-b border-dotted border-slate-400 flex-grow text-center">{header.time || '......'}</span></div></div></div>
-                            </div>
-                            {header.note && (<div className="text-center font-bold text-xs mt-1 mb-1"><span className="border-b border-slate-800 pb-0.5 inline-block px-4">ملاحظة: {header.note}</span></div>)}
-                        </div>
-                        <div className="space-y-2">
-                            {questions.length === 0 && (<div className="text-center text-slate-400 py-10 no-print">(أضف أسئلة لتظهر هنا)</div>)}
-                            {questions.map((q, index) => {
-                                const isFirst = index === 0; const isLast = index === questions.length - 1;
-                                const questionStyle = { fontSize: q.fontSize ? `${q.fontSize}px` : '18px', fontWeight: q.isBold ? 'bold' : 'normal', fontFamily: q.fontFamily || 'inherit', lineHeight: 1.3 };
-                                const subPointStyle = { fontSize: q.subPointsFontSize ? `${q.subPointsFontSize}px` : '16px', fontFamily: q.subPointsFontFamily || q.fontFamily || 'inherit', fontWeight: q.subPointsIsBold !== undefined ? (q.subPointsIsBold ? 'bold' : 'normal') : 'bold', lineHeight: 1.3 };
-                                const ActionButtons = () => (
-                                    <div className="absolute left-[-50px] top-0 flex flex-col gap-1 no-print z-20">
-                                        <button onClick={() => onDelete(q.id)} className="p-1 text-red-400 hover:text-red-600 bg-white shadow-sm rounded border border-slate-100" title="حذف"><Icons.Trash2 className="w-4 h-4" /></button>
-                                        <button onClick={() => onEdit(q)} className="p-1 text-blue-400 hover:text-blue-600 bg-white shadow-sm rounded border border-slate-100" title="تعديل"><Icons.Pencil className="w-4 h-4" /></button>
-                                        <div className="flex flex-col mt-1">
-                                            {!isFirst && (<button onClick={() => onMove(q.id, 'up')} className="p-1 text-slate-400 hover:text-slate-600 bg-white shadow-sm rounded-t border border-slate-100" title="نقل لأعلى"><Icons.ArrowUp className="w-3 h-3" /></button>)}
-                                            {!isLast && (<button onClick={() => onMove(q.id, 'down')} className="p-1 text-slate-400 hover:text-slate-600 bg-white shadow-sm rounded-b border-t-0 border border-slate-100" title="نقل لأسفل"><Icons.ArrowDown className="w-3 h-3" /></button>)}
+                <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 flex flex-col transition-colors duration-300">
+                    <div id="main-app-content">
+                        <nav className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30 shadow-sm">
+                            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                                <div className="flex justify-between h-16">
+                                    <div className="flex items-center gap-3">
+                                        <img src={SCHOOL_LOGO} alt="شعار" className="h-10 w-auto object-contain" />
+                                        <div className="flex flex-col justify-center">
+                                            <span className="font-bold text-base md:text-lg leading-tight text-slate-800 dark:text-white">{SCHOOL_NAME}</span>
+                                            {isOffline && <span className="text-xs text-red-500 flex items-center gap-1"><WifiOff size={12}/> وضع غير متصل</span>}
                                         </div>
                                     </div>
-                                );
-                                if (q.type === QuestionType.Separator) {
-                                    return (
-                                        <div key={q.id} className="group relative w-full py-1 text-center hover:bg-slate-50 transition-colors">
-                                            <ActionButtons />
-                                            {q.text === 'SEPARATOR_SOLID' && <hr className="border-t-2 border-slate-800 w-full" />}
-                                            {q.text === 'SEPARATOR_DASHED' && <hr className="border-t-2 border-dashed border-slate-800 w-full" />}
-                                            {q.text === 'SEPARATOR_DOUBLE' && <hr className="border-t-4 border-double border-slate-800 w-full" />}
-                                            {q.text === 'SEPARATOR_STARS' && <div className="text-xl tracking-[1em] text-slate-800">★ ★ ★</div>}
-                                            {q.text === 'SEPARATOR_FLOWERS' && <div className="text-xl tracking-[1em] text-slate-800">❀ ❀ ❀</div>}
-                                            {q.text === 'SEPARATOR_GEOMETRIC' && <div className="text-xl tracking-[1em] text-slate-800">◆ ◇ ◆</div>}
-                                            {!['SEPARATOR_SOLID', 'SEPARATOR_DASHED', 'SEPARATOR_DOUBLE', 'SEPARATOR_STARS', 'SEPARATOR_FLOWERS', 'SEPARATOR_GEOMETRIC'].includes(q.text) && (
-                                                <div className="flex items-center justify-center gap-4"><div className="h-px bg-slate-800 flex-grow max-w-[50px]"></div><span className="font-bold text-lg">{q.text}</span><div className="h-px bg-slate-800 flex-grow max-w-[50px]"></div></div>
+                                    <div className="flex items-center gap-2 sm:gap-4">
+                                        <div className="flex items-center gap-1 sm:gap-2">
+                                            <button onClick={() => { setPrintMode('menu'); setSinglePrintStudent(null); setPrintModalOpen(true); }} className="bg-slate-100 dark:bg-slate-700 p-2 rounded-lg hover:bg-slate-200"><Printer size={18} /></button>
+                                            <button onClick={() => setSettingsOpen(true)} className="bg-slate-100 dark:bg-slate-700 p-2 rounded-lg hover:bg-slate-200"><Settings size={18} /></button>
+                                        </div>
+                                        <button onClick={handleLogout} className="flex items-center gap-2 bg-red-50 text-red-600 px-3 py-2 rounded-lg text-sm font-bold"><LogOut size={18} /></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </nav>
+
+                        <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+                            {/* Offline Banner */}
+                            {isOffline && (
+                                <div className="bg-amber-100 text-amber-800 p-3 rounded-lg mb-4 flex items-center justify-center gap-2 text-sm font-bold border border-amber-200">
+                                    <WifiOff size={18} /> أنت الآن في وضع غير متصل. سيتم حفظ البيانات محلياً ومزامنتها عند عودة الاتصال.
+                                </div>
+                            )}
+
+                            {/* Stats */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 stats-cards">
+                                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                                    <div className="bg-primary text-white text-xl font-bold px-4 py-2 rounded-lg shadow-sm min-w-[60px] text-center">{activeStudents.length}</div>
+                                    <div className="text-blue-500 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-full"><Users size={20} /></div>
+                                </div>
+                                <div onClick={() => setQaidStatsOpen(true)} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between cursor-pointer hover:shadow-md">
+                                    <div><p className="text-xs text-slate-500 font-bold mb-1">القيود (تفاصيل)</p><h3 className="text-lg font-bold">{new Set(activeStudents.map(s => s.qaid)).size}</h3></div>
+                                    <div className="text-purple-500 bg-purple-50 dark:bg-purple-900/20 p-2 rounded-full"><Hash size={20} /></div>
+                                </div>
+                                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                                    <div><p className="text-xs text-slate-500 font-bold mb-1">الصفحات</p><h3 className="text-lg font-bold">{new Set(activeStudents.map(s => s.page)).size}</h3></div>
+                                    <div className="text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded-full"><FileText size={20} /></div>
+                                </div>
+                                <div onClick={() => setLatestStatsOpen(true)} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between cursor-pointer hover:shadow-md">
+                                    <div className="overflow-hidden"><p className="text-xs text-slate-500 font-bold mb-1">الأحدث (عرض)</p><h3 className="text-sm font-bold truncate">{activeStudents[0]?.name || '-'}</h3></div>
+                                    <div className="text-green-500 bg-green-50 dark:bg-green-900/20 p-2 rounded-full"><Calendar size={20} /></div>
+                                </div>
+                            </div>
+
+                            <div onClick={() => { resetForm(); setModalOpen(true); }} className="mb-6 cursor-pointer group">
+                                <div className="bg-gradient-to-r from-sky-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-2xl hover:shadow-indigo-500/20 transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-white/20 transition-all"></div>
+                                    <div className="relative flex items-center justify-between">
+                                        <div className="flex items-center gap-6">
+                                            <div className="bg-white/20 p-4 rounded-full backdrop-blur-sm group-hover:scale-110 transition-transform duration-300"><Plus size={32} className="text-white" /></div>
+                                            <div><h2 className="text-2xl font-bold mb-1">إضافة طالب جديد</h2><p className="text-indigo-100 text-sm opacity-90">انقر هنا لفتح نموذج تسجيل طالب جديد</p></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="sticky top-16 z-20 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-sm py-4 -mx-4 px-4 border-b border-slate-200 dark:border-slate-800 transition-colors duration-300 mb-4 search-bar shadow-sm">
+                                <div className="relative w-full">
+                                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                                    <input type="text" placeholder="بحث شامل..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-4 pr-10 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none shadow-sm" />
+                                </div>
+                            </div>
+
+                            {/* Filters Row */}
+                            <div className="flex flex-wrap items-center gap-2 w-full justify-end mb-6">
+                                <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg border border-slate-300 dark:border-slate-600 p-1 shadow-sm">
+                                    <Filter size={16} className="mx-2 text-slate-400" />
+                                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-transparent border-none text-sm p-1.5 outline-none cursor-pointer"><option value="newest">الأحدث أولاً</option><option value="alpha">أبجدي</option><option value="qaid">حسب القيد</option></select>
+                                    <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                                    <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="bg-transparent border-none text-sm p-1.5 outline-none cursor-pointer"><option value="">السنة</option>{availableYears.map(y => <option key={y} value={y}>{y}</option>)}</select>
+                                    <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="bg-transparent border-none text-sm p-1.5 outline-none cursor-pointer"><option value="">الشهر</option>{[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m}>{m}</option>)}</select>
+                                </div>
+
+                                <div className="flex gap-2 flex-grow md:flex-grow-0">
+                                    <select 
+                                        value={selectedQaidFilter}
+                                        onChange={(e) => setSelectedQaidFilter(e.target.value)}
+                                        className="flex-grow md:w-40 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-sm rounded-lg p-2.5 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-primary shadow-sm cursor-pointer"
+                                    >
+                                        <option value="">فلتر القيد (الكل)</option>
+                                        {availableQaids.map(qaid => (
+                                            <option key={qaid} value={qaid}>{qaid}</option>
+                                        ))}
+                                    </select>
+                                    
+                                    <input
+                                        type="text"
+                                        placeholder="ص.."
+                                        value={selectedPageFilter}
+                                        onChange={(e) => setSelectedPageFilter(e.target.value)}
+                                        className="w-16 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-sm rounded-lg p-2.5 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-primary shadow-sm text-center"
+                                    />
+                                </div>
+
+                                {(selectedYear || selectedMonth || selectedQaidFilter || selectedPageFilter) && <button onClick={() => { setSelectedYear(''); setSelectedMonth(''); setSelectedQaidFilter(''); setSelectedPageFilter(''); }} className="text-red-500 text-sm">مسح</button>}
+                            </div>
+
+                            {/* Data List with "Load More" */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-4">
+                                {visibleStudents.map((student, index) => (
+                                    <div key={student.id} onClick={() => setActiveRowId(activeRowId === student.id ? null : student.id)} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 hover:shadow-md transition-shadow relative cursor-pointer">
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex items-start gap-4">
+                                                {student.personalPhoto ? (
+                                                     <img src={student.personalPhoto} alt={student.name} className="h-12 w-12 rounded-full object-cover shadow-md shrink-0 border-2 border-white dark:border-slate-700 ring-1 ring-blue-200 dark:ring-blue-900 mt-1" />
+                                                ) : (
+                                                    <div className="hidden sm:flex h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white items-center justify-center text-lg font-bold shadow-md shrink-0 border-2 border-white dark:border-slate-700 ring-1 ring-blue-200 dark:ring-blue-900 mt-1">{student.name.charAt(0)}</div>
+                                                )}
+                                                <div className="flex flex-col gap-1">
+                                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">{student.name} {student.surname}</h3>
+                                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-600 dark:text-slate-300 mt-2">
+                                                        <div className="flex items-center gap-2 px-4 py-1 rounded-full shadow-sm transition-transform hover:scale-105" style={{ backgroundColor: '#893BFF' }}>
+                                                            <span className="font-bold text-white text-sm">ق</span>
+                                                            <div className="w-px h-4 bg-white/30"></div>
+                                                            <span className="font-mono font-bold text-white text-lg tracking-wider">{student.qaid}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 px-4 py-1 rounded-full shadow-sm transition-transform hover:scale-105" style={{ backgroundColor: '#FFE87C' }}>
+                                                            <span className="font-bold text-slate-800 text-sm">ص</span>
+                                                            <div className="w-px h-4 bg-slate-800/20"></div>
+                                                            <span className="font-mono font-bold text-slate-900 text-base">{student.page}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-700/50 px-2 py-1 rounded-md border border-slate-100 dark:border-slate-700 h-full">
+                                                            <Clock size={14} className="text-slate-400" />
+                                                            <span className="text-xs">{new Date(student.timestamp).toLocaleDateString('ar-EG')}</span>
+                                                        </div>
+                                                    </div>
+                                                    {student.note && <p className="text-xs text-slate-500 mt-1 flex items-center gap-1"><Info size={12} /> {student.note}</p>}
+                                                </div>
+                                            </div>
+                                            <button onClick={(e) => { e.stopPropagation(); setCurrentProfileStudent(student); setProfileModalOpen(true); }} className="text-slate-400 hover:text-primary"><Eye size={20} /></button>
+                                        </div>
+                                        {activeRowId === student.id && (
+                                            <div className="absolute left-4 top-12 flex items-center gap-1 animate-in fade-in slide-in-from-top-2 z-20 bg-slate-800 text-white p-1.5 rounded-lg shadow-xl">
+                                                <button onClick={(e) => { e.stopPropagation(); setSinglePrintStudent(student); setPrintMode('single'); setPrintModalOpen(true); }} className="p-1.5 hover:bg-slate-700 rounded"><Printer size={16}/></button>
+                                                <button onClick={(e) => { e.stopPropagation(); setFormData({name: student.name, surname: student.surname, qaid: student.qaid, page: student.page, note: student.note}); setEditingId(student.id); setModalOpen(true); }} className="p-1.5 hover:bg-blue-600 rounded text-blue-300"><Edit size={16}/></button>
+                                                <button onClick={(e) => { e.stopPropagation(); setDeleteId(student.id); }} className="p-1.5 hover:bg-red-600 rounded text-red-300"><Trash2 size={16}/></button>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Load More Button */}
+                            {visibleCount < filteredStudents.length ? (
+                                <div className="flex justify-center mt-6">
+                                    <button 
+                                        onClick={() => setVisibleCount(prev => prev + LOAD_MORE_COUNT)}
+                                        className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 px-6 py-2 rounded-full shadow-sm hover:shadow-md hover:text-primary transition-all flex items-center gap-2 font-medium"
+                                    >
+                                        <ChevronDown size={20} />
+                                        عرض المزيد من الطلاب ({filteredStudents.length - visibleCount} متبقي)
+                                    </button>
+                                </div>
+                            ) : filteredStudents.length > 0 ? (
+                                <p className="text-center text-slate-400 text-sm mt-6">تم عرض جميع النتائج</p>
+                            ) : (
+                                <p className="text-center text-slate-400 mt-6">لا توجد نتائج مطابقة</p>
+                            )}
+                        </main>
+                    </div>
+
+                    {/* --- MODALS --- */}
+
+                    {/* Profile Modal */}
+                    {profileModalOpen && currentProfileStudent && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm profile-modal" onClick={(e) => e.target === e.currentTarget && setProfileModalOpen(false)}>
+                            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden">
+                                {/* Profile Header */}
+                                <div className="relative bg-gradient-to-r from-blue-600 to-indigo-700 h-32 flex-shrink-0">
+                                    <button onClick={() => setProfileModalOpen(false)} className="absolute top-4 left-4 bg-white/20 hover:bg-white/30 text-white p-2 rounded-full"><X size={20}/></button>
+                                    <div className="absolute -bottom-12 right-8 flex items-end">
+                                        <div className="relative group">
+                                            {currentProfileStudent.personalPhoto ? (
+                                                <img src={currentProfileStudent.personalPhoto} className="w-24 h-24 rounded-full border-4 border-white dark:border-slate-800 object-cover shadow-lg bg-white" alt="Profile" />
+                                            ) : (
+                                                <div className="w-24 h-24 rounded-full border-4 border-white dark:border-slate-800 bg-slate-200 flex items-center justify-center text-3xl font-bold text-slate-500 shadow-lg">{currentProfileStudent.name.charAt(0)}</div>
+                                            )}
+                                            <button onClick={() => profilePicInputRef.current.click()} className="absolute bottom-0 left-0 bg-primary text-white p-1.5 rounded-full shadow-md hover:bg-blue-600"><Camera size={14}/></button>
+                                            <input type="file" ref={profilePicInputRef} className="hidden" accept="image/*" onChange={handleProfilePicUpload} />
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="pt-14 px-8 pb-4 border-b dark:border-slate-700 flex justify-between items-start">
+                                    <div>
+                                        <h1 className="text-2xl font-bold">{currentProfileStudent.name} {currentProfileStudent.surname}</h1>
+                                        <div className="flex gap-4 mt-2 text-sm text-slate-600 dark:text-slate-300">
+                                            <span className="flex items-center gap-1"><Hash size={14}/> قيد: <span className="font-mono font-bold">{currentProfileStudent.qaid}</span></span>
+                                            <span className="flex items-center gap-1"><FileText size={14}/> صفحة: <span className="font-mono font-bold">{currentProfileStudent.page}</span></span>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => documentInputRef.current.click()} className="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold shadow-sm"><Upload size={18}/> إضافة مستند</button>
+                                    <input type="file" ref={documentInputRef} className="hidden" accept="image/*" onChange={handleDocumentUpload} />
+                                </div>
+
+                                {/* Content Area */}
+                                <div className="flex-grow overflow-y-auto p-8 bg-slate-50 dark:bg-slate-900/50">
+                                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><ImageIcon size={20}/> المستندات والأوراق الثبوتية</h3>
+                                    {!telegramToken ? (
+                                        <div className="bg-amber-100 text-amber-800 p-4 rounded-xl border border-amber-200 flex items-center gap-3">
+                                            <AlertTriangle/>
+                                            <div>
+                                                <p className="font-bold">ميزة الصور غير مفعلة</p>
+                                                <p className="text-sm">يرجى الذهاب إلى الإعدادات وإضافة Token و Chat ID الخاص بـ Telegram لتفعيل رفع الصور.</p>
+                                            </div>
+                                        </div>
+                                    ) : (currentProfileStudent.documents && currentProfileStudent.documents.length > 0) ? (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                            {currentProfileStudent.documents.map((docItem, idx) => (
+                                                <div key={docItem.id || idx} className="group relative aspect-[3/4] rounded-xl overflow-hidden shadow-sm border dark:border-slate-700 bg-white dark:bg-slate-800">
+                                                    <img src={docItem.url} alt="Document" className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                                        <button onClick={(e) => handlePreviewImage(e, docItem.url)} title="عرض" className="p-2 bg-white/20 text-white rounded-full hover:bg-white/40 backdrop-blur-sm"><Eye size={20}/></button>
+                                                        <button onClick={(e) => handleDownloadDocument(e, docItem)} title="تحميل" className="p-2 bg-blue-500/80 text-white rounded-full hover:bg-blue-600 backdrop-blur-sm"><Download size={20}/></button>
+                                                        <button onClick={(e) => handleDeleteDocument(e, docItem)} title="حذف" className="p-2 bg-red-500/80 text-white rounded-full hover:bg-red-600 backdrop-blur-sm"><Trash2 size={20}/></button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-12 text-slate-400">
+                                            <ImageIcon size={48} className="mx-auto mb-2 opacity-50"/>
+                                            <p>لا توجد مستندات مرفقة</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Image Preview Modal (Lightbox) */}
+                    {previewImage && (
+                        <div className="fixed inset-0 z-[70] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md image-preview-modal" onClick={() => setPreviewImage(null)}>
+                            <button className="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"><X size={32}/></button>
+                            <img src={previewImage} alt="Preview" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
+                        </div>
+                    )}
+
+                    {/* Add/Edit Modal */}
+                    {modalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm add-modal" onClick={(e) => e.target === e.currentTarget && setModalOpen(false)}>
+                            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                                <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                                    <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">{editingId ? <Edit size={24}/> : <Plus size={24}/>} {editingId ? 'تعديل طالب' : 'إضافة طالب'}</h2>
+                                    <button onClick={() => setModalOpen(false)}><X size={24} /></button>
+                                </div>
+                                <form onSubmit={handleSave} className="p-6 overflow-y-auto space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-sm font-bold">الاسم <span className="text-red-500">*</span></label>
+                                            <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full p-3 rounded-lg border dark:bg-slate-700 outline-none" placeholder="الاسم الأول" />
+                                            {similarStudents.length > 0 && (
+                                                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                                    <p className="text-xs text-yellow-700 font-bold mb-1">أسماء مشابهة:</p>
+                                                    <ul className="space-y-1">
+                                                        {similarStudents.map(s => (
+                                                            <li key={s.id} className="text-xs text-slate-600 flex justify-between border-b last:border-0 pb-0.5">
+                                                                <span>{s.name} {s.surname}</span> <span className="font-mono text-[10px]">{s.qaid}</span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
                                             )}
                                         </div>
-                                    );
-                                }
-                                return (
-                                    <div key={q.id} className="group relative flex items-start gap-4 hover:bg-slate-50 transition-colors rounded p-1 -mx-1">
-                                        <ActionButtons />
-                                        <div className="flex-grow text-right">
-                                            <div className="w-full">
-                                                <p className="text-slate-900 text-justify" style={questionStyle}><span className="whitespace-nowrap ml-2 font-bold inline-block" style={{ ...questionStyle, textDecoration: 'underline' }}>{q.label ? q.label : `س ${index + 1} /`}</span>{q.text}</p>
-                                                {q.subPoints && q.subPoints.length > 0 && (
-                                                    <>
-                                                        {q.subPointsStyle === 'inline' ? (<div className="mt-1 text-slate-900 text-right" style={subPointStyle}>{q.subPoints.map((point, i) => (<span key={i} className="ml-6 inline-block">{i + 1}- {point}</span>))}</div>) : (<div className="mt-1 mr-4">{q.subPoints.map((point, i) => (<div key={i} className="text-slate-900" style={subPointStyle}>{i + 1}- {point}</div>))}</div>)}
-                                                    </>
-                                                )}
-                                                {(q.type === QuestionType.MultipleChoice || (q.options && q.options.length > 0)) && (<div className="mt-1 grid grid-cols-2 md:grid-cols-4 gap-4 px-4">{q.options?.map((opt, i) => (<span key={i} className="text-base text-slate-800 leading-tight">{i + 1}. {opt}</span>))}</div>)}
-                                                {q.type === QuestionType.TrueFalse && (<div className="mt-0.5 text-slate-600 text-sm">(صح / خطأ)</div>)}
-                                            </div>
-                                            {showAnswers && q.correctAnswer && (<div className="mt-2 mr-10 p-2 bg-green-50 text-green-800 text-sm border border-green-200 inline-block no-print">الجواب: {q.correctAnswer}</div>)}
+                                        <div className="space-y-1">
+                                            <label className="text-sm font-bold">اللقب</label>
+                                            <input type="text" value={formData.surname} onChange={e => setFormData({...formData, surname: e.target.value})} className="w-full p-3 rounded-lg border dark:bg-slate-700 outline-none" placeholder="اللقب" />
                                         </div>
-                                        {!q.hidePoints && (<div className="flex-shrink-0 w-16 text-left font-bold pt-1"><span className="inline-block border border-slate-800 rounded-full px-2 py-0.5 text-sm min-w-[3rem] text-center leading-tight">{q.points} د</span></div>)}
                                     </div>
-                                );
-                            })}
-                        </div>
-                        <div className="absolute bottom-6 left-0 right-0 px-6">
-                            <div className="flex justify-between items-end mt-4 pt-4">
-                                <div className="text-center w-1/3"><p className="font-bold">{header.teacherLabel || 'مدرس المادة'}</p><p className="mt-4 text-slate-800">{header.teacherName || '..................'}</p></div>
-                                <div className="text-center w-1/3"><p className="font-bold text-lg">دعائي لكم بالنجاح</p></div>
-                                <div className="text-center w-1/3"></div>
+                                    <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-700/30 p-4 rounded-xl">
+                                        <div className="space-y-1"><label className="text-sm font-bold">القيد *</label><input required type="text" value={formData.qaid} onChange={e => setFormData({...formData, qaid: e.target.value})} className="w-full p-3 rounded-lg border dark:bg-slate-800 outline-none font-mono" /></div>
+                                        <div className="space-y-1"><label className="text-sm font-bold">الصفحة *</label><input required type="text" value={formData.page} onChange={e => setFormData({...formData, page: e.target.value})} className="w-full p-3 rounded-lg border dark:bg-slate-800 outline-none font-mono" /></div>
+                                        {!editingId && lastSavedStudent && <button type="button" onClick={handleCopyLast} className="col-span-2 text-xs text-primary flex items-center gap-1 hover:underline"><Copy size={14}/> نسخ القيد والصفحة السابق</button>}
+                                    </div>
+                                    <div className="space-y-1"><label className="text-sm font-bold">ملاحظات</label><textarea rows={3} value={formData.note} onChange={e => setFormData({...formData, note: e.target.value})} className="w-full p-3 rounded-lg border dark:bg-slate-700 outline-none"></textarea></div>
+                                    <div className="pt-4 flex justify-end gap-3">
+                                        <button type="button" onClick={() => setModalOpen(false)} className="px-6 py-2.5 rounded-lg border">إلغاء</button>
+                                        <button type="submit" disabled={loading} className="px-6 py-2.5 rounded-lg bg-primary text-white font-bold flex items-center gap-2">{loading ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />} حفظ</button>
+                                    </div>
+                                </form>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    )}
+
+                    {/* Settings Modal */}
+                    {settingsOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm settings-modal" onClick={(e) => e.target === e.currentTarget && setSettingsOpen(false)}>
+                            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md p-6">
+                                <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold flex items-center gap-2"><Settings size={24} /> الإعدادات</h2><button onClick={() => setSettingsOpen(false)}><X size={20} /></button></div>
+                                <div className="space-y-6">
+                                    <div className="space-y-3">
+                                        <h3 className="font-bold text-sm text-slate-500 uppercase">عام</h3>
+                                        <button onClick={toggleDarkMode} className="w-full p-3 flex justify-between bg-slate-50 rounded-xl border"><div className="flex gap-2">{darkMode ? <Moon size={20}/> : <Sun size={20}/>} <span>الوضع {darkMode ? 'الليلي' : 'النهاري'}</span></div></button>
+                                        <button onClick={() => { setRecycleBinOpen(true); setSettingsOpen(false); }} className="w-full p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-200 flex gap-2"><Trash2 size={20}/> سلة المحذوفات ({deletedStudents.length})</button>
+                                        <button onClick={() => { handleExport(); setSettingsOpen(false); }} className="w-full p-3 bg-green-50 text-green-600 rounded-xl border border-green-200 flex gap-2"><FileDown size={20}/> تصدير Excel</button>
+                                        <label className="flex items-center justify-center gap-2 w-full p-3 border-2 border-dashed rounded-xl cursor-pointer hover:bg-slate-50"><Upload size={20}/> استيراد Excel<input type="file" accept=".xlsx" onChange={handleImport} ref={fileInputRef} className="hidden" /></label>
+                                    </div>
+                                    <div className="pt-6 border-t"><h3 className="font-bold text-sm text-red-500 uppercase mb-3">منطقة الخطر</h3><button onClick={() => setMasterDeleteOpen(true)} className="w-full p-3 bg-red-50 text-red-600 rounded-xl border border-red-200 flex justify-center gap-2"><ShieldAlert size={20}/> حذف شامل</button></div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Loading/Progress Overlay */}
+                    {loading && (
+                        <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center">
+                            <div className="bg-white p-8 rounded-xl flex flex-col items-center w-80">
+                                <Loader2 className="animate-spin text-primary mb-4" size={40} />
+                                <p className="font-bold text-lg mb-2">{loadingText}</p>
+                                {progress > 0 && (
+                                    <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-2">
+                                        <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style={{width: `${progress}%`}}></div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Recycle Bin & Delete Modals (Existing logic preserved, just simplified JSX for brevity) */}
+                    {recycleBinOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm recycle-bin-modal" onClick={(e) => e.target === e.currentTarget && setRecycleBinOpen(false)}>
+                            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl h-[80vh] flex flex-col">
+                                <div className="p-4 border-b flex justify-between items-center"><h2 className="text-xl font-bold flex gap-2"><Trash2/> سلة المحذوفات ({deletedStudents.length})</h2><div className="flex gap-2">{deletedStudents.length > 0 && <button onClick={handleEmptyTrash} className="text-red-600 font-bold text-sm px-3 py-1 bg-red-50 rounded">إفراغ الكل</button>}<button onClick={() => setRecycleBinOpen(false)}><X/></button></div></div>
+                                <div className="flex-grow overflow-y-auto p-4 custom-scrollbar space-y-2">
+                                    {deletedStudents.map(s => (
+                                        <div key={s.id} className="bg-white dark:bg-slate-700 p-3 rounded border flex justify-between items-center">
+                                            <div><p className="font-bold">{s.name}</p><p className="text-xs text-gray-500">حذف: {new Date(s.deletedAt).toLocaleDateString()}</p></div>
+                                            <div className="flex gap-2"><button onClick={() => handleRestore(s)} className="text-blue-500 text-sm">استعادة</button><button onClick={() => handlePermanentDelete(s.id)} className="text-red-500 text-sm">حذف نهائي</button></div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Stats Details Modals */}
+                    {qaidStatsOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm stats-detail-modal" onClick={(e) => e.target === e.currentTarget && setQaidStatsOpen(false)}><div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-2xl h-[80vh] overflow-y-auto"><h2 className="text-xl font-bold mb-4">تفاصيل القيود</h2><div className="grid grid-cols-3 gap-4">{qaidStats.map(s => <div key={s.qaid} className="border p-3 rounded text-center"><div className="text-2xl font-mono font-bold text-primary">{s.qaid}</div><div className="text-xs text-gray-500">صفحات: {s.pageCount} | طلاب: {s.studentCount}</div></div>)}</div></div></div>}
+                    {latestStatsOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm stats-detail-modal" onClick={(e) => e.target === e.currentTarget && setLatestStatsOpen(false)}><div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-2xl h-[80vh] overflow-y-auto"><h2 className="text-xl font-bold mb-4">آخر الإضافات</h2><table className="w-full text-right text-sm"><thead><tr className="bg-gray-100"><th>الاسم</th><th>قيد</th><th>صفحة</th><th>تاريخ</th></tr></thead><tbody>{latest25Students.map(s => <tr key={s.id} className="border-b"><td>{s.name}</td><td>{s.qaid}</td><td>{s.page}</td><td>{new Date(s.timestamp).toLocaleDateString()}</td></tr>)}</tbody></table></div></div>}
+                    
+                    {deleteId && <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm delete-confirm-modal" onClick={(e) => e.target === e.currentTarget && setDeleteId(null)}><div className="bg-white p-6 rounded-xl text-center"><h3 className="text-xl font-bold mb-2">تأكيد الحذف</h3><p className="mb-4">نقل للسلة؟</p><div className="flex justify-center gap-4"><button onClick={() => setDeleteId(null)} className="px-4 py-2 border rounded">إلغاء</button><button onClick={handleDelete} className="px-4 py-2 bg-red-600 text-white rounded">نعم، احذف</button></div></div></div>}
+                    
+                    {masterDeleteOpen && <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80" onClick={(e) => {if(e.target===e.currentTarget) setMasterDeleteOpen(false)}}><div className="bg-white p-6 rounded-xl max-w-md w-full"><h3 className="text-xl font-bold text-red-600 mb-2">حذف شامل!</h3><p className="mb-4 text-sm">اكتب "حذف الكل" للتأكيد:</p><input className="w-full border p-2 mb-4" value={masterDeleteInput} onChange={e=>setMasterDeleteInput(e.target.value)}/><div className="flex justify-end gap-2"><button onClick={()=>setMasterDeleteOpen(false)} className="px-3 py-1 bg-gray-200 rounded">إلغاء</button><button onClick={handleMasterDelete} className="px-3 py-1 bg-red-600 text-white rounded">تأكيد</button></div></div></div>}
+
+                    {/* Print Modal */}
+                    {printModalOpen && (
+                        <div className="fixed inset-0 z-50 bg-white flex flex-col print-modal-container">
+                            <div className="no-print p-4 border-b flex justify-between bg-slate-100"><h2 className="font-bold">الطباعة</h2><div className="flex gap-2"><button onClick={() => window.print()} className="bg-blue-600 text-white px-4 rounded">طباعة</button><button onClick={() => setPrintModalOpen(false)} className="bg-gray-300 px-4 rounded">إغلاق</button></div></div>
+                            <div className="flex-grow overflow-auto p-4 bg-white text-black">
+                                {printMode === 'menu' && (
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto mt-10">
+                                        <button onClick={() => setPrintMode('full')} className="p-8 border-2 rounded-xl hover:border-primary text-center"><FileSpreadsheet size={40} className="mx-auto mb-2 text-blue-500"/> سجل كامل</button>
+                                        <button onClick={() => setPrintMode('single')} className="p-8 border-2 rounded-xl hover:border-purple-500 text-center"><CreditCard size={40} className="mx-auto mb-2 text-purple-500"/> بطاقة مفردة</button>
+                                        <button onClick={() => setPrintMode('qaid')} className="p-8 border-2 rounded-xl hover:border-orange-500 text-center"><FolderOpen size={40} className="mx-auto mb-2 text-orange-500"/> حسب القيد</button>
+                                    </div>
+                                )}
+                                {printMode === 'single' && !singlePrintStudent && (
+                                    <div className="max-w-md mx-auto mt-10"><input autoFocus type="text" className="w-full p-4 border-2 rounded-xl text-lg" placeholder="بحث للطباعة..." value={singlePrintSearchTerm} onChange={(e) => setSinglePrintSearchTerm(e.target.value)} /><div className="mt-4 space-y-2">{singlePrintFiltered.map(s => <div key={s.id} onClick={() => setSinglePrintStudent(s)} className="p-4 border rounded cursor-pointer hover:bg-gray-50 flex justify-between"><span>{s.name}</span><Printer/></div>)}</div><button onClick={() => setPrintMode('menu')} className="mt-4 underline text-gray-500">عودة</button></div>
+                                )}
+                                {printMode === 'qaid' && !targetQaid && (
+                                    <div className="max-w-md mx-auto mt-10"><input autoFocus type="text" className="w-full p-4 border-2 rounded-xl text-lg" placeholder="بحث عن قيد..." value={singlePrintSearchTerm} onChange={(e) => setSinglePrintSearchTerm(e.target.value)} /><div className="mt-4 space-y-2">{qaidBatchFiltered.map(q => <div key={q} onClick={() => setTargetQaid(q)} className="p-4 border rounded cursor-pointer hover:bg-gray-50 flex justify-between"><span>قيد: {q}</span><Printer/></div>)}</div><button onClick={() => setPrintMode('menu')} className="mt-4 underline text-gray-500">عودة</button></div>
+                                )}
+                                <div className="print-area">
+                                    {printMode === 'single' && singlePrintStudent ? (
+                                        <div className="single-slip border-2 border-black p-8 max-w-2xl mx-auto rounded-xl mt-10 relative">
+                                            <div className="text-center border-b-2 border-black pb-4 mb-6">
+                                                <h1 className="text-2xl font-bold">{SCHOOL_NAME}</h1>
+                                                <h2 className="text-xl">بطاقة تعريف طالب</h2>
+                                            </div>
+                                            <div className="flex justify-between items-start">
+                                                <div className="space-y-4 text-right flex-grow text-lg">
+                                                    <div><span className="font-bold ml-2">الاسم:</span> {singlePrintStudent.name} {singlePrintStudent.surname}</div>
+                                                    <div><span className="font-bold ml-2">رقم القيد:</span> <span className="font-mono">{singlePrintStudent.qaid}</span></div>
+                                                    <div><span className="font-bold ml-2">رقم الصفحة:</span> <span className="font-mono">{singlePrintStudent.page}</span></div>
+                                                    <div><span className="font-bold ml-2">التاريخ:</span> {new Date(singlePrintStudent.timestamp).toLocaleDateString('ar-EG')}</div>
+                                                </div>
+                                                <div className="mr-4">
+                                                    {singlePrintStudent.personalPhoto ? (
+                                                         <img src={singlePrintStudent.personalPhoto} alt="Personal" className="w-32 h-32 object-cover border-2 border-black" />
+                                                    ) : (
+                                                         <img src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`${singlePrintStudent.name}\nقيد: ${singlePrintStudent.qaid}\nصفحة: ${singlePrintStudent.page}`)}`} alt="QR" className="border" />
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="mt-12 flex justify-between px-8 text-center"><div className="pt-8 border-t border-black w-1/3">شؤون الطلاب</div><div className="pt-8 border-t border-black w-1/3">المدير</div></div>
+                                            <div className="no-print mt-8 text-center"><button onClick={() => setSinglePrintStudent(null)} className="bg-gray-200 px-4 py-2 rounded">بحث آخر</button></div>
+                                        </div>
+                                    ) : (printMode === 'full' || (printMode === 'qaid' && targetQaid)) ? (
+                                        <div className="print-page-continuous p-8" dir="rtl">
+                                            <div className="text-center mb-6 pb-2 border-b-2 border-black"><h1 className="text-xl font-extrabold">{SCHOOL_NAME} - {targetQaid ? `قيد ${targetQaid}` : 'السجل الشامل'}</h1><p className="text-xs">التاريخ: {new Date().toLocaleDateString('ar-EG')}</p></div>
+                                            <div className="print-col-layout">
+                                                <div className="print-header-row"><div className="print-cell w-8 justify-center">#</div><div className="print-cell flex-grow">الاسم</div><div className="print-cell w-12 justify-center">قيد</div><div className="print-cell w-12 justify-center">ص</div></div>
+                                                {(targetQaid ? activeStudents.filter(s => s.qaid === targetQaid) : filteredStudents).sort((a,b)=>a.name.localeCompare(b.name,'ar')).map((s, idx) => (
+                                                    <div key={s.id} className="print-row-card"><div className="print-cell w-8 justify-center bg-gray-50 font-bold">{idx+1}</div><div className="print-cell flex-grow font-bold text-[11px]">{s.name} {s.surname}</div><div className="print-cell w-12 justify-center font-mono font-bold">{s.qaid}</div><div className="print-cell w-12 justify-center font-mono font-bold">{s.page}</div></div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {toast && <div className={`fixed bottom-6 left-6 z-[100] px-6 py-4 rounded-xl shadow-2xl text-white font-medium flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 ${toast.type==='success'?'bg-emerald-600':'bg-red-600'}`}>{toast.type==='success'?<Check size={20}/>:<AlertTriangle size={20}/>}{toast.msg}</div>}
                 </div>
             );
-        };
+        }
 
-        // 5. App Component
-        const App = () => {
-            const [header, setHeader] = useState({ directorate: 'إدارة', schoolName: '', examName: 'امتحانات نصف السنة', round: 'الدور الأول', year: '2025 - 2026', subject: '', grade: '', time: 'ساعتان', note: 'الإجابة عن جميع الأسئلة', teacherLabel: 'مدرس المادة', teacherName: '', borderStyle: 'double' });
-            const [questions, setQuestions] = useState([]);
-            const [showAnswers, setShowAnswers] = useState(false);
-            const [editingQuestion, setEditingQuestion] = useState(null);
-
-            const handleAddManualQuestion = (question) => { setQuestions(prev => [...prev, question]); };
-            const handleUpdateQuestion = (updatedQuestion) => { setQuestions(prev => prev.map(q => q.id === updatedQuestion.id ? updatedQuestion : q)); setEditingQuestion(null); };
-            const handleCancelEdit = () => { setEditingQuestion(null); };
-            const handleDeleteQuestion = (id) => { setQuestions(prev => prev.filter(q => q.id !== id)); if (editingQuestion?.id === id) { setEditingQuestion(null); } };
-            const handleEditQuestion = (question) => { setEditingQuestion(question); const formElement = document.getElementById('manual-question-form'); if (formElement) { formElement.scrollIntoView({ behavior: 'smooth' }); } };
-            const handleMoveQuestion = (id, direction) => { const index = questions.findIndex(q => q.id === id); if (index === -1) return; if (direction === 'up' && index === 0) return; if (direction === 'down' && index === questions.length - 1) return; const newQuestions = [...questions]; const targetIndex = direction === 'up' ? index - 1 : index + 1; [newQuestions[index], newQuestions[targetIndex]] = [newQuestions[targetIndex], newQuestions[index]]; setQuestions(newQuestions); };
-            const handlePrint = () => { window.print(); };
-
-            return (
-                <div className="min-h-screen flex flex-col bg-slate-100">
-                <header className="bg-white border-b border-slate-200 sticky top-0 z-50 no-print shadow-sm">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-3"><div className="bg-indigo-600 p-2 rounded-lg"><Icons.PenTool className="w-6 h-6 text-white" /></div><h1 className="text-xl font-bold text-slate-800 tracking-tight">صانع الامتحانات</h1></div>
-                    <div className="flex gap-3">
-                        {questions.length > 0 && (
-                            <>
-                                <button onClick={() => setShowAnswers(!showAnswers)} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-50 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200">{showAnswers ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}{showAnswers ? 'إخفاء الأجوبة' : 'عرض الأجوبة'}</button>
-                                <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"><Icons.Printer className="w-4 h-4" /> طباعة الورقة</button>
-                            </>
-                        )}
-                    </div>
-                    </div>
-                </header>
-                <main className="flex-grow p-4 sm:p-8">
-                    <div className="max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-12 gap-8">
-                    <div className="xl:col-span-4 no-print space-y-6">
-                        <ExamHeaderForm header={header} setHeader={setHeader} />
-                        <SeparatorForm onAddQuestion={handleAddManualQuestion} />
-                        <div id="manual-question-form"><ManualQuestionForm onAddQuestion={handleAddManualQuestion} questionToEdit={editingQuestion} onUpdateQuestion={handleUpdateQuestion} onCancelEdit={handleCancelEdit} /></div>
-                    </div>
-                    <div className="xl:col-span-8 print:w-full print:col-span-12 flex justify-center bg-slate-200/50 p-4 rounded-3xl print:p-0 print:bg-white print:block">
-                        <ExamPreview questions={questions} header={header} onDelete={handleDeleteQuestion} onEdit={handleEditQuestion} onMove={handleMoveQuestion} showAnswers={showAnswers} />
-                    </div>
-                    </div>
-                </main>
-                <footer className="bg-white border-t border-slate-200 py-6 mt-auto no-print"><div className="max-w-7xl mx-auto px-4 text-center text-slate-500 text-sm">&copy; {new Date().getFullYear()} ExamMaker. جميع الحقوق محفوظة.</div></footer>
-                </div>
-            );
-        };
-
-        // Initialize App
-        const container = document.getElementById('root');
-        const root = ReactDOM.createRoot(container);
-        root.render(<App />);
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<React.StrictMode><App /></React.StrictMode>);
+    /* ]]> */
     </script>
 </body>
 </html>
